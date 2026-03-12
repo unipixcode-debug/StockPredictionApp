@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import api from './api';
+import { useParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, BarChart2, TrendingUp, TrendingDown, 
   Zap, PieChart, Target, Info, RefreshCw, BarChart3,
@@ -26,8 +29,7 @@ const AssetDetails = () => {
         // In a real app, you'd fetch specific asset data. 
         // For now, we reuse the flow API and filter or use mock.
         try {
-            const response = await fetch(`http://localhost:5000/api/market/flow?timeframe=${timeframe}`);
-            const result = await response.json();
+            const result = await api.get(`/market/flow?timeframe=${timeframe}`);
             const asset = result.assets.find(a => a.id === assetId);
             setData(asset);
             setLoading(false);
