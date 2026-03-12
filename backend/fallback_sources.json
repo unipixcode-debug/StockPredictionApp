@@ -1,0 +1,126 @@
+[
+  {
+    "id": 1,
+    "name": "Financial Times",
+    "url": "https://ft.com/rss/home",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 2,
+    "name": "Fortune",
+    "url": "https://fortune.com/feed/",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 3,
+    "name": "WSJ Markets",
+    "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 4,
+    "name": "CNBC",
+    "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 5,
+    "name": "Seeking Alpha",
+    "url": "https://seekingalpha.com/feed.xml",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 6,
+    "name": "Yahoo Finance",
+    "url": "https://finance.yahoo.com/rss/",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 7,
+    "name": "Investing.com",
+    "url": "https://www.investing.com/rss/",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 8,
+    "name": "Barron's",
+    "url": "https://www.barrons.com/xml/rss/3_7566.xml",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 9,
+    "name": "Federal Reserve",
+    "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 10,
+    "name": "ECB",
+    "url": "https://www.ecb.europa.eu/rss/press.html",
+    "type": "NEWS_RSS",
+    "active": true
+  },
+  {
+    "id": 11,
+    "name": "Finnhub API",
+    "url": "https://finnhub.io/api/v1/news",
+    "type": "MARKET_API",
+    "active": true
+  },
+  {
+    "id": 12,
+    "name": "Marketaux",
+    "url": "https://api.marketaux.com/v1/news/all",
+    "type": "MARKET_API",
+    "active": true
+  },
+  {
+    "id": 13,
+    "name": "Alpha Vantage",
+    "url": "https://www.alphavantage.co/query?function=NEWS_SENTIMENT",
+    "type": "MARKET_API",
+    "active": true
+  },
+  {
+    "id": 14,
+    "name": "StockNewsAPI",
+    "url": "https://stocknewsapi.com/api/v1",
+    "type": "MARKET_API",
+    "active": true
+  },
+  {
+    "id": 15,
+    "name": "NewsData.io",
+    "url": "https://newsdata.io/api/1/news",
+    "type": "MARKET_API",
+    "active": true
+  },
+  {
+    "id": 16,
+    "name": "SEC EDGAR",
+    "url": "https://www.sec.gov/cgi-bin/browse-edgar",
+    "type": "MARKET_API",
+    "active": true
+  },
+  {
+    "id": 17,
+    "name": "SEC EDGAR",
+    "type": "SCRAPER",
+    "url": "https://www.sec.gov/cgi-bin/browse-edgar"
+  },
+  {
+    "id": 18,
+    "name": "Federal Reserve",
+    "type": "SCRAPER",
+    "url": "https://www.federalreserve.gov/"
+  }
+]
