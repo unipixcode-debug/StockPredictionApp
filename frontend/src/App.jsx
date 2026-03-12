@@ -156,7 +156,7 @@ function LoginScreen({ onLogin, theme, toggleTheme }) {
               onClick={onLogin}
               className="w-full premium-button flex items-center justify-center space-x-4 shadow-2xl hover:-translate-y-1 transition-all"
             >
-              <img src="https://www.google.com/favicon.ico" className="w-6 h-6 grayscale brightness-0 invert" alt="Google" />
+              <img src="https://www.google.com/favicon.ico" className="w-6 h-6" alt="Google" />
               <span className="text-lg">Google ile Giriş Yap</span>
             </button>
             

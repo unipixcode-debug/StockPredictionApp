@@ -201,7 +201,7 @@ const MoneyFlow = () => {
                                     {/* Asset Box */}
                                     <div 
                                         className={`
-                                            p-12 rounded-[3.5rem] border-2 transition-all duration-500 relative group overflow-hidden shadow-2xl
+                                            p-8 rounded-[3rem] border-2 transition-all duration-500 relative group overflow-hidden shadow-2xl
                                             ${asset.color === 'orange' ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40 shadow-amber-500/10' : ''}
                                             ${asset.color === 'cyan' ? 'bg-primary/5 border-primary/20 hover:border-primary/40 shadow-primary/10' : ''}
                                             ${asset.color === 'green' ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40 shadow-emerald-500/10' : ''}
@@ -231,11 +231,11 @@ const MoneyFlow = () => {
                                         
                                         <div className="space-y-2 mb-10">
                                             <div className="flex items-baseline space-x-3">
-                                                <span className="text-6xl font-black italic tracking-tighter">{asset.value.toFixed(1)}</span>
-                                                <span className="text-2xl font-black italic opacity-20">{asset.unit}</span>
+                                                <span className="text-5xl font-black italic tracking-tighter">{asset.value.toFixed(1)}</span>
+                                                <span className="text-xl font-black italic opacity-20">{asset.unit}</span>
                                             </div>
                                             <div className="flex items-center space-x-3">
-                                                <span className={`text-xl font-black italic shadow-text ${asset.change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                <span className={`text-3xl font-black italic shadow-text ${asset.change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                                     {asset.change > 0 ? '+' : ''}{asset.change.toFixed(2)}%
                                                 </span>
                                                 <span className="text-xs font-bold text-muted-foreground opacity-30 uppercase tracking-widest">{timeframes.find(t => t.id === timeframe).label} {t('Change') || 'Değişim'}</span>
@@ -311,7 +311,7 @@ const MoneyFlow = () => {
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            <span className={`text-sm font-black italic shadow-text ${sub.change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                            <span className={`text-xl font-black italic shadow-text ${sub.change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                                                 {sub.change > 0 ? '+' : ''}{sub.change.toFixed(2)}%
                                                             </span>
                                                         </div>
