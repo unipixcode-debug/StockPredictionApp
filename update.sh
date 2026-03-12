@@ -8,6 +8,7 @@ git pull origin main
 echo "--- 2. Building Frontend ---"
 cd frontend
 npm install
+export VITE_API_URL="/api"
 npm run build
 
 echo "--- 3. Updating Backend & Seeding Database ---"
