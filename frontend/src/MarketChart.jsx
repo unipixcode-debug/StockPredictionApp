@@ -14,8 +14,6 @@ const MarketChart = () => {
     const name = queryParams.get('name') || symbol;
     
     const [currency, setCurrency] = useState('USD');
-    const [loading, setLoading] = useState(true);
-
     // Map common names to TradingView symbols
     const getTVSymbol = (s, cur) => {
         const mapping = {
@@ -48,52 +46,6 @@ const MarketChart = () => {
 
     const tvSymbol = getTVSymbol(symbol, currency);
 
-    useEffect(() => {
-        setLoading(true);
-
-        const initWidget = () => {
-            if (window.TradingView) {
-                new window.TradingView.widget({
-                    "autosize": true,
-                    "symbol": tvSymbol,
-                    "interval": "D",
-                    "timezone": "Etc/UTC",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "tr",
-                    "toolbar_bg": "#0f172a",
-                    "enable_publishing": false,
-                    "hide_top_toolbar": false,
-                    "hide_legend": false,
-                    "save_image": false,
-                    "container_id": "tv_chart_container",
-                    "onChartReady": () => setLoading(false)
-                });
-            }
-        };
-
-        if (!document.getElementById('tradingview-tv-js')) {
-            const script = document.createElement('script');
-            script.id = 'tradingview-tv-js';
-            script.src = 'https://s3.tradingview.com/tv.js';
-            script.async = true;
-            script.onload = initWidget;
-            document.head.appendChild(script);
-        } else {
-            // Script already loaded, just initialize unless it's still loading
-            if (window.TradingView) {
-                initWidget();
-            } else {
-                // If it's script element but not loaded yet, wait
-                document.getElementById('tradingview-tv-js').addEventListener('load', initWidget);
-            }
-        }
-
-        return () => {
-            // Container content cleared by React, no need to remove script
-        };
-    }, [tvSymbol]);
-
     return (
         <motion.div 
             initial={{ opacity: 0, scale: 0.98 }}
@@ -117,7 +69,7 @@ const MarketChart = () => {
                             </div>
                         </div>
                         <p className="text-xs text-muted-foreground font-black uppercase tracking-[0.3em] mt-1 opacity-50">
-                            Piyasa Sembolü: <span className="text-foreground">{tvSymbol}</span>
+                            Piyasa Sembolü: <span className="text-foreground">{tvSymbol.replace('BINANCE:', '').replace('TVC:', '')}</span>
                         </p>
                     </div>
                 </div>
@@ -140,17 +92,11 @@ const MarketChart = () => {
 
             {/* Chart Container */}
             <div className="flex-1 glass-card relative group shadow-2xl overflow-hidden border-border/50">
-                {loading && (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-md">
-                        <div className="relative">
-                            <RefreshCw className="animate-spin text-primary w-14 h-14" />
-                            <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
-                        </div>
-                        <p className="mt-6 text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground animate-pulse">Grafik Yükleniyor...</p>
-                    </div>
-                )}
-                
-                <div id="tv_chart_container" className="absolute inset-0 w-full h-full" />
+                <iframe
+                    title="TradingView Chart"
+                    src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${tvSymbol}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Etc%2FUTC&studies=[]&locale=tr`}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                />
                 
                 {/* Decorative Borders */}
                 <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-primary/20 to-transparent" />

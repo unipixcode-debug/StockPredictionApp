@@ -130,9 +130,25 @@ class NewsService {
             allNews.forEach(item => {
                 item.importanceScore = this.calculateImportanceScore(item);
             });
+            
+            // Sort by score
             allNews.sort((a, b) => b.importanceScore - a.importanceScore);
 
-            let finalNews = allNews.slice(0, 50);
+            // Variety booster: take top news but ensure we don't just take one source
+            const sourceCounts = {};
+            const diverseNews = [];
+            for (const item of allNews) {
+                const sName = item.sourceName || 'Other';
+                sourceCounts[sName] = (sourceCounts[sName] || 0) + 1;
+                
+                // Allow up to 10 items per source in the top list to ensure variety
+                if (sourceCounts[sName] <= 10) {
+                    diverseNews.push(item);
+                }
+                if (diverseNews.length >= 60) break;
+            }
+
+            let finalNews = diverseNews;
 
             // Filter news based on query keywords
             if (query) {
