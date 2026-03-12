@@ -188,8 +188,8 @@ const MoneyFlow = () => {
             </div>
 
             {/* Money Flow Schema */}
-            <div className="relative pb-20 py-8">
-                <div className="flex flex-wrap lg:flex-nowrap items-start justify-center gap-12 lg:gap-20 px-4 md:px-12 py-8">
+            <div className="relative overflow-x-auto pb-20 py-8 scrollbar-hide">
+                <div className="flex items-start justify-center md:justify-start gap-12 lg:gap-20 min-w-[1280px] px-4 md:px-12 py-8">
                     {data.assets.map((asset, index) => {
                         const topSubAssets = asset.subAssets?.slice(0, 2) || [];
                         const hasMore = (asset.subAssets?.length || 0) > 2;
