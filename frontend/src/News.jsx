@@ -188,6 +188,24 @@ const News = () => {
                         <span>{formatDate(item.pubDate)}</span>
                     </div>
                 </div>
+                
+                {/* Importance Score Badge */}
+                <div className="ml-auto self-start">
+                    <div className={`
+                        flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-dashed
+                        ${item.importanceScore >= 80 ? 'bg-rose-500/10 border-rose-500/30 text-rose-500' : 
+                          item.importanceScore >= 60 ? 'bg-primary/10 border-primary/30 text-primary' : 
+                          'bg-secondary/50 border-border text-muted-foreground'}
+                    `}>
+                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                            item.importanceScore >= 80 ? 'bg-rose-500' : 
+                            item.importanceScore >= 60 ? 'bg-primary' : 'bg-muted-foreground'
+                        }`} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">
+                            {language === 'TR' ? 'ÖNEM:' : 'SCORE:'} {item.importanceScore || 50}
+                        </span>
+                    </div>
+                </div>
               </div>
 
               <h3 className="text-xl font-bold leading-snug mb-4 group-hover:text-primary transition-colors">

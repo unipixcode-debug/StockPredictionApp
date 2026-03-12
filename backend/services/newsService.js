@@ -24,6 +24,36 @@ class NewsService {
         };
     }
 
+    calculateImportanceScore(item) {
+        let score = 50; // Base score
+        const text = (item.title + " " + (item.contentSnippet || "")).toLowerCase();
+        
+        // High impact keywords
+        const highImpactWords = ['fed', 'faiz', 'enflasyon', 'kriz', 'çöküş', 'ralli', 'merkez bankası', 'savaş', 'rates', 'inflation', 'crisis', 'crash', 'rally', 'central bank', 'war', 'ai', 'yapay zeka', 'bitcoin', 'bankruptcy', 'iflas'];
+        // Medium impact keywords
+        const mediumImpactWords = ['bilanço', 'kar', 'zarar', 'earnings', 'profit', 'loss', 'büyüme', 'growth', 'hisse', 'stock', 'piyasa', 'market', 'yatırım', 'investment'];
+
+        for (const word of highImpactWords) {
+            if (text.includes(word)) score += 15;
+        }
+        for (const word of mediumImpactWords) {
+            if (text.includes(word)) score += 8;
+        }
+
+        // Time decay (newer is more important)
+        const ageHours = (Date.now() - new Date(item.pubDate).getTime()) / (1000 * 60 * 60);
+        if (ageHours < 1) score += 20;
+        else if (ageHours < 4) score += 10;
+        else if (ageHours < 12) score += 5;
+        else if (ageHours > 24) score -= 10;
+        else if (ageHours > 72) score -= 30;
+
+        // Add a small pseudo-random variation based on title length to break ties and make it look natural
+        score += (item.title?.length || 0) % 5;
+
+        return Math.min(Math.max(score, 10), 99); // Cap between 10 and 99
+    }
+
     async getFeedsWithNames() {
         const defaultFeeds = [
             { name: 'CNBC', url: 'https://www.cnbc.com/id/10000664/device/rss/rss.html' },
@@ -96,8 +126,11 @@ class NewsService {
 
             console.log(`Total raw news items found: ${allNews.length}`);
 
-            // Sort all news by publication date descending
-            allNews.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+            // Calculate Importance Score and Sort
+            allNews.forEach(item => {
+                item.importanceScore = this.calculateImportanceScore(item);
+            });
+            allNews.sort((a, b) => b.importanceScore - a.importanceScore);
 
             let finalNews = allNews.slice(0, 50);
 
