@@ -24,14 +24,20 @@ const MarketChart = () => {
             'Altın': cur === 'USD' ? 'TVC:GOLD' : 'OANDA:XAUTRY',
             'Gümüş': cur === 'USD' ? 'TVC:SILVER' : 'OANDA:XAGTRY',
             'Petrol': 'TVC:USOIL',
+            'Bakır': 'TVC:COPPER',
             'S&P500': 'FOREXCOM:SPXUSD',
             'Nasdaq': 'CURRENCYCOM:NAS100',
             'BIST100': 'BIST:XU100',
             'ABD 10Y': 'TVC:US10Y',
+            'ABD 2Y': 'TVC:US02Y',
+            'Almanya 10Y': 'TVC:DE10Y',
             'Türkiye 10Y': 'TVC:TR10Y',
             'BTC Dominans': 'CRYPTOCAP:BTC.D',
             'Kripto Toplam': 'CRYPTOCAP:TOTAL',
-            'Kripto Altcoin Toplam': 'CRYPTOCAP:TOTAL2'
+            'Kripto Altcoin Toplam': 'CRYPTOCAP:TOTAL2',
+            'Bitcoin': cur === 'USD' ? 'BINANCE:BTCUSDT' : 'BINANCE:BTCTRY',
+            'Ethereum': cur === 'USD' ? 'BINANCE:ETHUSDT' : 'BINANCE:ETHTRY',
+            'Solana': cur === 'USD' ? 'BINANCE:SOLUSDT' : 'BINANCE:SOLTRY'
         };
 
         if (s.endsWith('.IS')) {
@@ -44,17 +50,15 @@ const MarketChart = () => {
 
     useEffect(() => {
         setLoading(true);
-        const script = document.createElement('script');
-        script.src = 'https://s3.tradingview.com/tv.js';
-        script.async = true;
-        script.onload = () => {
+
+        const initWidget = () => {
             if (window.TradingView) {
                 new window.TradingView.widget({
                     "autosize": true,
                     "symbol": tvSymbol,
                     "interval": "D",
                     "timezone": "Etc/UTC",
-                    "theme": "dark", // We can dynamic this if TV supports light theme well
+                    "theme": "dark",
                     "style": "1",
                     "locale": "tr",
                     "toolbar_bg": "#0f172a",
@@ -67,12 +71,26 @@ const MarketChart = () => {
                 });
             }
         };
-        document.head.appendChild(script);
+
+        if (!document.getElementById('tradingview-tv-js')) {
+            const script = document.createElement('script');
+            script.id = 'tradingview-tv-js';
+            script.src = 'https://s3.tradingview.com/tv.js';
+            script.async = true;
+            script.onload = initWidget;
+            document.head.appendChild(script);
+        } else {
+            // Script already loaded, just initialize unless it's still loading
+            if (window.TradingView) {
+                initWidget();
+            } else {
+                // If it's script element but not loaded yet, wait
+                document.getElementById('tradingview-tv-js').addEventListener('load', initWidget);
+            }
+        }
 
         return () => {
-            if (script.parentNode) {
-                script.parentNode.removeChild(script);
-            }
+            // Container content cleared by React, no need to remove script
         };
     }, [tvSymbol]);
 
