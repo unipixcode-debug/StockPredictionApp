@@ -1,6 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { OpenAI } = require('openai');
 const axios = require('axios');
+const emailService = require('./emailService');
 
 class AIService {
     constructor() {
@@ -107,7 +108,25 @@ class AIService {
             }
         }
 
+        // If we get here, all providers failed
+        if (this.isQuotaError(lastError)) {
+            emailService.sendQuotaExhaustedAlert('Tüm Mevcut AI Sağlayıcıları');
+        }
+
         throw new Error(`All AI providers failed. Last error: ${lastError?.message || 'Unknown'}`);
+    }
+
+    isQuotaError(error) {
+        if (!error) return false;
+        const msg = error.message?.toLowerCase() || "";
+        const status = error.response?.status;
+        return (
+            status === 429 || 
+            msg.includes("quota") || 
+            msg.includes("limit") || 
+            msg.includes("exhausted") || 
+            msg.includes("credit")
+        );
     }
 
     async translateNewsItems(newsItems, targetLang) {

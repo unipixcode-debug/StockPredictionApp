@@ -60,16 +60,12 @@ class FlowService {
                 {
                     id: 'crypto',
                     name: 'KRİPTO',
-                    value: this.calcValue(baseValues.crypto, (indicators.btc?.change || 0) * mult),
-                    change: (indicators.btc?.change || 0) * mult,
-                    flowAmount: Math.abs(baseValues.crypto * (indicators.btc?.change || 0) / 100) * 1.5 * mult,
+                    value: this.calcValue(baseValues.crypto, (indicators['BTC-USD']?.change || 0) * mult),
+                    change: (indicators['BTC-USD']?.change || 0) * mult,
+                    flowAmount: Math.abs(baseValues.crypto * (indicators['BTC-USD']?.change || 0) / 100) * 1.5 * mult,
                     color: 'cyan',
                     unit: 'T$',
-                    subAssets: [
-                        { name: 'Bitcoin', value: 1.3, change: (indicators.btc?.change || 0) * mult, price: indicators.btc?.price },
-                        { name: 'Ethereum', value: 0.4, change: (indicators.eth?.change || 0) * mult, price: indicators.eth?.price },
-                        { name: 'Diğer', value: 0.9, change: (indicators.btc?.change || 0) * 0.8 * mult }
-                    ]
+                    subAssets: this.getCryptoSubAssets(indicators, mult)
                 },
                 {
                     id: 'stocks',
@@ -118,6 +114,56 @@ class FlowService {
         };
 
         return flowData;
+    }
+
+    getCryptoSubAssets(indicators, mult) {
+        // Calculate Dominance metrics
+        const cryptoKeys = Object.keys(indicators).filter(k => k.endsWith('-USD'));
+        const totalMCap = cryptoKeys.reduce((acc, k) => acc + (indicators[k]?.marketCap || 0), 0);
+        
+        const getDom = (sym) => {
+            const mcap = indicators[sym]?.marketCap || 0;
+            return totalMCap > 0 ? (mcap / totalMCap) * 100 : 0;
+        };
+
+        const btcDom = getDom('BTC-USD');
+        const ethDom = getDom('ETH-USD');
+        const xrpDom = getDom('XRP-USD');
+        const usdtDom = getDom('USDT-USD');
+        const altDom = 100 - btcDom;
+
+        // Base sub-assets (Dominance metrics)
+        const subs = [
+            { name: 'Bitcoin Dominans', value: btcDom, change: (indicators['BTC-USD']?.change || 0) * mult, symbol: 'CRYPTOCAP:BTC.D', unit: '%' },
+            { name: 'Altcoin Dominans', value: altDom, change: 0, symbol: 'CRYPTOCAP:OTHERS.D', unit: '%' },
+            { name: 'XRP Dominans', value: xrpDom, change: (indicators['XRP-USD']?.change || 0) * mult, symbol: 'CRYPTOCAP:XRP.D', unit: '%' },
+            { name: 'USDT Dominans', value: usdtDom, change: 0, symbol: 'CRYPTOCAP:USDT.D', unit: '%' },
+        ];
+
+        // Add Top 100 individual coins (limited for UI sanity, user asked for top 100 but we might want to slice or keep all)
+        cryptoKeys.forEach(k => {
+            const name = k.replace('-USD', '');
+            if (['BTC', 'ETH', 'XRP', 'USDT'].includes(name)) {
+                subs.push({
+                    name: name === 'BTC' ? 'Bitcoin' : name,
+                    value: (indicators[k]?.marketCap || 0) / 1e12, // Convert to Trillions for display consistency
+                    change: (indicators[k]?.change || 0) * mult,
+                    price: indicators[k]?.price,
+                    symbol: k
+                });
+            } else {
+                // Other top coins
+                subs.push({
+                    name: name,
+                    value: (indicators[k]?.marketCap || 0) / 1e12,
+                    change: (indicators[k]?.change || 0) * mult,
+                    price: indicators[k]?.price,
+                    symbol: k
+                });
+            }
+        });
+
+        return subs.sort((a, b) => (b.value || 0) - (a.value || 0));
     }
 
     calcValue(base, changePercent) {
