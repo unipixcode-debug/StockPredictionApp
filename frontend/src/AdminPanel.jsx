@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
     Database, Plus, Trash2, Globe, Server, 
-    Rss, Code, ShieldCheck, Zap, ArrowRight, RefreshCw, Palette, CheckCircle2, XCircle, Coins, Lock, Gift
+    Rss, Code, ShieldCheck, Zap, ArrowRight, RefreshCw, Palette, CheckCircle2, XCircle, Coins, Lock, Gift,
+    Search, List, History, Terminal
 } from 'lucide-react';
 import api from './api';
 import { useTheme } from './ThemeContext';
@@ -33,13 +34,27 @@ const AdminPanel = () => {
   });
   const [creditLogs, setCreditLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [adminLogs, setAdminLogs] = useState([]);
+  const [loadingAdminLogs, setLoadingAdminLogs] = useState(false);
 
   useEffect(() => {
     fetchSources();
     fetchPricing();
     fetchFeatureToggles();
     fetchCreditLogs();
+    fetchAdminLogs();
   }, []);
+
+  const fetchAdminLogs = async () => {
+    setLoadingAdminLogs(true);
+    try {
+      const logs = await api.get('/admin/logs');
+      setAdminLogs(logs);
+    } catch (e) {} finally {
+      setLoadingAdminLogs(false);
+    }
+  };
 
   const fetchFeatureToggles = async () => {
     try {
@@ -472,7 +487,19 @@ const AdminPanel = () => {
               <p className="text-xs text-muted-foreground">Kullanıcı bazında kalan kredi ve paket bilgisi</p>
             </div>
           </div>
-          <button onClick={fetchCreditLogs} className="text-xs font-bold text-primary hover:opacity-70 transition-opacity"><RefreshCw size={14} /></button>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+              <input
+                type="text"
+                placeholder="Kullanıcı Ara..."
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+                className="bg-secondary/30 border border-border rounded-xl py-1.5 pl-9 pr-4 text-xs font-bold focus:outline-none focus:border-primary/50 transition-all w-48 md:w-64"
+              />
+            </div>
+            <button onClick={fetchCreditLogs} className="text-xs font-bold text-primary hover:opacity-70 transition-opacity"><RefreshCw size={14} /></button>
+          </div>
         </div>
         {loadingLogs ? (
           <div className="text-center py-8 text-muted-foreground text-sm">Yükleniyor...</div>
@@ -489,7 +516,12 @@ const AdminPanel = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {creditLogs.map(u => (
+                {creditLogs
+                  .filter(u => 
+                    (u.name?.toLowerCase().includes(userSearchTerm.toLowerCase())) || 
+                    (u.email?.toLowerCase().includes(userSearchTerm.toLowerCase()))
+                  )
+                  .map(u => (
                   <tr key={u.id} className="text-muted-foreground">
                     <td className="py-3 pr-4 font-bold text-foreground">{u.name || u.email}</td>
                     <td className="py-3 pr-4">
@@ -517,14 +549,63 @@ const AdminPanel = () => {
                     </td>
                   </tr>
                 ))}
-                {creditLogs.length === 0 && (
-                  <tr><td colSpan={4} className="py-8 text-center text-muted-foreground text-xs">Henüz kullanıcı yok</td></tr>
+                {creditLogs.filter(u => 
+                    (u.name?.toLowerCase().includes(userSearchTerm.toLowerCase())) || 
+                    (u.email?.toLowerCase().includes(userSearchTerm.toLowerCase()))
+                ).length === 0 && (
+                  <tr><td colSpan={5} className="py-8 text-center text-muted-foreground text-xs">Aramaya uygun kullanıcı bulunamadı</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Admin Activity Logs */}
+      <div className="premium-card p-6 mt-8 border border-border">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="p-3 rounded-2xl bg-amber-500/10"><History className="text-amber-400" size={20} /></div>
+            <div>
+              <h3 className="text-lg font-black uppercase tracking-tight">Sistem Günlüğü</h3>
+              <p className="text-xs text-muted-foreground">Son 50 admin hareketi</p>
+            </div>
+          </div>
+          <button onClick={fetchAdminLogs} className="text-xs font-bold text-primary hover:opacity-70 transition-opacity"><RefreshCw size={14} /></button>
+        </div>
+        
+        {loadingAdminLogs ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">Günlükler yükleniyor...</div>
+        ) : (
+          <div className="space-y-3">
+            {adminLogs.map(log => (
+              <div key={log.id} className="p-3 rounded-xl bg-secondary/10 border border-border/50 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-[10px] font-black">
+                    <Terminal size={12} />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-black text-foreground uppercase">{log.adminName}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-bold">{log.action}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {log.action === 'UPDATE_CREDITS' ? `Hedef: ${log.details.user} (${log.details.newValue} Kredi)` : `Ayar: ${log.targetId} -> ${log.details.newValue}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-[9px] font-black text-muted-foreground/40 uppercase">
+                  {new Date(log.createdAt).toLocaleString('tr-TR')}
+                </div>
+              </div>
+            ))}
+            {adminLogs.length === 0 && (
+              <div className="py-8 text-center text-muted-foreground text-xs">Henüz bir hareket kaydedilmemiş</div>
+            )}
+          </div>
+        )}
+      </div>
+
 
       {/* Developer-Only: Token Pricing Settings */}
       <div className="premium-card p-6 mt-8 border-2 border-amber-500/20 bg-amber-500/5">

@@ -4,7 +4,7 @@ import {
     ActivityIndicator, Switch, TextInput, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, Zap, Coins, Lock, Users, RefreshCw, CheckCircle, Gift } from 'lucide-react-native';
+import { Settings, Zap, Coins, Lock, Users, RefreshCw, CheckCircle, Gift, Search } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 
 const API_BASE = Config.API_BASE;
@@ -33,6 +33,7 @@ const AdminScreen = () => {
     const [loading, setLoading] = useState(true);
     const [savingKey, setSavingKey] = useState<string | null>(null);
     const [savedKey, setSavedKey] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         fetchAll();
@@ -191,10 +192,28 @@ const AdminScreen = () => {
                             <Coins color="#4ade80" size={18} />
                             <Text style={styles.sectionTitle}>Kredi Kullanım Dökümü</Text>
                         </View>
-                        {creditLogs.length === 0 ? (
-                            <Text style={styles.emptyText}>Henüz kullanıcı yok</Text>
+
+                        {/* Search Bar */}
+                        <View style={styles.searchContainer}>
+                            <Search color="rgba(255,255,255,0.3)" size={16} />
+                            <TextInput
+                                placeholder="Kullanıcı Ara (Ad veya E-posta)..."
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                style={styles.searchInput}
+                            />
+                        </View>
+                        {creditLogs.filter(u => 
+                            (u.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || 
+                            (u.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+                        ).length === 0 ? (
+                            <Text style={styles.emptyText}>Sonuç bulunamadı</Text>
                         ) : (
-                            creditLogs.map(u => (
+                            creditLogs.filter(u => 
+                                (u.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || 
+                                (u.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+                            ).map(u => (
                                 <View key={u.id} style={styles.userRow}>
                                     <View style={styles.userInfo}>
                                         <Text style={styles.userName}>{u.name || u.email}</Text>
@@ -285,6 +304,8 @@ const styles = StyleSheet.create({
     toggleInfo: { flex: 1 },
     toggleLabel: { fontSize: 14, fontWeight: '700', color: 'white' },
     toggleDesc: { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingHorizontal: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    searchInput: { flex: 1, height: 40, color: 'white', fontSize: 13, fontWeight: '600', marginLeft: 8 },
     emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', paddingVertical: 12 },
     userRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
     userInfo: { flex: 1 },

@@ -20,6 +20,7 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   'arrow.up.arrow.down': 'swap-vert',
   'newspaper.fill': 'newspaper',
+  'gearshape.fill': 'settings',
 } as IconMapping;
 
 /**

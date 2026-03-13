@@ -3,6 +3,7 @@ const router = express.Router();
 const DataSource = require('../models/DataSource');
 const User = require('../models/User');
 const GlobalSetting = require('../models/GlobalSetting');
+const AdminLog = require('../models/AdminLog');
 const { isAdmin } = require('../middleware/auth');
 
 const fs = require('fs');
@@ -113,10 +114,29 @@ router.put('/users/:id/credits', async (req, res) => {
         const { credits, tier } = req.body;
         const user = await User.findByPk(req.params.id);
         if (!user) return res.status(404).json({ error: 'User not found' });
+        
+        const prevCredits = user.credits;
+        const prevTier = user.tier;
+
         await user.update({ 
             ...(credits !== undefined && { credits }), 
             ...(tier !== undefined && { tier }) 
         });
+
+        // Log the action
+        await AdminLog.create({
+            adminId: req.user?.id || 'dev-id',
+            adminName: req.user?.name || 'Developer',
+            action: 'UPDATE_CREDITS',
+            targetId: user.id,
+            details: {
+                user: user.email,
+                prevCredits, newValue: user.credits,
+                prevTier, newTier: user.tier
+            },
+            ipAddress: req.ip
+        });
+
         res.json({ message: 'User updated', credits: user.credits, tier: user.tier });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -157,7 +177,31 @@ router.put('/settings/:key', developerCheck, async (req, res) => {
             key: req.params.key,
             value: String(value),
         });
+
+        // Log the action
+        await AdminLog.create({
+            adminId: req.user?.id || 'dev-id',
+            adminName: req.user?.name || 'Developer',
+            action: 'UPDATE_SETTING',
+            targetId: req.params.key,
+            details: { newValue: value },
+            ipAddress: req.ip
+        });
+
         res.json({ message: 'Setting updated', setting });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin loglarını listele
+router.get('/logs', async (req, res) => {
+    try {
+        const logs = await AdminLog.findAll({
+            order: [['createdAt', 'DESC']],
+            limit: 50
+        });
+        res.json(logs);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
