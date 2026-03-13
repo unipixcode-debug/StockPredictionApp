@@ -211,6 +211,13 @@ const Dashboard = () => {
           <p className="text-muted-foreground font-medium mt-1">{t('GlobalAnalysis')}</p>
         </div>
         <div className="flex items-center space-x-4">
+          <button
+            onClick={() => window.location.href = '/admin'}
+            className="flex items-center space-x-2 px-4 py-2 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 hover:bg-rose-500/20 transition-all shadow-lg shadow-rose-500/10 group"
+          >
+            <Shield size={18} className="group-hover:rotate-12 transition-transform" />
+            <span className="text-xs font-black uppercase tracking-widest">Admin</span>
+          </button>
           <div className="px-4 py-2 bg-secondary/50 border border-border rounded-2xl flex items-center space-x-3 backdrop-blur-md">
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_#00f2fe]" />
             <span className="text-xs font-black uppercase tracking-widest opacity-70">Online</span>

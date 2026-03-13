@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
     Database, Plus, Trash2, Globe, Server, 
-    Rss, Code, ShieldCheck, Zap, ArrowRight, RefreshCw, Palette, CheckCircle2, XCircle, Coins, Lock
+    Rss, Code, ShieldCheck, Zap, ArrowRight, RefreshCw, Palette, CheckCircle2, XCircle, Coins, Lock, Gift
 } from 'lucide-react';
 import api from './api';
 import { useTheme } from './ThemeContext';
@@ -67,6 +67,19 @@ const AdminPanel = () => {
       setCreditLogs(users);
     } catch (e) {} finally {
       setLoadingLogs(false);
+    }
+  };
+
+  const grantCredits = async (userId, userName) => {
+    const amount = window.prompt(`${userName} kullanıcısına kaç kredi vermek istersiniz?`, "100");
+    if (!amount || isNaN(amount)) return;
+
+    try {
+      await api.put(`/admin/users/${userId}`, { credits: parseInt(amount) });
+      fetchCreditLogs();
+      alert(`${userName} kullanıcısına ${amount} kredi verildi.`);
+    } catch (e) {
+      alert("Hata: Kredi verilemedi.");
     }
   };
 
@@ -471,7 +484,8 @@ const AdminPanel = () => {
                   <th className="pb-3 pr-4">Kullanıcı</th>
                   <th className="pb-3 pr-4">Paket</th>
                   <th className="pb-3 pr-4">Kredi</th>
-                  <th className="pb-3">Rol</th>
+                  <th className="pb-3 pr-4">Rol</th>
+                  <th className="pb-3 text-right">İşlem</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -492,6 +506,14 @@ const AdminPanel = () => {
                         u.role === 'developer' ? 'bg-amber-500/10 text-amber-400' :
                         u.role === 'admin' ? 'bg-rose-500/10 text-rose-400' : 'bg-secondary text-muted-foreground'
                       }`}>{u.role || 'user'}</span>
+                    </td>
+                    <td className="py-3 text-right">
+                      <button 
+                        onClick={() => grantCredits(u.id, u.name || u.email)}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black hover:bg-emerald-500/20 transition-all flex items-center space-x-2 ml-auto"
+                      >
+                        <Gift size={12} /> <span>Bedava Kredi</span>
+                      </button>
                     </td>
                   </tr>
                 ))}

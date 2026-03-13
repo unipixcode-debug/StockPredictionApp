@@ -4,7 +4,7 @@ import {
     ActivityIndicator, Switch, TextInput, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, Zap, Coins, Lock, Users, RefreshCw, CheckCircle } from 'lucide-react-native';
+import { Settings, Zap, Coins, Lock, Users, RefreshCw, CheckCircle, Gift } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 
 const API_BASE = Config.API_BASE;
@@ -106,6 +106,34 @@ const AdminScreen = () => {
         }
     };
 
+    const grantCredits = async (userId: string, userName: string) => {
+        Alert.prompt(
+            'Kredi Ver',
+            `${userName} kullanıcısına kaç kredi vermek istersiniz?`,
+            [
+                { text: 'İptal', style: 'cancel' },
+                {
+                    text: 'Ver',
+                    onPress: async (amount: string | undefined) => {
+                        if (!amount || isNaN(Number(amount))) return;
+                        try {
+                            await fetch(`${API_BASE}/admin/users/${userId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ credits: Number(amount) }),
+                            });
+                            fetchAll();
+                        } catch (e) {
+                            Alert.alert('Hata', 'Kredi verilemedi');
+                        }
+                    }
+                }
+            ],
+            'plain-text',
+            '100'
+        );
+    };
+
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -178,6 +206,13 @@ const AdminScreen = () => {
                                                 <Text style={styles.badgeText}>{u.role || 'user'}</Text>
                                             </View>
                                         </View>
+                                        <TouchableOpacity 
+                                            onPress={() => grantCredits(u.id, u.name || u.email)}
+                                            style={styles.giftBtn}
+                                        >
+                                            <Gift size={10} color="#4ade80" />
+                                            <Text style={styles.giftBtnText}>Bedava Kredi Ver</Text>
+                                        </TouchableOpacity>
                                     </View>
                                     <Text style={[styles.creditValue,
                                         u.role === 'developer' ? { color: '#f59e0b' } :
@@ -270,6 +305,8 @@ const styles = StyleSheet.create({
     priceInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', color: 'white', fontWeight: '700', fontSize: 16, paddingHorizontal: 12, paddingVertical: 8 },
     saveBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', minWidth: 64, alignItems: 'center' },
     saveBtnText: { color: '#f59e0b', fontWeight: '900', fontSize: 12 },
+    giftBtn: { marginTop: 10, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(74, 222, 128, 0.1)', borderWidth: 1, borderColor: 'rgba(74, 222, 128, 0.2)', flexDirection: 'row', alignItems: 'center', gap: 6 },
+    giftBtnText: { color: '#4ade80', fontSize: 10, fontWeight: '800' },
 });
 
 export default AdminScreen;
