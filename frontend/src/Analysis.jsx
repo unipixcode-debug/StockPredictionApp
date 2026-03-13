@@ -78,6 +78,7 @@ const Analysis = () => {
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <IndicatorCard
           label="VIX Korku Endeksi"
+          symbol="^VIX"
           value={fmtPrice(stats?.raw?.vix?.price)}
           change={fmtChange(stats?.raw?.vix?.change)}
           up={stats?.raw?.vix?.change >= 0}
@@ -87,6 +88,7 @@ const Analysis = () => {
         />
         <IndicatorCard
           label="DXY Dolar Endeksi"
+          symbol="DX=F"
           value={fmtPrice(stats?.raw?.dxy?.price)}
           change={fmtChange(stats?.raw?.dxy?.change)}
           up={stats?.raw?.dxy?.change >= 0}
@@ -96,6 +98,7 @@ const Analysis = () => {
         />
         <IndicatorCard
           label="Bitcoin"
+          symbol="BTC-USD"
           value={`$${stats?.raw?.btc?.price != null ? stats.raw.btc.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : '–'}`}
           change={fmtChange(stats?.raw?.btc?.change)}
           up={stats?.raw?.btc?.change >= 0}
@@ -105,6 +108,7 @@ const Analysis = () => {
         />
         <IndicatorCard
           label="S&P 500"
+          symbol="^GSPC"
           value={fmtPrice(stats?.raw?.sp500?.price)}
           change={fmtChange(stats?.raw?.sp500?.change)}
           up={stats?.raw?.sp500?.change >= 0}
@@ -114,6 +118,7 @@ const Analysis = () => {
         />
         <IndicatorCard
           label="Altın (Spot)"
+          symbol="GC=F"
           value={`$${stats?.raw?.gold?.price != null ? stats.raw.gold.price.toFixed(1) : '–'}`}
           change={fmtChange(stats?.raw?.gold?.change)}
           up={stats?.raw?.gold?.change >= 0}
@@ -123,6 +128,7 @@ const Analysis = () => {
         />
         <IndicatorCard
           label="Nasdaq"
+          symbol="^IXIC"
           value={fmtPrice(stats?.raw?.nasdaq?.price)}
           change={fmtChange(stats?.raw?.nasdaq?.change)}
           up={stats?.raw?.nasdaq?.change >= 0}
@@ -186,9 +192,13 @@ const Analysis = () => {
   );
 };
 
-function IndicatorCard({ label, value, change, up, icon, desc, loading }) {
+function IndicatorCard({ label, symbol, value, change, up, icon, desc, loading }) {
+  const navigate = useNavigate();
   return (
-    <div className="glass-card p-8 group hover:-translate-y-1 transition-all duration-500 hover:shadow-2xl">
+    <div 
+      className="glass-card p-8 group hover:-translate-y-1 transition-all duration-500 hover:shadow-2xl cursor-pointer"
+      onClick={() => symbol && navigate(`/chart/${symbol}`)}
+    >
       <div className="flex justify-between items-start mb-5">
         <div className="w-12 h-12 bg-secondary/50 rounded-2xl flex items-center justify-center border border-border group-hover:border-primary/30 transition-all shadow-inner">
           {icon}
@@ -209,7 +219,7 @@ function IndicatorCard({ label, value, change, up, icon, desc, loading }) {
         <div className="h-8 w-24 bg-white/5 rounded-lg animate-pulse mt-1" />
       ) : (
         <>
-          <p className="text-3xl font-black tracking-tighter">{value}</p>
+          <p className="text-3xl font-black tracking-tighter group-hover:text-primary transition-colors">{value}</p>
           <p className="text-xs font-bold text-muted-foreground opacity-40 mt-1 uppercase">{desc}</p>
         </>
       )}
@@ -219,15 +229,19 @@ function IndicatorCard({ label, value, change, up, icon, desc, loading }) {
 
 function PredictionRow({ data }) {
   const isBuy = data.direction === 'BUY';
+  const navigate = useNavigate();
   return (
-    <div className="glass-card p-7 group relative hover:border-primary/20 transition-all duration-500 border-border/50">
+    <div 
+      className="glass-card p-7 group relative hover:border-primary/20 transition-all duration-500 border-border/50 cursor-pointer"
+      onClick={() => navigate(`/chart/${data.symbol}`)}
+    >
       <div className="flex justify-between items-start">
         <div className="flex items-center space-x-5">
           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shadow-inner ${isBuy ? 'bg-emerald-500/10 border-emerald-500/20 rotate-3' : 'bg-rose-500/10 border-rose-500/20 -rotate-3'}`}>
             {isBuy ? <TrendingUp className="text-emerald-500" size={28} /> : <TrendingDown className="text-rose-500" size={28} />}
           </div>
           <div>
-            <h3 className="text-xl font-black tracking-tighter italic uppercase">{data.symbol}</h3>
+            <h3 className="text-xl font-black tracking-tighter italic uppercase group-hover:text-primary transition-colors">{data.symbol}</h3>
             <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em] opacity-60">{data.market} Piyasası</p>
           </div>
         </div>

@@ -5,3 +5,4 @@ startup_log.txt
 .DS_Store
 dist/
 coverage/
+fallback_sources.json

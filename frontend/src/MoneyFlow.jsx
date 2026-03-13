@@ -213,30 +213,33 @@ const MoneyFlow = () => {
                                             ${asset.color === 'indigo' ? 'bg-indigo-500/5 border-indigo-500/20 hover:border-indigo-500/40 shadow-indigo-500/10' : ''}
                                         `}
                                     >
-                                        <div className="flex justify-between items-start mb-8">
+                                        <div 
+                                            className="flex justify-between items-start mb-8 cursor-pointer group/header"
+                                            onClick={() => goToChart(asset.id, asset.name)}
+                                        >
                                             <div className="flex flex-col">
-                                                <h3 className="font-black text-3xl tracking-tighter uppercase italic opacity-90">{asset.name}</h3>
+                                                <h3 className="font-black text-3xl tracking-tighter uppercase italic opacity-90 group-hover/header:text-primary transition-colors">{asset.name}</h3>
                                                 <div className="flex items-center space-x-3 mt-2">
                                                     <div className={`w-2 h-2 rounded-full ${asset.change > 0 ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`} />
                                                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">{t('MarketLiquidity') || 'Pazar Likiditesi'}</span>
                                                 </div>
                                             </div>
                                             <div className="flex space-x-4">
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); goToChart(asset.id, asset.name); }}
-                                                    className="w-12 h-12 rounded-2xl bg-background border border-border flex items-center justify-center text-muted-foreground hover:text-primary transition-all hover:shadow-[0_0_20px_rgba(0,242,254,0.1)] active:scale-90 shadow-inner"
-                                                >
+                                                <div className="w-12 h-12 rounded-2xl bg-background border border-border flex items-center justify-center text-muted-foreground group-hover/header:text-primary transition-all group-hover/header:shadow-[0_0_20px_rgba(0,242,254,0.1)] shadow-inner">
                                                     <BarChart2 size={24} />
-                                                </button>
+                                                </div>
                                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-inner ${asset.change > 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-rose-500/10 border-rose-500/20 text-rose-500'}`}>
                                                     {asset.change > 0 ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
                                                 </div>
                                             </div>
                                         </div>
                                         
-                                        <div className="space-y-2 mb-10">
+                                        <div 
+                                            className="space-y-2 mb-10 cursor-pointer group/price"
+                                            onClick={() => goToChart(asset.id, asset.name)}
+                                        >
                                             <div className="flex items-baseline space-x-3">
-                                                <span className="text-5xl font-black italic tracking-tighter">{asset.value.toFixed(1)}</span>
+                                                <span className="text-5xl font-black italic tracking-tighter group-hover/price:text-primary transition-colors">{asset.value.toFixed(1)}</span>
                                                 <span className="text-xl font-black italic opacity-20">{asset.unit}</span>
                                             </div>
                                             <div className="flex items-center space-x-3">
@@ -253,9 +256,9 @@ const MoneyFlow = () => {
                                                 <div 
                                                     key={sub.name}
                                                     onClick={() => goToChart(sub.symbol || sub.name, sub.name)}
-                                                    className="px-4 py-2 bg-secondary/40 hover:bg-secondary/60 rounded-2xl text-[11px] font-black uppercase tracking-tight border border-border cursor-pointer transition-all flex items-center space-x-3 active:scale-95 shadow-inner"
+                                                    className="px-4 py-2 bg-secondary/40 hover:bg-secondary/60 hover:border-primary/30 rounded-2xl text-[11px] font-black uppercase tracking-tight border border-border cursor-pointer transition-all flex items-center space-x-3 active:scale-95 shadow-inner group/pill"
                                                 >
-                                                    <span className="opacity-70">{sub.name}</span>
+                                                    <span className="opacity-70 group-hover/pill:opacity-100">{sub.name}</span>
                                                     <span className={`font-black ${sub.change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                                         {sub.change > 0 ? '↑' : '↓'}
                                                     </span>

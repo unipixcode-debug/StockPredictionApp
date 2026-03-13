@@ -10,7 +10,10 @@ class NewsService {
             'https://www.cnbc.com/id/15839069/device/rss/rss.html',
             'https://www.investing.com/rss/news_25.rss',
             'https://cointelegraph.com/rss/tag/bitcoin',
-            'https://www.coindesk.com/arc/outboundfeeds/rss/'
+            'https://www.coindesk.com/arc/outboundfeeds/rss/',
+            'https://www.bloomberg.com/politics/feeds/site.xml',
+            'https://www.reutersagency.com/feed/?best-sectors=business-finance',
+            'https://www.marketwatch.com/rss/topstories'
         ];
         
         // Mapping for better search results
@@ -60,7 +63,10 @@ class NewsService {
             { name: 'CNBC Main', url: 'https://www.cnbc.com/id/15839069/device/rss/rss.html' },
             { name: 'Investing.com', url: 'https://www.investing.com/rss/news_25.rss' },
             { name: 'Cointelegraph', url: 'https://cointelegraph.com/rss/tag/bitcoin' },
-            { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' }
+            { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
+            { name: 'Bloomberg', url: 'https://www.bloomberg.com/politics/feeds/site.xml' },
+            { name: 'Reuters', url: 'https://www.reutersagency.com/feed/?best-sectors=business-finance' },
+            { name: 'MarketWatch', url: 'https://www.marketwatch.com/rss/topstories' }
         ];
 
         let dynamicSources = [];

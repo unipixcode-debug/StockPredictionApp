@@ -6,7 +6,7 @@ import {
   Search, Play, ChevronDown, ChevronUp, Cpu, Bot
 } from 'lucide-react';
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine
 } from 'recharts';
 import api from './api';
 import { useLanguage } from './LanguageContext';
@@ -21,8 +21,17 @@ const Dashboard = () => {
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [searchSymbol, setSearchSymbol] = useState('');
   const [statsError, setStatsError] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const [filter, setFilter] = useState(t('All'));
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef(null);
+
+  const symbolSuggestions = [
+    { name: 'BTC-USD', market: 'Crypto' }, { name: 'ETH-USD', market: 'Crypto' }, { name: 'SOL-USD', market: 'Crypto' },
+    { name: 'AAPL', market: 'US Stock' }, { name: 'NVDA', market: 'US Stock' }, { name: 'TSLA', market: 'US Stock' },
+    { name: 'THYAO.IS', market: 'BIST' }, { name: 'ASELS.IS', market: 'BIST' }, { name: 'EREGL.IS', market: 'BIST' },
+    { name: 'XAU-USD', market: 'Commodity' }, { name: 'EURUSD=X', market: 'FX' }
+  ];
 
   useEffect(() => {
     fetchData();
@@ -84,14 +93,16 @@ const Dashboard = () => {
     if (!searchSymbol.trim()) return;
 
     setLoadingAnalysis(true);
+    setShowNotification(true);
+    // Notification will stay for a bit
+    setTimeout(() => setShowNotification(false), 5000);
+
     try {
       const response = await api.post('/predictions/analyze', { symbol: searchSymbol.toUpperCase() });
-      // Add new prediction to the top of the list
       setPredictions(prev => [response, ...prev]);
       setSearchSymbol('');
     } catch (error) {
       console.error("Analysis request failed", error);
-      alert(t('AnalysisError'));
     } finally {
       setLoadingAnalysis(false);
     }
@@ -238,7 +249,10 @@ const Dashboard = () => {
 
             <div className="flex bg-secondary/30 p-1.5 rounded-2xl border border-border backdrop-blur-md w-full sm:w-auto justify-center">
               {[t('All'), t('Crypto'), t('Stocks_Category')].map((tab) => (
-                <button key={tab} className={`px-5 py-1.5 rounded-xl text-xs font-bold transition-all w-full sm:w-auto ${tab === t('All') ? 'bg-primary text-primary-foreground shadow-lg' : 'hover:bg-white/5 text-muted-foreground hover:text-foreground'}`}>
+                <button 
+                  key={tab} 
+                  onClick={() => setFilter(tab)}
+                  className={`px-5 py-1.5 rounded-xl text-xs font-bold transition-all w-full sm:w-auto ${filter === tab ? 'bg-primary text-primary-foreground shadow-lg' : 'hover:bg-white/5 text-muted-foreground hover:text-foreground'}`}>
                   {tab}
                 </button>
               ))}
@@ -246,13 +260,39 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {/* Async Request Notification */}
+        <AnimatePresence>
+          {showNotification && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-primary/10 border border-primary/30 p-4 rounded-2xl flex items-center space-x-4 backdrop-blur-xl"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+                <Bot size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-black uppercase italic tracking-tighter">İstek Talebiniz Alındı</p>
+                <p className="text-xs text-muted-foreground font-medium">En kısa sürede tahmininiz görüntülenecektir. Sayfayı değiştirseniz bile sistem analizi tamamlayacaktır.</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {loading && predictions.length === 0 ? (
             [1, 2, 3, 4].map(i => (
               <div key={i} className="glass-card h-48 animate-pulse bg-white/5 border-white/5" />
             ))
           ) : (
-            predictions.map(pred => (
+            predictions
+              .filter(p => {
+                if (filter === t('All')) return true;
+                if (filter === t('Crypto')) return p.market?.toLowerCase().includes('crypto');
+                return p.market?.toLowerCase().includes('stock') || p.market?.toLowerCase().includes('bist');
+              })
+              .map(pred => (
               <motion.div key={pred.id} variants={itemVariants}>
                 <PredictionCard data={pred} />
               </motion.div>
@@ -304,26 +344,27 @@ function PredictionCard({ data }) {
 
   return (
     <div className={`glass-card p-8 group relative transition-all duration-500 border-border/50 ${expanded ? 'border-primary/30 shadow-[0_0_50px_rgba(0,242,254,0.05)]' : 'hover:border-primary/20 hover:shadow-[0_0_30px_rgba(0,242,254,0.05)]'}`}>
-      <div className="flex justify-between items-start">
-        <div className="flex items-center space-x-6">
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border shadow-inner ${bgClass}`}>
-            {isBuy ? <TrendingUp className="text-emerald-500" size={32} /> : isHold ? <Activity className="text-amber-500" size={32} /> : <TrendingDown className="text-rose-500" size={32} />}
-          </div>
-          <div>
-            <h3 className="text-2xl font-black tracking-tighter italic uppercase">{data.symbol}</h3>
-            <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em] opacity-60">{data.market} Piyasası</p>
-          </div>
+      <div className="flex justify-between items-start mb-6">
+        <div 
+          className="cursor-pointer group/sym"
+          onClick={(e) => { e.stopPropagation(); navigate(`/chart/${data.symbol}`); }}
+        >
+          <h3 className="text-3xl font-black italic tracking-tighter group-hover/sym:text-primary transition-colors">{data.symbol}</h3>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-40">{data.market} {t('Market')}</p>
         </div>
-        <div className="text-right">
-          <p className={`text-4xl font-black italic tracking-tighter ${colorClass}`}>
-            {isBuy ? t('Buy') : isHold ? t('Hold') : t('Sell')}
-          </p>
-          <div className="flex items-center justify-end space-x-2 mt-1">
-            <div className="w-12 h-1 bg-secondary rounded-full overflow-hidden">
-              <div className={`h-full ${isBuy ? 'bg-emerald-500' : isHold ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${data.score}%` }} />
-            </div>
-            <p className="text-muted-foreground font-black text-[10px] uppercase opacity-40">{t('Score')}: {data.score}</p>
+        <div className={`p-4 rounded-2xl flex items-center shadow-lg ${isBuy ? 'bg-emerald-500/10 text-emerald-500 shadow-emerald-500/20' : isHold ? 'bg-amber-500/10 text-amber-500 shadow-amber-500/20' : 'bg-rose-500/10 text-rose-500 shadow-rose-500/20'}`}>
+          {isBuy ? <TrendingUp size={28} /> : isHold ? <Activity size={28} /> : <TrendingDown size={28} />}
+        </div>
+      </div>
+      <div className="text-right">
+        <p className={`text-4xl font-black italic tracking-tighter ${colorClass}`}>
+          {isBuy ? t('Buy') : isHold ? t('Hold') : t('Sell')}
+        </p>
+        <div className="flex items-center justify-end space-x-2 mt-1">
+          <div className="w-12 h-1 bg-secondary rounded-full overflow-hidden">
+            <div className={`h-full ${isBuy ? 'bg-emerald-500' : isHold ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${data.score}%` }} />
           </div>
+          <p className="text-muted-foreground font-black text-[10px] uppercase opacity-40">{t('Score')}: {data.score}</p>
         </div>
       </div>
 
@@ -381,63 +422,47 @@ function PredictionCard({ data }) {
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={data.analysis_details.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <defs>
-                          <linearGradient id="colorAI" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                          </linearGradient>
-                          <linearGradient id="colorML" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#ff00ff" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#ff00ff" stopOpacity={0} />
+                          <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={isBuy ? "#10b981" : "#e11d48"} stopOpacity={0.3} />
+                            <stop offset="95%" stopColor={isBuy ? "#10b981" : "#e11d48"} stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                        <XAxis
-                          dataKey="timeframe"
-                          stroke="hsl(var(--muted-foreground))"
-                          fontSize={10}
-                          tickLine={false}
-                          axisLine={false}
-                          dy={10}
-                        />
-                        <YAxis
-                          stroke="hsl(var(--muted-foreground))"
-                          fontSize={10}
-                          tickLine={false}
-                          axisLine={false}
-                          domain={[0, 100]}
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
+                        <XAxis hide dataKey="time" />
+                        <YAxis 
+                          hide 
+                          domain={['dataMin - 0.1', 'dataMax + 0.1']}
                         />
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            borderColor: 'hsl(var(--border))',
-                            borderRadius: '16px',
-                            boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const item = payload[0].payload;
+                              return (
+                                <div className="bg-[#0c0c0e] border border-white/10 p-3 rounded-xl shadow-2xl">
+                                  <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">
+                                    {item.isPrediction ? "🤖 ML Tahmini" : "📊 Gerçek Veri"}
+                                  </p>
+                                  <p className="text-sm font-black italic">
+                                    ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
                           }}
-                          itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
-                          labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '4px', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
                         />
-                        <Legend
-                          iconType="circle"
-                          wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '20px' }}
-                          formatter={(value) => <span className="uppercase tracking-widest text-muted-foreground mr-4">{value === 'ai' ? t('AILine') : t('MLLine')}</span>}
-                        />
+                        <ReferenceLine y={data.entryPrice} stroke="#60a5fa" strokeDasharray="5 5" label={{ value: 'ENTRY', position: 'left', fill: '#60a5fa', fontSize: 10, fontWeight: 'black' }} />
+                        <ReferenceLine y={data.targetPrice} stroke="#10b981" label={{ value: 'TARGET', position: 'left', fill: '#10b981', fontSize: 10, fontWeight: 'black' }} />
+                        <ReferenceLine y={data.stopLoss} stroke="#e11d48" label={{ value: 'STOP', position: 'left', fill: '#e11d48', fontSize: 10, fontWeight: 'black' }} />
+                        
                         <Area
                           type="monotone"
-                          dataKey="ml"
-                          stroke="#ff00ff"
-                          strokeWidth={2}
-                          fillOpacity={1}
-                          fill="url(#colorML)"
-                          activeDot={{ r: 6, fill: '#ff00ff', stroke: '#000', strokeWidth: 2 }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="ai"
-                          stroke="hsl(var(--primary))"
+                          dataKey="price"
+                          stroke={isBuy ? "#10b981" : "#e11d48"}
                           strokeWidth={3}
                           fillOpacity={1}
-                          fill="url(#colorAI)"
-                          activeDot={{ r: 6, fill: 'hsl(var(--primary))', stroke: '#000', strokeWidth: 2 }}
+                          fill="url(#colorPrice)"
+                          animationDuration={2000}
                         />
                       </AreaChart>
                     </ResponsiveContainer>

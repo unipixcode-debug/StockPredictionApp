@@ -82,6 +82,13 @@ const translations = {
     AITrendChart: "Makine Öğrenimi (ML) vs. Yapay Zeka (AI) Trendi",
     AILine: "Yapay Zeka (AI)",
     MLLine: "Gelişmiş Makine Öğr. (ML)",
+    Entry: "Giriş",
+    Target: "Hedef",
+    StopLoss: "Zarar Kes",
+    RequestReceived: "İstek Talebiniz Alındı",
+    RequestReceivedDesc: "En kısa sürede tahmininiz görüntülenecektir. Sayfayı değiştirseniz bile sistem analizi tamamlayacaktır.",
+    SubAssets: "Alt Varlıklar",
+    AnalysisResults: "Analiz Sonuçları",
 
     // News
     NewsTitle: "Akıllı Haber Bülteni",
@@ -171,8 +178,15 @@ const translations = {
     ConfidenceScore: "Confidence Score",
     CreatedAt: "Created At",
     AITrendChart: "Machine Learning (ML) vs. AI Trend",
-    AILine: "Artificial Intelligence (AI)",
+    AILine: "AI (Artificial Intelligence)",
     MLLine: "Advanced ML",
+    Entry: "Entry",
+    Target: "Target",
+    StopLoss: "Stop Loss",
+    RequestReceived: "Request Received",
+    RequestReceivedDesc: "Your prediction will be displayed shortly. The system will complete the analysis even if you navigate away.",
+    SubAssets: "Sub Assets",
+    AnalysisResults: "Analysis Results",
 
     // News
     NewsTitle: "Smart News Bulletin",

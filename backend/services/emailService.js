@@ -2,63 +2,46 @@ const nodemailer = require('nodemailer');
 
 class EmailService {
     constructor() {
-        this.transporter = null;
-        this.adminEmail = process.env.ADMIN_EMAIL;
-    }
-
-    initTransporter() {
-        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-            console.warn("SMTP credentials missing. Email alerts will not be sent.");
-            return false;
-        }
-
         this.transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: parseInt(process.env.SMTP_PORT) || 587,
-            secure: process.env.SMTP_SECURE === 'true', // true for 465, false for others
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
+            secure: process.env.SMTP_SECURE === 'true',
             auth: {
                 user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-            }
+                pass: process.env.SMTP_PASS,
+            },
         });
-
-        return true;
     }
 
     async sendAlert(subject, text) {
         try {
-            if (!this.transporter) {
-                const initialized = this.initTransporter();
-                if (!initialized) return;
+            if (!process.env.SMTP_USER || !process.env.ADMIN_EMAIL) {
+                console.log('SMTP not configured, skipping alert email.');
+                return;
             }
 
-            const mailOptions = {
-                from: `"PredictPro Monitor" <${process.env.SMTP_USER}>`,
-                to: this.adminEmail,
-                subject: `🚨 PredictPro ALERT: ${subject}`,
+            const info = await this.transporter.sendMail({
+                from: `"PredictPro System" <${process.env.SMTP_USER}>`,
+                to: process.env.ADMIN_EMAIL,
+                subject: subject,
                 text: text,
-                html: `<div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                        <h2 style="color: #e11d48;">🚨 PredictPro Sistem Uyarısı</h2>
-                        <p>${text.replace(/\n/g, '<br>')}</p>
-                        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-                        <small style="color: #666;">Bu e-posta otomatik olarak oluşturulmuştur.</small>
-                       </div>`
-            };
+                html: `<div style="font-family: sans-serif; padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h2 style="color: #ef4444;">PredictPro Sistem Uyarısı</h2>
+                    <p style="font-size: 16px; color: #1e293b;">${text}</p>
+                    <hr style="border: 0; border-top: 1px solid #cbd5e1; margin: 20px 0;">
+                    <p style="font-size: 12px; color: #64748b;">Bu otomatik bir sistem uyarısıdır. Lütfen cevaplamayınız.</p>
+                </div>`,
+            });
 
-            const info = await this.transporter.sendMail(mailOptions);
-            console.log('Alert email sent: ' + info.messageId);
+            console.log('Alert email sent: %s', info.messageId);
         } catch (error) {
-            console.error('Failed to send alert email:', error.message);
+            console.error('Error sending alert email:', error);
         }
     }
 
     async sendQuotaExhaustedAlert(providerName) {
-        const subject = `AI Kotası Tükendi (${providerName})`;
-        const text = `PredictPro uygulaması için kullanılan ${providerName} anahtarının kotası tükenmiş görünüyor. 
-        Analizlerin devam edebilmesi için lütfen API anahtarlarınızı kontrol edin veya yeni bir anahtar ekleyin.
-        
-        Tarih: ${new Date().toLocaleString('tr-TR')}`;
-        
+        const subject = `CRITICAL: AI Quota Exhausted - ${providerName}`;
+        const text = `Sistemdeki tüm AI sağlayıcıları veya belirtilen ${providerName} sağlayıcısı kota sınırına ulaştı. Tahmin ve analiz hizmetleri şu an verilemiyor. Lütfen API anahtarlarını kontrol edin veya yeni anahtarlar ekleyin.`;
         await this.sendAlert(subject, text);
     }
 }

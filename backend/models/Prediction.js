@@ -19,7 +19,15 @@ const Prediction = sequelize.define('Prediction', {
         type: DataTypes.ENUM('BUY', 'SELL', 'HOLD'),
         allowNull: false
     },
+    entryPrice: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+    },
     targetPrice: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+    },
+    stopLoss: {
         type: DataTypes.FLOAT,
         allowNull: true
     },
