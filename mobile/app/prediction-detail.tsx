@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Share, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Config } from '@/constants/Config';
 import { ChevronLeft, Share2, TrendingUp, TrendingDown, Clock, BrainCircuit, ShieldCheck } from 'lucide-react-native';
 
-const API_BASE = 'http://192.168.1.7:5000/api';
+const API_BASE = Config.API_BASE;
 
 interface Prediction {
     id: string;
