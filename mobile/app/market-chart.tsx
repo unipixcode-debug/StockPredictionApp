@@ -29,14 +29,23 @@ const MarketChartScreen = () => {
             'Mısır': 'CBOT:ZC1!',
             'Kahve': 'ICEUS:KC1!',
             'S&P500': 'FOREXCOM:SPXUSD',
+            'ABD (S&P500)': 'FOREXCOM:SPXUSD',
             'Nasdaq': 'CURRENCYCOM:NAS100',
+            'Avrupa (STOXX)': 'INDEX:SX5E',
+            'Çin (SSE)': 'SSE:000001',
             'BIST100': 'BIST:XU100',
+            'XU100': 'BIST:XU100',
+            'Türkiye (BIST)': 'BIST:XU100',
             'ABD 10Y': 'TVC:US10Y',
             'ABD 2Y': 'TVC:US02Y',
             'Almanya 10Y': 'TVC:DE10Y',
             'Japonya 10Y': 'TVC:JP10Y',
             'İngiltere 10Y': 'TVC:GB10Y',
             'Türkiye 10Y': 'TVC:TR10Y',
+            'VIX': 'TVC:VIX',
+            '^VIX': 'TVC:VIX',
+            'Dolar Endeksi': 'TVC:DXY',
+            'DXY': 'TVC:DXY',
             'BTC Dominans': 'CRYPTOCAP:BTC.D',
             'Kripto Toplam': 'CRYPTOCAP:TOTAL',
             'Kripto Altcoin Toplam': 'CRYPTOCAP:TOTAL2',
@@ -51,10 +60,9 @@ const MarketChartScreen = () => {
         };
         
         // If it's a BIST stock like THYAO.IS, TV symbol is BIST:THYAO
-        if (s.endsWith('.IS')) {
+        if (s && s.endsWith && s.endsWith('.IS')) {
             return `BIST:${s.replace('.IS', '')}`;
         }
-
         return mapping[s] || s;
     };
 
