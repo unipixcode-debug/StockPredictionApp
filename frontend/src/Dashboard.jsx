@@ -22,6 +22,8 @@ const Dashboard = () => {
   const [searchSymbol, setSearchSymbol] = useState('');
   const [statsError, setStatsError] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
   const [filter, setFilter] = useState(t('All'));
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef(null);
@@ -94,6 +96,7 @@ const Dashboard = () => {
 
     setLoadingAnalysis(true);
     setShowNotification(true);
+    setErrorMsg(null);
     // Notification will stay for a bit
     setTimeout(() => setShowNotification(false), 5000);
 
@@ -103,6 +106,8 @@ const Dashboard = () => {
       setSearchSymbol('');
     } catch (error) {
       console.error("Analysis request failed", error);
+      setErrorMsg("An error occurred during analysis. Please try again.");
+      setTimeout(() => setErrorMsg(null), 5000);
     } finally {
       setLoadingAnalysis(false);
     }
@@ -227,25 +232,67 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full md:w-auto">
-            {/* AI Request Search Bar */}
-            <form onSubmit={handleAnalyzeRequest} className="relative flex-1 sm:w-64 group/search">
-              <input
-                type="text"
-                placeholder={t('SearchSymbolPlaceholder')}
-                value={searchSymbol}
-                onChange={(e) => setSearchSymbol(e.target.value)}
-                className="w-full bg-secondary/30 border border-border rounded-full py-2.5 pl-10 pr-12 text-sm font-bold placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 transition-colors backdrop-blur-md uppercase placeholder:normal-case"
-              />
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/search:text-primary transition-colors" />
-              <button
-                type="submit"
-                disabled={loadingAnalysis || !searchSymbol.trim()}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
-              >
-                {loadingAnalysis ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
-              </button>
-            </form>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:space-y-0 sm:space-x-4 w-full md:w-auto">
+            {/* AI Request Search Bar with Dropdown */}
+            <div className="relative flex-1 sm:w-64 group/search">
+              <form onSubmit={handleAnalyzeRequest} className="relative">
+                <input
+                  type="text"
+                  placeholder={t('SearchSymbolPlaceholder')}
+                  value={searchSymbol}
+                  onChange={(e) => setSearchSymbol(e.target.value)}
+                  onFocus={() => setShowSuggestions(true)}
+                  className="w-full bg-secondary/30 border border-border rounded-full py-2.5 pl-10 pr-12 text-sm font-bold placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 transition-colors backdrop-blur-md uppercase placeholder:normal-case"
+                />
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/search:text-primary transition-colors" />
+                <button
+                  type="submit"
+                  disabled={loadingAnalysis || !searchSymbol.trim()}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {loadingAnalysis ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                </button>
+              </form>
+
+              {/* Suggestions Dropdown */}
+              <AnimatePresence>
+                {showSuggestions && searchSymbol.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    className="absolute z-50 left-0 right-0 mt-2 bg-[#0c0c0e]/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl"
+                  >
+                    {symbolSuggestions
+                      .filter(s => s.name.toLowerCase().includes(searchSymbol.toLowerCase()))
+                      .slice(0, 5)
+                      .map((s, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setSearchSymbol(s.name);
+                            setShowSuggestions(false);
+                          }}
+                          className="w-full px-5 py-3 flex items-center justify-between hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-xs font-black">
+                              {s.name.substring(0, 1)}
+                            </div>
+                            <span className="text-sm font-bold text-foreground">{s.name}</span>
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50">{s.market}</span>
+                        </button>
+                      ))}
+                    {symbolSuggestions.filter(s => s.name.toLowerCase().includes(searchSymbol.toLowerCase())).length === 0 && (
+                      <div className="px-5 py-3 text-xs text-muted-foreground font-medium italic">
+                        Öneri bulunamadı: "{searchSymbol}"
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             <div className="flex bg-secondary/30 p-1.5 rounded-2xl border border-border backdrop-blur-md w-full sm:w-auto justify-center">
               {[t('All'), t('Crypto'), t('Stocks_Category')].map((tab) => (
@@ -262,7 +309,7 @@ const Dashboard = () => {
 
         {/* Async Request Notification */}
         <AnimatePresence>
-          {showNotification && (
+          {showNotification && !errorMsg && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -275,6 +322,23 @@ const Dashboard = () => {
               <div>
                 <p className="text-sm font-black uppercase italic tracking-tighter">İstek Talebiniz Alındı</p>
                 <p className="text-xs text-muted-foreground font-medium">En kısa sürede tahmininiz görüntülenecektir. Sayfayı değiştirseniz bile sistem analizi tamamlayacaktır.</p>
+              </div>
+            </motion.div>
+          )}
+
+          {errorMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-rose-500/10 border border-rose-500/30 p-4 rounded-2xl flex items-center space-x-4 backdrop-blur-xl"
+            >
+              <div className="w-10 h-10 rounded-full bg-rose-500 flex items-center justify-center text-white">
+                <Activity size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-black uppercase italic tracking-tighter text-rose-500">Analiz Hatası</p>
+                <p className="text-xs text-muted-foreground font-medium">{errorMsg}</p>
               </div>
             </motion.div>
           )}
@@ -292,6 +356,7 @@ const Dashboard = () => {
                 if (filter === t('Crypto')) return p.market?.toLowerCase().includes('crypto');
                 return p.market?.toLowerCase().includes('stock') || p.market?.toLowerCase().includes('bist');
               })
+              .slice(0, 5) // Limit to top 5 most recent
               .map(pred => (
               <motion.div key={pred.id} variants={itemVariants}>
                 <PredictionCard data={pred} />
