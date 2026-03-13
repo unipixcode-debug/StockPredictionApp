@@ -12,7 +12,7 @@ const Prediction = sequelize.define('Prediction', {
         allowNull: false,
     },
     market: {
-        type: DataTypes.ENUM('US', 'CRYPTO', 'BIST'),
+        type: DataTypes.ENUM('US', 'CRYPTO', 'BIST', 'COMMODITY', 'FX'),
         allowNull: false
     },
     direction: {

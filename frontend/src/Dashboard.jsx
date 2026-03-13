@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, Activity,
   ArrowUpRight, Globe, Bitcoin, RefreshCw, Zap, Newspaper,
-  Search, Play, ChevronDown, ChevronUp, Cpu, Bot
+  Search, Play, ChevronDown, ChevronUp, Cpu, Bot, Trash2
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine
@@ -29,10 +29,10 @@ const Dashboard = () => {
   const retryTimerRef = useRef(null);
 
   const symbolSuggestions = [
-    { name: 'BTC-USD', market: 'Crypto' }, { name: 'ETH-USD', market: 'Crypto' }, { name: 'SOL-USD', market: 'Crypto' },
-    { name: 'AAPL', market: 'US Stock' }, { name: 'NVDA', market: 'US Stock' }, { name: 'TSLA', market: 'US Stock' },
-    { name: 'THYAO.IS', market: 'BIST' }, { name: 'ASELS.IS', market: 'BIST' }, { name: 'EREGL.IS', market: 'BIST' },
-    { name: 'XAU-USD', market: 'Commodity' }, { name: 'EURUSD=X', market: 'FX' }
+    { name: 'BTC-USD', market: 'Crypto' }, { name: 'ETH-USD', market: 'Crypto' }, { name: 'SOL-USD', market: 'Crypto' }, { name: 'XRPUSD', market: 'Crypto' },
+    { name: 'AAPL', market: 'US Stock' }, { name: 'NVDA', market: 'US Stock' }, { name: 'TSLA', market: 'US Stock' }, { name: 'MSFT', market: 'US Stock' },
+    { name: 'THYAO.IS', market: 'BIST' }, { name: 'ASELS.IS', market: 'BIST' }, { name: 'EREGL.IS', market: 'BIST' }, { name: 'KCHOL.IS', market: 'BIST' },
+    { name: 'XAUUSD', market: 'Commodity' }, { name: 'GC=F', market: 'Commodity' }, { name: 'SI=F', market: 'Commodity' }, { name: 'BRENT', market: 'Commodity' }, { name: 'EURUSD', market: 'FX' }
   ];
 
   useEffect(() => {
@@ -101,7 +101,7 @@ const Dashboard = () => {
     setTimeout(() => setShowNotification(false), 5000);
 
     try {
-      const response = await api.post('/predictions/analyze', { symbol: searchSymbol.toUpperCase() });
+      const response = await api.post('/predictions/analyze', { symbol: searchSymbol.toUpperCase().trim() });
       setPredictions(prev => [response, ...prev]);
       setSearchSymbol('');
     } catch (error) {
@@ -110,6 +110,17 @@ const Dashboard = () => {
       setTimeout(() => setErrorMsg(null), 5000);
     } finally {
       setLoadingAnalysis(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/predictions/${id}`);
+      setPredictions(prev => prev.filter(p => p.id !== id));
+    } catch (error) {
+      console.error("Delete failed", error);
+      setErrorMsg("Deletion failed.");
+      setTimeout(() => setErrorMsg(null), 3000);
     }
   };
 
@@ -295,7 +306,7 @@ const Dashboard = () => {
             </div>
 
             <div className="flex bg-secondary/30 p-1.5 rounded-2xl border border-border backdrop-blur-md w-full sm:w-auto justify-center">
-              {[t('All'), t('Crypto'), t('Stocks_Category')].map((tab) => (
+              {[t('All'), t('Crypto'), t('Stocks_Category'), t('Commodities_Category')].map((tab) => (
                 <button 
                   key={tab} 
                   onClick={() => setFilter(tab)}
@@ -354,12 +365,13 @@ const Dashboard = () => {
               .filter(p => {
                 if (filter === t('All')) return true;
                 if (filter === t('Crypto')) return p.market?.toLowerCase().includes('crypto');
+                if (filter === t('Commodities_Category')) return p.market?.toLowerCase().includes('commodity');
                 return p.market?.toLowerCase().includes('stock') || p.market?.toLowerCase().includes('bist');
               })
-              .slice(0, 5) // Limit to top 5 most recent
+              .slice(0, 20) // Limit to top 20 most recent to ensure visibility
               .map(pred => (
               <motion.div key={pred.id} variants={itemVariants}>
-                <PredictionCard data={pred} />
+                <PredictionCard data={pred} onDelete={() => handleDelete(pred.id)} />
               </motion.div>
             ))
           )}
@@ -399,7 +411,7 @@ function StatCard({ label, value, trend, trendUp = true, icon, loading = false }
   );
 }
 
-function PredictionCard({ data }) {
+function PredictionCard({ data, onDelete }) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const isBuy = data.direction === 'BUY';
@@ -421,6 +433,15 @@ function PredictionCard({ data }) {
           {isBuy ? <TrendingUp size={28} /> : isHold ? <Activity size={28} /> : <TrendingDown size={28} />}
         </div>
       </div>
+      
+      {/* Delete Button */}
+      <button 
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-full transition-all opacity-0 group-hover:opacity-100"
+      >
+        <Trash2 size={16} />
+      </button>
+
       <div className="text-right">
         <p className={`text-4xl font-black italic tracking-tighter ${colorClass}`}>
           {isBuy ? t('Buy') : isHold ? t('Hold') : t('Sell')}

@@ -47,18 +47,30 @@ router.post('/analyze', authCheck, async (req, res) => {
     }
 
     try {
-        // Automatically default market based on hint to match Prediction model ENUM ('US', 'CRYPTO', 'BIST')
+        // Automatically default market based on hint to match Prediction model ENUM ('US', 'CRYPTO', 'BIST', 'COMMODITY')
         let resolvedMarket = market || 'BIST'; 
-        const sym = symbol.toUpperCase();
-        if (sym.includes('USD') || sym.includes('USDT')) resolvedMarket = 'CRYPTO';
-        else if (sym.includes('AAPL') || sym.includes('NVDA') || sym.includes('TSLA') || !sym.includes('.IS')) resolvedMarket = 'US';
-        else if (sym.includes('.IS')) resolvedMarket = 'BIST';
+        let sym = symbol.toUpperCase().trim();
+        if (!sym.includes('-')) {
+            sym = sym.replace('USD', '-USD').replace('USDT', '-USDT');
+        }
+        
+        const finalSymbol = sym;
+        
+        if (finalSymbol.includes('GC=F') || finalSymbol.includes('SI=F') || finalSymbol.includes('CL=F') || finalSymbol.includes('XAU') || finalSymbol.includes('XAG')) {
+            resolvedMarket = 'COMMODITY';
+        } else if (finalSymbol.includes('USD') || finalSymbol.includes('USDT') || finalSymbol.includes('XR')) {
+            resolvedMarket = 'CRYPTO';
+        } else if (finalSymbol.includes('AAPL') || finalSymbol.includes('NVDA') || finalSymbol.includes('TSLA') || !finalSymbol.includes('.IS')) {
+            resolvedMarket = 'US';
+        } else if (finalSymbol.includes('.IS')) {
+            resolvedMarket = 'BIST';
+        }
 
         // predictionEngine usually writes to DB
         // If DB is down, predictionEngine.generatePrediction will throw inside Prediction.create
         // So we will catch it and generate a manual fallback response so the UI still shows the AI analysis
         try {
-            const result = await predictionEngine.generatePrediction(symbol, resolvedMarket);
+            const result = await predictionEngine.generatePrediction(finalSymbol, resolvedMarket);
             res.json(result);
         } catch (engineError) {
             console.warn("predictionEngine failed (probably DB sync issue). Giving raw AI result + memory store");
@@ -105,7 +117,7 @@ router.post('/analyze', authCheck, async (req, res) => {
 
             const newObj = {
                 id: nextPredictionId++,
-                symbol: symbol,
+                symbol: finalSymbol,
                 market: resolvedMarket,
                 direction: result.direction,
                 score: result.score,
@@ -122,6 +134,26 @@ router.post('/analyze', authCheck, async (req, res) => {
 
     } catch (error) {
         console.error("Analyze Error", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Tahmin sil
+router.delete('/:id', authCheck, async (req, res) => {
+    try {
+        const deleted = await Prediction.destroy({ where: { id: req.params.id } });
+        
+        // Remove from memory store as well
+        const memIndex = memoryPredictions.findIndex(p => p.id == req.params.id);
+        if (memIndex !== -1) memoryPredictions.splice(memIndex, 1);
+
+        if (deleted || memIndex !== -1) {
+            res.json({ message: 'Prediction deleted successfully' });
+        } else {
+            res.status(404).json({ error: 'Prediction not found' });
+        }
+    } catch (error) {
+        console.error("Delete Error", error);
         res.status(500).json({ error: error.message });
     }
 });

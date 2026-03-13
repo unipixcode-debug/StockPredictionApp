@@ -15,8 +15,13 @@ class PredictionEngine {
         try {
             console.log(`Analyzing ${symbol} in ${market} market...`);
 
-            // 1. Varlık Verilerini Çek
-            const quote = await yahooFinance.quote(symbol);
+            // 1. Varlık Verilerini Çek - Emtia düzeltmesi (XAU-USD veya XAUUSD bazen hatalı veri döner)
+            let fetchSymbol = symbol;
+            if (market === 'COMMODITY' && (symbol.includes('XAU') || symbol.includes('GOLD'))) fetchSymbol = 'GC=F';
+            if (market === 'COMMODITY' && (symbol.includes('XAG') || symbol.includes('SILVER'))) fetchSymbol = 'SI=F';
+            
+            console.log(`Fetching quote for ${fetchSymbol}...`);
+            const quote = await yahooFinance.quote(fetchSymbol);
             if (!quote) throw new Error('Symbol not found');
 
             // 2. Makro / Korelasyon Verileri
