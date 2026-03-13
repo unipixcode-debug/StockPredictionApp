@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, Activity,
   ArrowUpRight, Globe, Bitcoin, RefreshCw, Zap, Newspaper,
-  Search, Play, ChevronDown, ChevronUp, Cpu, Bot, Trash2
+  Search, Play, ChevronDown, ChevronUp, Cpu, Bot, Trash2, Shield, AlertTriangle, Coins
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine
 } from 'recharts';
 import api from './api';
 import { useLanguage } from './LanguageContext';
+
+const DISCLAIMER_KEY = 'predictpro_disclaimer_accepted';
 
 const Dashboard = () => {
   const [predictions, setPredictions] = useState([]);
@@ -25,8 +27,21 @@ const Dashboard = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [filter, setFilter] = useState(t('All'));
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef(null);
+
+  // Show disclaimer on first visit
+  useEffect(() => {
+    if (!localStorage.getItem(DISCLAIMER_KEY)) {
+      setShowDisclaimer(true);
+    }
+  }, []);
+
+  const acceptDisclaimer = () => {
+    localStorage.setItem(DISCLAIMER_KEY, 'true');
+    setShowDisclaimer(false);
+  };
 
   const symbolSuggestions = [
     { name: 'BTC-USD', market: 'Crypto' }, { name: 'ETH-USD', market: 'Crypto' }, { name: 'SOL-USD', market: 'Crypto' }, { name: 'XRPUSD', market: 'Crypto' },
@@ -106,8 +121,12 @@ const Dashboard = () => {
       setSearchSymbol('');
     } catch (error) {
       console.error("Analysis request failed", error);
-      setErrorMsg("An error occurred during analysis. Please try again.");
-      setTimeout(() => setErrorMsg(null), 5000);
+      if (error?.status === 403 || error?.response?.status === 403) {
+        setErrorMsg(`⚡ Yetersiz Kredi! Mevcut: ${error?.response?.data?.credits ?? '?'} / Gereken: 20`);
+      } else {
+        setErrorMsg("An error occurred during analysis. Please try again.");
+      }
+      setTimeout(() => setErrorMsg(null), 7000);
     } finally {
       setLoadingAnalysis(false);
     }
@@ -147,6 +166,45 @@ const Dashboard = () => {
       variants={containerVariants}
       className="space-y-12"
     >
+      {/* Legal Disclaimer Modal */}
+      <AnimatePresence>
+        {showDisclaimer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-card border border-border rounded-3xl p-8 max-w-xl w-full shadow-2xl"
+            >
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-3 rounded-2xl bg-amber-500/10">
+                  <AlertTriangle className="text-amber-400" size={28} />
+                </div>
+                <h2 className="text-2xl font-black uppercase italic tracking-tight">⚠️ Yasal Uyarı</h2>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-8">
+                Bu sayfada yer alan tüm içerikler yalnızca yapay zeka tabanlı algoritmik analizden oluşmakta olup
+                yatırım tavsiyesi, finansal danışmanlık veya alım-satım önerisi niteliği taşımaz. SPK lisanslı bir
+                yatırım danışmanı hizmeti verilmemektedir. Sunulan tahminler ve analizler geçmiş verilere dayanır;
+                gelecekteki sonuçları garanti etmez. Yatırım kararlarınızı vermeden önce yetkili bir finansal
+                danışmana başvurmanız tavsiye edilir. Doğabilecek zararlardan uygulama geliştiricisi sorumlu tutulamaz.
+              </p>
+              <button
+                onClick={acceptDisclaimer}
+                className="w-full premium-button flex items-center justify-center space-x-2 py-4"
+              >
+                <Shield size={18} />
+                <span className="uppercase tracking-tighter font-black">Okudum, Anladım ve Kabul Ediyorum</span>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-4xl font-black tracking-tight italic uppercase">{t('Dashboard')}</h1>

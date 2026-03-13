@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const DataSource = require('../models/DataSource');
 const User = require('../models/User');
+const GlobalSetting = require('../models/GlobalSetting');
 const { isAdmin } = require('../middleware/auth');
 
 const fs = require('fs');
@@ -101,6 +102,62 @@ router.get('/users', async (req, res) => {
     try {
         const users = await User.findAll({ attributes: { exclude: ['password'] } });
         res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Kullanıcı kredi/tier güncelle (Admin/Developer)
+router.put('/users/:id/credits', async (req, res) => {
+    try {
+        const { credits, tier } = req.body;
+        const user = await User.findByPk(req.params.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        await user.update({ 
+            ...(credits !== undefined && { credits }), 
+            ...(tier !== undefined && { tier }) 
+        });
+        res.json({ message: 'User updated', credits: user.credits, tier: user.tier });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * Developer-Only Settings (pricing, limits)
+ * Only accessible to users with role = 'developer'
+ */
+const developerCheck = (req, res, next) => {
+    // In production this would check req.user.role === 'developer'
+    // For now, allow through, but mark with a header check for future
+    // TODO: Tie to actual auth when login flow is complete
+    next();
+};
+
+// Tüm global ayarları getir (Geliştirici paneli)
+router.get('/settings', developerCheck, async (req, res) => {
+    try {
+        const settings = await GlobalSetting.findAll();
+        res.json(settings);
+    } catch (error) {
+        // Return defaults if table doesn't exist yet
+        res.json([
+            { key: 'price_per_100_tokens', value: '9.99', description: '100 Token Paketi Fiyatı (USD)' },
+            { key: 'price_per_500_tokens', value: '39.99', description: '500 Token Paketi (Pro) Fiyatı (USD)' },
+            { key: 'price_per_1000_tokens', value: '69.99', description: '1000 Token Paketi (Premium) Fiyatı (USD)' },
+        ]);
+    }
+});
+
+// Global ayar güncelle (Geliştirici paneli)
+router.put('/settings/:key', developerCheck, async (req, res) => {
+    try {
+        const { value } = req.body;
+        const [setting, created] = await GlobalSetting.upsert({
+            key: req.params.key,
+            value: String(value),
+        });
+        res.json({ message: 'Setting updated', setting });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

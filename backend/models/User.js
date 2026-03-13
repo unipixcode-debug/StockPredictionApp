@@ -29,8 +29,17 @@ const User = sequelize.define('User', {
         allowNull: true
     },
     role: {
-        type: DataTypes.ENUM('user', 'admin'),
+        type: DataTypes.ENUM('user', 'admin', 'developer'),
         defaultValue: 'user'
+    },
+    tier: {
+        type: DataTypes.ENUM('FREE', 'PRO', 'PREMIUM'),
+        defaultValue: 'FREE'
+    },
+    credits: {
+        type: DataTypes.INTEGER,
+        defaultValue: 100,  // Free tier starts with 100 credits (5 analyses)
+        allowNull: false
     }
 }, {
     timestamps: true,

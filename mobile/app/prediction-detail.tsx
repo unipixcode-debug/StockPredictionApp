@@ -130,7 +130,11 @@ const PredictionDetailScreen = () => {
                             <View style={styles.metaDivider} />
                             <View style={styles.metaItem}>
                                 <Text style={styles.metaLabel}>MARKET</Text>
-                                <Text style={[styles.metaValue, { textTransform: 'uppercase' }]}>{prediction.market}</Text>
+                                <Text style={[styles.metaValue, { textTransform: 'uppercase' }]}>
+                                    {prediction.market === 'COMMODITY' ? 'EMTİA' : 
+                                     prediction.market === 'CRYPTO' ? 'KRİPTO' : 
+                                     prediction.market === 'BIST' ? 'BIST' : prediction.market}
+                                </Text>
                             </View>
                         </View>
                     </View>

@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, StyleSheet, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Activity, TrendingUp, TrendingDown, Clock, Search, ChevronRight, BrainCircuit } from 'lucide-react-native';
+import { Activity, TrendingUp, TrendingDown, Clock, Search, ChevronRight, BrainCircuit, Trash2, Play, RefreshCw, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Config } from '@/constants/Config';
+import { TextInput } from 'react-native';
 
 const API_BASE = `${Config.API_BASE}${Config.ENDPOINTS.PREDICTIONS}`;
+
+// Simple module-level flag to track disclaimer acceptance per session
+let disclaimerShown = false;
 
 interface Prediction {
     id: string;
@@ -21,9 +25,17 @@ const DashboardScreen = () => {
     const [predictions, setPredictions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadingAnalysis, setLoadingAnalysis] = useState(false);
     const [showNotification, setShowNotification] = useState(false);
+    const [searchSymbol, setSearchSymbol] = useState('');
     const [filter, setFilter] = useState('HEPSİ');
+    const [showDisclaimer, setShowDisclaimer] = useState(!disclaimerShown);
     const router = useRouter();
+
+    const acceptDisclaimer = () => {
+        disclaimerShown = true;
+        setShowDisclaimer(false);
+    };
 
     const fetchData = async () => {
         try {
@@ -32,15 +44,47 @@ const DashboardScreen = () => {
             setPredictions(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Fetch error:', error);
+            // Fallback mock predictions if API fails
             setPredictions([
-                { id: '1', symbol: 'BTC-USD', market: 'crypto', prediction: 'YÜKSELİŞ', sentiment_score: 85, summary: 'Güçlü hacim ve pozitif haber akışı.', createdAt: new Date().toISOString() },
-                { id: '2', symbol: 'THYAO.IS', market: 'tr_stocks', prediction: 'DÜŞÜŞ', sentiment_score: 30, summary: 'Kısa vadeli kar satışı beklentisi.', createdAt: new Date().toISOString() },
-                { id: '3', symbol: 'GOLD', market: 'commodities', prediction: 'YÜKSELİŞ', sentiment_score: 72, summary: 'Enflasyon verisi sonrası talep artışı.', createdAt: new Date().toISOString() },
-                { id: '4', symbol: 'NVDA', market: 'stocks', prediction: 'YÜKSELİŞ', sentiment_score: 91, summary: 'Yapay zeka çiplerine olan talep devam ediyor.', createdAt: new Date().toISOString() }
+                { id: '1', symbol: 'BTC-USD', market: 'CRYPTO', direction: 'BUY', score: 85, analysis_details: { summary: 'Güçlü hacim ve pozitif haber akışı.' }, createdAt: new Date().toISOString() },
+                { id: '3', symbol: 'GOLD', market: 'COMMODITY', direction: 'BUY', score: 72, analysis_details: { summary: 'Enflasyon verisi sonrası talep artışı.' }, createdAt: new Date().toISOString() },
             ]);
         } finally {
             setLoading(false);
             setRefreshing(false);
+        }
+    };
+
+    const handleAnalyze = async () => {
+        if (!searchSymbol.trim()) return;
+        setLoadingAnalysis(true);
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 5000);
+
+        try {
+            const response = await fetch(`${Config.API_BASE}/predictions/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol: searchSymbol.toUpperCase().trim() })
+            });
+            const result = await response.json();
+            if (result.id) {
+                setPredictions(prev => [result, ...prev]);
+                setSearchSymbol('');
+            }
+        } catch (error) {
+            console.error('Analysis error:', error);
+        } finally {
+            setLoadingAnalysis(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        try {
+            await fetch(`${Config.API_BASE}/predictions/${id}`, { method: 'DELETE' });
+            setPredictions(prev => prev.filter(p => p.id !== id));
+        } catch (error) {
+            console.error('Delete error:', error);
         }
     };
 
@@ -63,6 +107,22 @@ const DashboardScreen = () => {
 
     return (
         <View style={styles.container}>
+            {/* Legal Disclaimer Modal */}
+            <Modal visible={showDisclaimer} transparent animationType="fade">
+                <View style={styles.disclaimerOverlay}>
+                    <View style={styles.disclaimerCard}>
+                        <Text style={styles.disclaimerTitle}>⚠️ Yasal Uyarı</Text>
+                        <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+                            <Text style={styles.disclaimerText}>
+                                Bu sayfada yer alan tüm içerikler yalnızca yapay zeka tabanlı algoritmik analizden oluşmakta olup yatırım tavsiyesi, finansal danışmanlık veya alım-satım önerisi niteliği taşımaz. SPK lisanslı bir yatırım danışmanı hizmeti verilmemektedir. Sunulan tahminler ve analizler geçmiş verilere dayanır; gelecekteki sonuçları garanti etmez. Yatırım kararlarınızı vermeden önce yetkili bir finansal danışmana başvurmanız tavsiye edilir. Doğabilecek zararlardan uygulama geliştiricisi sorumlu tutulamaz.
+                            </Text>
+                        </ScrollView>
+                        <TouchableOpacity onPress={acceptDisclaimer} style={styles.disclaimerButton}>
+                            <Text style={styles.disclaimerButtonText}>Okudum, Anladım ve Kabul Ediyorum</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
             <SafeAreaView style={styles.safeArea}>
                 <ScrollView 
                     style={styles.scrollView}
@@ -76,8 +136,38 @@ const DashboardScreen = () => {
                             </View>
                             <Text style={styles.headerTitle}>PredictPro</Text>
                         </View>
-                        <TouchableOpacity style={styles.iconButton}>
-                            <Search size={22} color="white" />
+                        <TouchableOpacity style={styles.iconButton} onPress={onRefresh}>
+                            <RefreshCw size={22} color="white" className={refreshing ? 'animate-spin' : ''} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* AI Analysis Search Box */}
+                    <View style={styles.searchSection}>
+                        <View style={styles.searchInputWrapper}>
+                            <TextInput
+                                placeholder="Sembol ör: XRPUSD, BTC-USD"
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                value={searchSymbol}
+                                onChangeText={setSearchSymbol}
+                                style={styles.searchInput}
+                                autoCapitalize="characters"
+                            />
+                            {searchSymbol.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearchSymbol('')} style={styles.clearButton}>
+                                    <X size={16} color="rgba(255,255,255,0.4)" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <TouchableOpacity 
+                            onPress={handleAnalyze} 
+                            disabled={loadingAnalysis || !searchSymbol.trim()}
+                            style={[styles.analyzeButton, (loadingAnalysis || !searchSymbol.trim()) && { opacity: 0.5 }]}
+                        >
+                            {loadingAnalysis ? (
+                                <ActivityIndicator size="small" color="#0f172a" />
+                            ) : (
+                                <Play size={20} color="#0f172a" fill="#0f172a" />
+                            )}
                         </TouchableOpacity>
                     </View>
 
@@ -88,20 +178,21 @@ const DashboardScreen = () => {
                         <MarketStatCard label="İşlem Hacmi" value="Yüksek" score={88} color="indigo" />
                     </ScrollView>
 
-                    {/* Predictions List Header */}
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Son Tahminler</Text>
-                        <View style={styles.tabRow}>
-                            {['HEPSİ', 'KRİPTO', 'BORSA'].map((tab) => (
-                                <TouchableOpacity 
-                                    key={tab} 
-                                    onPress={() => setFilter(tab)}
-                                    style={[styles.tabButton, filter === tab && styles.tabButtonActive]}
-                                >
-                                    <Text style={[styles.tabText, filter === tab && styles.tabTextActive]}>{tab}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
+                            <View style={styles.tabRow}>
+                                {['HEPSİ', 'KRİPTO', 'BORSA', 'EMTİA'].map((tab) => (
+                                    <TouchableOpacity 
+                                        key={tab} 
+                                        onPress={() => setFilter(tab)}
+                                        style={[styles.tabButton, filter === tab && styles.tabButtonActive]}
+                                    >
+                                        <Text style={[styles.tabText, filter === tab && styles.tabTextActive]}>{tab}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </ScrollView>
                     </View>
 
                     {/* Notification Overlay */}
@@ -120,7 +211,8 @@ const DashboardScreen = () => {
                             .filter(p => {
                                 if (filter === 'HEPSİ') return true;
                                 if (filter === 'KRİPTO') return p.market?.toLowerCase().includes('crypto');
-                                return p.market?.toLowerCase().includes('stock') || p.market?.toLowerCase().includes('bist') || p.market?.toLowerCase().includes('tr_stocks');
+                                if (filter === 'EMTİA') return p.market?.toLowerCase().includes('commodity');
+                                return p.market?.toLowerCase().includes('stock') || p.market?.toLowerCase().includes('bist') || p.market?.toLowerCase().includes('us');
                             })
                             .map((item) => (
                             <TouchableOpacity 
@@ -140,6 +232,9 @@ const DashboardScreen = () => {
                                         <Text style={[styles.predictionStatusText, { color: item.direction === 'BUY' ? '#4ade80' : item.direction === 'HOLD' ? '#f59e0b' : '#f87171' }]}>
                                             {item.direction || item.prediction}
                                         </Text>
+                                        <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteButton}>
+                                            <Trash2 size={16} color="rgba(248, 113, 113, 0.6)" />
+                                        </TouchableOpacity>
                                     </View>
                                     <View style={styles.priceRow}>
                                         <Text style={styles.priceLabel}>Fiyat:</Text>
@@ -197,10 +292,17 @@ const styles = StyleSheet.create({
     sectionHeader: { flexDirection: 'column', alignItems: 'flex-start', marginBottom: 20 },
     sectionTitle: { fontSize: 20, fontWeight: '900', color: 'white', marginBottom: 12, textTransform: 'uppercase', fontStyle: 'italic' },
     tabRow: { flexDirection: 'row', gap: 8 },
+    tabScroll: { marginTop: 4 },
     tabButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
     tabButtonActive: { backgroundColor: '#22d3ee', borderColor: '#22d3ee' },
     tabText: { fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.5)' },
     tabTextActive: { color: '#0f172a' },
+    searchSection: { flexDirection: 'row', gap: 12, marginBottom: 32 },
+    searchInputWrapper: { flex: 1, height: 50, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
+    searchInput: { flex: 1, color: 'white', fontWeight: '700', fontSize: 14 },
+    clearButton: { padding: 4 },
+    analyzeButton: { width: 50, height: 50, backgroundColor: '#22d3ee', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    deleteButton: { padding: 4, marginLeft: 8 },
     notificationCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(34, 211, 238, 0.1)', padding: 16, borderRadius: 20, marginBottom: 20, borderLeftWidth: 4, borderLeftColor: '#22d3ee' },
     notificationTitle: { fontSize: 14, fontWeight: '900', color: 'white', marginBottom: 2 },
     notificationDesc: { fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 16 },
@@ -208,8 +310,8 @@ const styles = StyleSheet.create({
     predictionCard: { backgroundColor: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 24, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 16 },
     predictionIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
     predictionContent: { flex: 1 },
-    predictionCardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-    symbolText: { fontSize: 18, fontWeight: '900', color: 'white', letterSpacing: -0.5 },
+    predictionCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    symbolText: { fontSize: 18, fontWeight: '900', color: 'white', letterSpacing: -0.5, flex: 1 },
     priceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 },
     priceLabel: { fontSize: 10, color: 'rgba(255,255,255,0.3)', fontWeight: '800', textTransform: 'uppercase' },
     priceValue: { fontSize: 12, fontWeight: '900', color: 'rgba(255,255,255,0.8)' },
@@ -218,7 +320,14 @@ const styles = StyleSheet.create({
     cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 12 },
     timeContainer: { flexDirection: 'row', alignItems: 'center' },
     timeText: { fontSize: 10, color: 'rgba(255,255,255,0.3)', fontWeight: '600', marginLeft: 6 },
-    scoreText: { fontSize: 10, fontWeight: '900', color: 'rgba(34, 211, 238, 0.5)', textTransform: 'uppercase' }
+    scoreText: { fontSize: 10, fontWeight: '900', color: 'rgba(34, 211, 238, 0.5)', textTransform: 'uppercase' },
+    // Disclaimer styles
+    disclaimerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    disclaimerCard: { backgroundColor: '#0f172a', borderRadius: 32, padding: 28, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', width: '100%' },
+    disclaimerTitle: { fontSize: 22, fontWeight: '900', color: '#f59e0b', marginBottom: 16, textAlign: 'center' },
+    disclaimerText: { fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 22 },
+    disclaimerButton: { backgroundColor: '#22d3ee', padding: 18, borderRadius: 20, marginTop: 20, alignItems: 'center' },
+    disclaimerButtonText: { color: '#0f172a', fontWeight: '900', fontSize: 14 },
 });
 
 export default DashboardScreen;

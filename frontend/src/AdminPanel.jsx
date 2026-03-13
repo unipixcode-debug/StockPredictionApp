@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
     Database, Plus, Trash2, Globe, Server, 
-    Rss, Code, ShieldCheck, Zap, ArrowRight, RefreshCw, Palette, CheckCircle2, XCircle
+    Rss, Code, ShieldCheck, Zap, ArrowRight, RefreshCw, Palette, CheckCircle2, XCircle, Coins, Lock
 } from 'lucide-react';
 import api from './api';
 import { useTheme } from './ThemeContext';
@@ -19,10 +19,76 @@ const AdminPanel = () => {
     type: 'NEWS_RSS',
     url: '',
   });
+  const [pricing, setPricing] = useState([
+    { key: 'price_per_100_tokens', value: '9.99', description: '100 Token Paketi Fiyatı (USD)' },
+    { key: 'price_per_500_tokens', value: '39.99', description: '500 Token Paketi (Pro) Fiyatı (USD)' },
+    { key: 'price_per_1000_tokens', value: '69.99', description: '1000 Token Paketi (Premium) Fiyatı (USD)' },
+  ]);
+  const [savingPrice, setSavingPrice] = useState(false);
+  const [priceSaved, setPriceSaved] = useState(false);
+  const [featureToggles, setFeatureToggles] = useState({
+    news_enabled: true,
+    auto_prediction_enabled: true,
+    money_flow_ai_enabled: true,
+  });
+  const [creditLogs, setCreditLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   useEffect(() => {
     fetchSources();
+    fetchPricing();
+    fetchFeatureToggles();
+    fetchCreditLogs();
   }, []);
+
+  const fetchFeatureToggles = async () => {
+    try {
+      const data = await api.get('/admin/settings');
+      const toggleMap = {};
+      data.forEach(s => {
+        if (s.key.endsWith('_enabled')) toggleMap[s.key] = s.value === 'true';
+      });
+      if (Object.keys(toggleMap).length) setFeatureToggles(prev => ({...prev, ...toggleMap}));
+    } catch (e) {}
+  };
+
+  const toggleFeature = async (key) => {
+    const newValue = !featureToggles[key];
+    setFeatureToggles(prev => ({...prev, [key]: newValue}));
+    try {
+      await api.put(`/admin/settings/${key}`, { value: String(newValue) });
+    } catch (e) { console.error('Toggle save failed', e); }
+  };
+
+  const fetchCreditLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      const users = await api.get('/admin/users');
+      setCreditLogs(users);
+    } catch (e) {} finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const fetchPricing = async () => {
+    try {
+      const data = await api.get('/admin/settings');
+      if (Array.isArray(data) && data.length > 0) setPricing(data);
+    } catch (e) { /* use defaults */ }
+  };
+
+  const savePricing = async (key, value) => {
+    setSavingPrice(true);
+    try {
+      await api.put(`/admin/settings/${key}`, { value });
+      setPriceSaved(true);
+      setTimeout(() => setPriceSaved(false), 2000);
+    } catch (e) {
+      console.error('Failed to save pricing', e);
+    } finally {
+      setSavingPrice(false);
+    }
+  };
 
   const { primaryColor, updatePrimaryColor, hexToHSL, hslStringToHex } = useTheme();
 
@@ -304,6 +370,177 @@ const AdminPanel = () => {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Developer-Only: Token Pricing Settings */}
+      <div className="premium-card p-6 mt-8 border-2 border-amber-500/20 bg-amber-500/5">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="p-3 rounded-2xl bg-amber-500/10">
+            <Lock className="text-amber-400" size={20} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-tight">Geliştirici: Token Fiyatları</h3>
+            <p className="text-xs text-muted-foreground">Bu bölüm yalnızca geliştirici rolü tarafından görülebilir.</p>
+          </div>
+          {priceSaved && (
+            <span className="ml-auto text-xs text-emerald-400 font-black flex items-center space-x-1">
+              <CheckCircle2 size={14} /> <span>Kaydedildi</span>
+            </span>
+          )}
+        </div>
+        <div className="space-y-4">
+          {pricing.map((p) => (
+            <div key={p.key} className="flex items-center space-x-4">
+              <label className="flex-1 text-sm font-bold text-muted-foreground">{p.description}</label>
+              <div className="flex items-center space-x-2">
+                <span className="text-muted-foreground font-bold">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={pricing.find(x => x.key === p.key)?.value ?? p.value}
+                  onChange={(e) => setPricing(prev => prev.map(x => x.key === p.key ? {...x, value: e.target.value} : x))}
+                  className="w-24 bg-secondary/30 border border-border rounded-xl px-3 py-2 text-sm font-bold text-center focus:outline-none focus:border-amber-500/50"
+                />
+                <button
+                  onClick={() => savePricing(p.key, pricing.find(x => x.key === p.key)?.value)}
+                  disabled={savingPrice}
+                  className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-black hover:bg-amber-500/20 transition-all disabled:opacity-50"
+                >
+                  {savingPrice ? '...' : 'Kaydet'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Feature Toggles - Admin Control */}
+      <div className="premium-card p-6 mt-8 border border-border">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="p-3 rounded-2xl bg-primary/10"><Zap className="text-primary" size={20} /></div>
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-tight">Özellik Kontrolü</h3>
+            <p className="text-xs text-muted-foreground">AI özelliklerini etkinleştir/devre dışı bırak</p>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {[
+            { key: 'news_enabled', label: 'Haber Akışı (News)', desc: 'Aylık 20 Token harcatır. Kapatırsan haber tabı devre dışı kalır.' },
+            { key: 'auto_prediction_enabled', label: 'Otomatik Tahmin', desc: 'Sistem periyodik olarak tahmin üretmesini durdurur.' },
+            { key: 'money_flow_ai_enabled', label: 'Money Flow AI Analizi', desc: 'Para akışı sayfasındaki AI yorumlarını kapatır.' },
+          ].map(feat => (
+            <div key={feat.key} className="flex items-center justify-between p-4 rounded-2xl bg-secondary/20 border border-border">
+              <div>
+                <p className="text-sm font-bold">{feat.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{feat.desc}</p>
+              </div>
+              <button
+                onClick={() => toggleFeature(feat.key)}
+                className={`relative w-12 h-6 rounded-full transition-all ${
+                  featureToggles[feat.key] ? 'bg-primary' : 'bg-secondary'
+                }`}
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow ${
+                  featureToggles[feat.key] ? 'left-7' : 'left-1'
+                }`} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Credit Usage Log */}
+      <div className="premium-card p-6 mt-8 border border-border">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="p-3 rounded-2xl bg-emerald-500/10"><Coins className="text-emerald-400" size={20} /></div>
+            <div>
+              <h3 className="text-lg font-black uppercase tracking-tight">Kredi Kullanım Dökümü</h3>
+              <p className="text-xs text-muted-foreground">Kullanıcı bazında kalan kredi ve paket bilgisi</p>
+            </div>
+          </div>
+          <button onClick={fetchCreditLogs} className="text-xs font-bold text-primary hover:opacity-70 transition-opacity"><RefreshCw size={14} /></button>
+        </div>
+        {loadingLogs ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">Yükleniyor...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-black uppercase text-muted-foreground border-b border-border">
+                  <th className="pb-3 pr-4">Kullanıcı</th>
+                  <th className="pb-3 pr-4">Paket</th>
+                  <th className="pb-3 pr-4">Kredi</th>
+                  <th className="pb-3">Rol</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {creditLogs.map(u => (
+                  <tr key={u.id} className="text-muted-foreground">
+                    <td className="py-3 pr-4 font-bold text-foreground">{u.name || u.email}</td>
+                    <td className="py-3 pr-4">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                        u.tier === 'PREMIUM' ? 'bg-amber-500/10 text-amber-400' :
+                        u.tier === 'PRO' ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'
+                      }`}>{u.tier || 'FREE'}</span>
+                    </td>
+                    <td className={`py-3 pr-4 font-black ${
+                      u.role === 'developer' ? 'text-amber-400' : (u.credits ?? 100) < 20 ? 'text-rose-400' : 'text-emerald-400'
+                    }`}>{u.role === 'developer' ? '∞ Sınırsız' : (u.credits ?? '100')}</td>
+                    <td className="py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                        u.role === 'developer' ? 'bg-amber-500/10 text-amber-400' :
+                        u.role === 'admin' ? 'bg-rose-500/10 text-rose-400' : 'bg-secondary text-muted-foreground'
+                      }`}>{u.role || 'user'}</span>
+                    </td>
+                  </tr>
+                ))}
+                {creditLogs.length === 0 && (
+                  <tr><td colSpan={4} className="py-8 text-center text-muted-foreground text-xs">Henüz kullanıcı yok</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Developer-Only: Token Pricing Settings */}
+      <div className="premium-card p-6 mt-8 border-2 border-amber-500/20 bg-amber-500/5">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="p-3 rounded-2xl bg-amber-500/10"><Lock className="text-amber-400" size={20} /></div>
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-tight">Geliştirici: Token Fiyatları</h3>
+            <p className="text-xs text-muted-foreground">Bu bölüm yalnızca geliştirici rolü tarafından görülebilir.</p>
+          </div>
+          {priceSaved && (
+            <span className="ml-auto text-xs text-emerald-400 font-black flex items-center space-x-1">
+              <CheckCircle2 size={14} /> <span>Kaydedildi</span>
+            </span>
+          )}
+        </div>
+        <div className="space-y-4">
+          {pricing.map((p) => (
+            <div key={p.key} className="flex items-center space-x-4">
+              <label className="flex-1 text-sm font-bold text-muted-foreground">{p.description}</label>
+              <div className="flex items-center space-x-2">
+                <span className="text-muted-foreground font-bold">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={pricing.find(x => x.key === p.key)?.value ?? p.value}
+                  onChange={(e) => setPricing(prev => prev.map(x => x.key === p.key ? {...x, value: e.target.value} : x))}
+                  className="w-24 bg-secondary/30 border border-border rounded-xl px-3 py-2 text-sm font-bold text-center focus:outline-none focus:border-amber-500/50"
+                />
+                <button
+                  onClick={() => savePricing(p.key, pricing.find(x => x.key === p.key)?.value)}
+                  disabled={savingPrice}
+                  className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-black hover:bg-amber-500/20 transition-all disabled:opacity-50"
+                >
+                  {savingPrice ? '...' : 'Kaydet'}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </motion.div>

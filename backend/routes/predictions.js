@@ -2,7 +2,10 @@ const express = require('express');
 const router = express.Router();
 const predictionEngine = require('../services/predictionEngine');
 const Prediction = require('../models/Prediction');
+const User = require('../models/User');
 const { isAdmin } = require('../middleware/auth');
+
+const CREDIT_COST_PER_ANALYSIS = 20;
 
 // In-memory array to store newly requested predictions if DB is down
 const memoryPredictions = [];
@@ -36,11 +39,39 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// Bypass isAdmin for local testing/demo
+// Bypass isAdmin for local testing/demo (allows anonymous users to analyze)
 const authCheck = (req, res, next) => next();
 
-// Yeni tahmin tetikle (Admin yetkisi gerekir - bypassed for demo)
-router.post('/analyze', authCheck, async (req, res) => {
+// Credit check middleware for analyze
+const creditCheck = async (req, res, next) => {
+    // If user is logged in, check/deduct credits
+    if (req.user) {
+        const user = await User.findByPk(req.user.id);
+        if (!user) return next(); // Can't find user, allow for now
+
+        // Developer role has unlimited credits
+        if (user.role === 'developer' || user.role === 'admin') {
+            req.dbUser = user;
+            return next();
+        }
+
+        // Regular users: check credits
+        if (user.credits < CREDIT_COST_PER_ANALYSIS) {
+            return res.status(403).json({ 
+                error: 'Yetersiz Kredi', 
+                credits: user.credits, 
+                required: CREDIT_COST_PER_ANALYSIS,
+                tier: user.tier
+            });
+        }
+
+        req.dbUser = user;
+    }
+    next();
+};
+
+// Yeni tahmin tetikle
+router.post('/analyze', authCheck, creditCheck, async (req, res) => {
     const { symbol, market } = req.body;
     if (!symbol) {
         return res.status(400).json({ error: 'Symbol is required' });
@@ -64,6 +95,11 @@ router.post('/analyze', authCheck, async (req, res) => {
             resolvedMarket = 'US';
         } else if (finalSymbol.includes('.IS')) {
             resolvedMarket = 'BIST';
+        }
+
+        // Deduct credits BEFORE running the potentially expensive analysis
+        if (req.dbUser && req.dbUser.role !== 'developer' && req.dbUser.role !== 'admin') {
+            await req.dbUser.update({ credits: req.dbUser.credits - CREDIT_COST_PER_ANALYSIS });
         }
 
         // predictionEngine usually writes to DB
