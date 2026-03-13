@@ -146,6 +146,41 @@ const PredictionDetailScreen = () => {
                         <LevelCard label="STOP" value={prediction.stopLoss} color="#f87171" />
                     </View>
 
+                    {/* AI vs ML Comparison Chart */}
+                    <View style={styles.chartSection}>
+                        <View style={styles.sectionTitleRow}>
+                            <Activity color="#22d3ee" size={20} />
+                            <Text style={styles.sectionTitle}>Model Karşılaştırması (AI vs ML)</Text>
+                        </View>
+                        
+                        <View style={styles.chartLegend}>
+                            <View style={styles.legendItem}>
+                                <View style={[styles.legendDot, { backgroundColor: '#00f2fe' }]} />
+                                <Text style={styles.legendText}>AI Skor (Flash)</Text>
+                            </View>
+                            <View style={styles.legendItem}>
+                                <View style={[styles.legendDot, { backgroundColor: '#4ade80' }]} />
+                                <Text style={styles.legendText}>ML Skor (Stable)</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.customChartContainer}>
+                            {prediction.analysis_details?.chartData ? (
+                                prediction.analysis_details.chartData.map((d: any, i: number) => (
+                                    <View key={i} style={styles.chartColumn}>
+                                        <View style={styles.barStack}>
+                                            <View style={[styles.bar, { height: (d.ai * 1.2), backgroundColor: '#00f2fe', opacity: 0.8 }]} />
+                                            <View style={[styles.bar, { height: (d.ml * 1.2), backgroundColor: '#4ade80', opacity: 0.8 }]} />
+                                        </View>
+                                        <Text style={styles.columnLabel}>{d.timeframe}</Text>
+                                    </View>
+                                ))
+                            ) : (
+                                <Text style={styles.noDataText}>Grafik verisi mevcut değil.</Text>
+                            )}
+                        </View>
+                    </View>
+
                     {/* AI Reasoning Section */}
                     <View style={styles.analysisSection}>
                         <View style={styles.sectionTitleRow}>
@@ -231,7 +266,31 @@ const styles = StyleSheet.create({
     timeBadge: { flexDirection: 'row', alignItems: 'center' },
     timeText: { fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: '600', marginLeft: 8 },
     shieldBadge: { flexDirection: 'row', alignItems: 'center' },
-    shieldText: { fontSize: 10, color: '#4ade80', fontWeight: '900', letterSpacing: 1.5, marginLeft: 6 }
+    shieldText: { fontSize: 10, color: '#4ade80', fontWeight: '900', letterSpacing: 1.5, marginLeft: 6 },
+    // Chart Styles
+    chartSection: { marginTop: 40 },
+    chartLegend: { flexDirection: 'row', gap: 16, marginBottom: 24, justifyContent: 'center' },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    legendDot: { width: 8, height: 8, borderRadius: 4 },
+    legendText: { fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: '800', textTransform: 'uppercase' },
+    customChartContainer: { 
+        height: 180, 
+        backgroundColor: 'rgba(255,255,255,0.02)', 
+        borderRadius: 32, 
+        borderWidth: 1, 
+        borderColor: 'rgba(255,255,255,0.05)',
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 40,
+        paddingTop: 20
+    },
+    chartColumn: { alignItems: 'center', gap: 8 },
+    barStack: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+    bar: { width: 6, borderRadius: 3 },
+    columnLabel: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.2)', position: 'absolute', bottom: -25 },
+    noDataText: { fontSize: 12, color: 'rgba(255,255,255,0.3)', width: '100%', textAlign: 'center' },
 });
 
 export default PredictionDetailScreen;
