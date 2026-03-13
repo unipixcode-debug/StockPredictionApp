@@ -47,10 +47,12 @@ router.post('/analyze', authCheck, async (req, res) => {
     }
 
     try {
-        // Automatically default market based on hint
-        let resolvedMarket = market || 'Genel';
-        if (symbol.toUpperCase().includes('USD') || symbol.toUpperCase().includes('USDT')) resolvedMarket = 'Crypto';
-        if (symbol.toUpperCase().includes('AAPL') || symbol.toUpperCase().includes('NVDA')) resolvedMarket = 'US Stock';
+        // Automatically default market based on hint to match Prediction model ENUM ('US', 'CRYPTO', 'BIST')
+        let resolvedMarket = market || 'BIST'; 
+        const sym = symbol.toUpperCase();
+        if (sym.includes('USD') || sym.includes('USDT')) resolvedMarket = 'CRYPTO';
+        else if (sym.includes('AAPL') || sym.includes('NVDA') || sym.includes('TSLA') || !sym.includes('.IS')) resolvedMarket = 'US';
+        else if (sym.includes('.IS')) resolvedMarket = 'BIST';
 
         // predictionEngine usually writes to DB
         // If DB is down, predictionEngine.generatePrediction will throw inside Prediction.create
@@ -67,7 +69,7 @@ router.post('/analyze', authCheck, async (req, res) => {
             Provide a detailed, confident analysis and a score.
             Format exactly as JSON: {"direction": "BUY" or "SELL" or "HOLD", "confidenceScore": 0-100 (integer), "analysisText": "your detailed reasoning"}`;
             
-            const responseText = await aiService.generateContent(prompt, "gemini-1.5-flash");
+            const responseText = await aiService.generateContent(prompt, "gemini-1.5-flash-latest");
             
             let result = { direction: "HOLD", score: 50, summary: "Analiz tamamlanamadı." };
             try {

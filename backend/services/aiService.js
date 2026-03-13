@@ -77,7 +77,7 @@ class AIService {
                 
                 if (provider.type === 'GEMINI') {
                     // Correcting SDK usage: getGenerativeModel
-                    const model = provider.instance.getGenerativeModel({ model: modelOverride || "gemini-1.5-flash" });
+                    const model = provider.instance.getGenerativeModel({ model: modelOverride || "gemini-1.5-flash-latest" });
                     const result = await model.generateContent(prompt);
                     const response = await result.response;
                     return response.text();
@@ -147,7 +147,7 @@ class AIService {
 
             const prompt = `Translate the following JSON array of news articles to Turkish. Ensure the output is valid, complete JSON. Do not cut off the output. Return ONLY the JSON array containing exactly the same 'id' fields and the translated 'title' and 'snippet' fields.\n\n${JSON.stringify(payload)}`;
             
-            const responseText = await this.generateContent(prompt, "gemini-1.5-flash");
+            const responseText = await this.generateContent(prompt, "gemini-1.5-flash-latest");
             
             // Clean up backticks if model ignored instruction
             let cleanJson = responseText.trim();
@@ -206,7 +206,7 @@ Use the exact following structure:
 Article Text:
 ${textToSummarize.substring(0, 15000)}
 `;
-            return await this.generateContent(prompt, "gemini-1.5-flash");
+            return await this.generateContent(prompt, "gemini-1.5-flash-latest");
         } catch (error) {
             console.error("AI Article Summarization Error:", error.message);
             throw error;
