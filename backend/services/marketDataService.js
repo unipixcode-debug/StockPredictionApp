@@ -16,7 +16,7 @@ class MarketDataService {
                 gold: 'GC=F',
                 silver: 'SI=F',
                 oil: 'CL=F', // Crude Oil
-                bonds: '^TNX', // 10 Year Treasury Yield
+                bonds: '^TNX', // US 10 Year Treasury Yield
                 dxy: 'DX=F',
                 btc: 'BTC-USD',
                 eth: 'ETH-USD',
@@ -24,7 +24,20 @@ class MarketDataService {
                 nasdaq: '^IXIC',
                 bist100: 'XU100.IS',
                 sse: '000001.SS', // Shanghai Composite
-                stoxx: '^STOXX50E' // Euro Stoxx 50
+                stoxx: '^STOXX50E', // Euro Stoxx 50
+                // Expanded Commodities
+                copper: 'HG=F',
+                platinum: 'PL=F',
+                palladium: 'PA=F',
+                naturalGas: 'NG=F',
+                wheat: 'ZW=F',
+                corn: 'ZC=F',
+                coffee: 'KC=F',
+                // Expanded Bonds
+                japan10y: '^JGB10',
+                uk10y: '^GILT', // This might need verification, but it's common
+                germany10y: '^GDBR10',
+                turkey10y: 'TR10Y.IS'
             };
 
             const results = {};

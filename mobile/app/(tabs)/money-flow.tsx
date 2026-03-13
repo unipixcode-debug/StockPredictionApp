@@ -14,7 +14,7 @@ import { Config } from '@/constants/Config';
 
 const API_BASE = `${Config.API_BASE}${Config.ENDPOINTS.MARKET_FLOW}`;
 
-interface SubAsset { name: string; value?: number; change: number; symbol?: string; }
+interface SubAsset { name: string; value?: number; change: number; symbol?: string; price?: number; }
 interface Asset { id: string; name: string; value: number; change: number; flowAmount?: number; color: string; unit: string; subAssets?: SubAsset[]; }
 interface MarketData { assets: Asset[]; indicators: { vix: { price: number; change: number }; dxy: { price: number; change: number }; }; }
 
@@ -134,7 +134,10 @@ const MoneyFlowScreen = () => {
 
                     {/* VIX / DXY */}
                     <View style={s.indicatorsRow}>
-                        <View style={s.indicatorCard}>
+                        <TouchableOpacity 
+                            onPress={() => router.push({ pathname: '/market-chart' as any, params: { name: 'VIX Korku Endeksi', symbol: '^VIX' } })}
+                            style={s.indicatorCard}
+                        >
                             <Text style={s.indicatorLabel}>VIX</Text>
                             <Text style={[s.indicatorValue, { color: data.indicators.vix.change > 0 ? '#f87171' : '#4ade80' }]}>
                                 {data.indicators.vix.price.toFixed(1)}
@@ -142,8 +145,11 @@ const MoneyFlowScreen = () => {
                             <Text style={[s.indicatorChange, { color: data.indicators.vix.change > 0 ? '#f87171' : '#4ade80' }]}>
                                 {data.indicators.vix.change > 0 ? '▲' : '▼'} {Math.abs(data.indicators.vix.change).toFixed(2)}
                             </Text>
-                        </View>
-                        <View style={[s.indicatorCard, s.indicatorCardRight]}>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            onPress={() => router.push({ pathname: '/market-chart' as any, params: { name: 'DXY Dolar Endeksi', symbol: 'DX-Y.NYB' } })}
+                            style={[s.indicatorCard, s.indicatorCardRight]}
+                        >
                             <Text style={s.indicatorLabel}>DXY</Text>
                             <Text style={[s.indicatorValue, { color: data.indicators.dxy.change > 0 ? '#4ade80' : '#f87171' }]}>
                                 {data.indicators.dxy.price.toFixed(1)}
@@ -151,7 +157,7 @@ const MoneyFlowScreen = () => {
                             <Text style={[s.indicatorChange, { color: data.indicators.dxy.change > 0 ? '#4ade80' : '#f87171' }]}>
                                 {data.indicators.dxy.change > 0 ? '▲' : '▼'} {Math.abs(data.indicators.dxy.change).toFixed(2)}
                             </Text>
-                        </View>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Assets */}
@@ -225,9 +231,16 @@ const MoneyFlowScreen = () => {
                                                 >
                                                     <View>
                                                         <Text style={s.subName}>{sub.name}</Text>
-                                                        {sub.value != null && (
-                                                            <Text style={s.subValue}>${sub.value.toFixed(2)}{asset.unit}</Text>
-                                                        )}
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                            {sub.value != null && (
+                                                                <Text style={s.subValue}>${sub.value.toFixed(2)}{asset.unit}</Text>
+                                                            )}
+                                                            {sub.price != null && (
+                                                                <Text style={[s.subValue, { marginLeft: 8, color: '#22d3ee', fontWeight: '800' }]}>
+                                                                    · ${sub.price > 1000 ? sub.price.toLocaleString() : sub.price.toFixed(2)}
+                                                                </Text>
+                                                            )}
+                                                        </View>
                                                     </View>
                                                     <View style={s.subRight}>
                                                         <Text style={[s.subChange, { color: sub.change > 0 ? '#4ade80' : '#f87171' }]}>

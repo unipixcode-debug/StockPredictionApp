@@ -22,19 +22,32 @@ const MarketChartScreen = () => {
             'Gümüş': cur === 'USD' ? 'TVC:SILVER' : 'OANDA:XAGTRY',
             'Petrol': 'TVC:USOIL',
             'Bakır': 'TVC:COPPER',
+            'Platin': 'NYMEX:PL1!',
+            'Palladyum': 'NYMEX:PA1!',
+            'Doğalgaz': 'NYMEX:NG1!',
+            'Buğday': 'CBOT:ZW1!',
+            'Mısır': 'CBOT:ZC1!',
+            'Kahve': 'ICEUS:KC1!',
             'S&P500': 'FOREXCOM:SPXUSD',
             'Nasdaq': 'CURRENCYCOM:NAS100',
             'BIST100': 'BIST:XU100',
             'ABD 10Y': 'TVC:US10Y',
             'ABD 2Y': 'TVC:US02Y',
             'Almanya 10Y': 'TVC:DE10Y',
+            'Japonya 10Y': 'TVC:JP10Y',
+            'İngiltere 10Y': 'TVC:GB10Y',
             'Türkiye 10Y': 'TVC:TR10Y',
             'BTC Dominans': 'CRYPTOCAP:BTC.D',
             'Kripto Toplam': 'CRYPTOCAP:TOTAL',
             'Kripto Altcoin Toplam': 'CRYPTOCAP:TOTAL2',
             'Bitcoin': cur === 'USD' ? 'BINANCE:BTCUSDT' : 'BINANCE:BTCTRY',
             'Ethereum': cur === 'USD' ? 'BINANCE:ETHUSDT' : 'BINANCE:ETHTRY',
-            'Solana': cur === 'USD' ? 'BINANCE:SOLUSDT' : 'BINANCE:SOLTRY'
+            'Solana': cur === 'USD' ? 'BINANCE:SOLUSDT' : 'BINANCE:SOLTRY',
+            // Category Mappings
+            'commodities': 'TVC:GOLD',
+            'stocks': 'FOREXCOM:SPXUSD',
+            'crypto': 'BINANCE:BTCUSDT',
+            'bonds': 'TVC:US10Y'
         };
         
         // If it's a BIST stock like THYAO.IS, TV symbol is BIST:THYAO

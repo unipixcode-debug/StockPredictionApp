@@ -162,14 +162,20 @@ const MoneyFlow = () => {
                     </div>
                 </div>
                 <div className="flex items-center flex-wrap gap-6">
-                    <div className="px-6 py-3 bg-secondary/40 backdrop-blur-md rounded-4xl border border-border flex items-center space-x-4 shadow-inner">
-                        <span className="text-xs font-black tracking-widest text-muted-foreground uppercase opacity-50">VIX:</span>
+                    <div 
+                        onClick={() => goToChart('^VIX', 'VIX Endeksi')}
+                        className="px-6 py-3 bg-secondary/40 hover:bg-secondary/60 backdrop-blur-md rounded-4xl border border-border flex items-center space-x-4 shadow-inner cursor-pointer transition-all active:scale-95 group"
+                    >
+                        <span className="text-xs font-black tracking-widest text-muted-foreground uppercase opacity-50 group-hover:text-primary transition-colors">VIX:</span>
                         <span className={`text-xl font-black italic ${data?.indicators?.vix?.change > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                             {data?.indicators?.vix?.price?.toFixed(2)}
                         </span>
                     </div>
-                    <div className="px-6 py-3 bg-secondary/40 backdrop-blur-md rounded-4xl border border-border flex items-center space-x-4 shadow-inner">
-                        <span className="text-xs font-black tracking-widest text-muted-foreground uppercase opacity-50">DXY:</span>
+                    <div 
+                        onClick={() => goToChart('DX-Y.NYB', 'Dolar Endeksi')}
+                        className="px-6 py-3 bg-secondary/40 hover:bg-secondary/60 backdrop-blur-md rounded-4xl border border-border flex items-center space-x-4 shadow-inner cursor-pointer transition-all active:scale-95 group"
+                    >
+                        <span className="text-xs font-black tracking-widest text-muted-foreground uppercase opacity-50 group-hover:text-primary transition-colors">DXY:</span>
                         <span className={`text-xl font-black italic ${data?.indicators?.dxy?.change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {data?.indicators?.dxy?.price?.toFixed(2)}
                         </span>
@@ -303,11 +309,18 @@ const MoneyFlow = () => {
                                                                 </div>
                                                                 <div className="flex flex-col">
                                                                     <span className="text-sm font-black uppercase tracking-tight italic">{sub.name}</span>
-                                                                    {sub.value && (
-                                                                        <span className="text-[10px] font-bold text-muted-foreground opacity-50 uppercase tracking-widest leading-none mt-1">
-                                                                            ${sub.value.toFixed(2)}{asset.unit}
-                                                                        </span>
-                                                                    )}
+                                                                    <div className="flex items-center space-x-2 mt-1">
+                                                                        {sub.value && (
+                                                                            <span className="text-[10px] font-bold text-muted-foreground opacity-50 uppercase tracking-widest leading-none">
+                                                                                ${sub.value.toFixed(2)}{asset.unit}
+                                                                            </span>
+                                                                        )}
+                                                                        {sub.price && (
+                                                                            <span className="text-[10px] font-black text-primary opacity-80 uppercase tracking-widest leading-none border-l border-border pl-2">
+                                                                                Fiyat: ${sub.price > 1000 ? sub.price.toLocaleString() : sub.price.toFixed(2)}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                             <span className={`text-xl font-black italic shadow-text ${sub.change > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>

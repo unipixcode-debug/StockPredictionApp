@@ -39,15 +39,22 @@ class FlowService {
                 {
                     id: 'commodities',
                     name: 'EMTİA',
-                    value: this.calcValue(baseValues.gold + baseValues.silver + baseValues.oil, (indicators.gold?.change || 0) * mult),
+                    value: this.calcValue(baseValues.gold + baseValues.silver + baseValues.oil + 1.5, (indicators.gold?.change || 0) * mult), // Added 1.5T for "Others"
                     change: (indicators.gold?.change || 0) * mult,
-                    flowAmount: Math.abs((baseValues.gold + baseValues.silver + baseValues.oil) * (indicators.gold?.change || 0) / 100) * 0.4 * mult,
+                    flowAmount: Math.abs((baseValues.gold + baseValues.silver + baseValues.oil + 1.5) * (indicators.gold?.change || 0) / 100) * 0.4 * mult,
                     color: 'orange',
                     unit: 'T$',
                     subAssets: [
-                        { name: 'Altın', value: baseValues.gold, change: (indicators.gold?.change || 0) * mult },
-                        { name: 'Gümüş', value: baseValues.silver, change: (indicators.silver?.change || 0) * mult },
-                        { name: 'Petrol', value: baseValues.oil, change: (indicators.oil?.change || 0) * mult }
+                        { name: 'Altın', value: baseValues.gold, change: (indicators.gold?.change || 0) * mult, price: indicators.gold?.price },
+                        { name: 'Gümüş', value: baseValues.silver, change: (indicators.silver?.change || 0) * mult, price: indicators.silver?.price },
+                        { name: 'Petrol', value: baseValues.oil, change: (indicators.oil?.change || 0) * mult, price: indicators.oil?.price },
+                        { name: 'Bakır', value: 0.8, change: (indicators.copper?.change || 0) * mult, price: indicators.copper?.price },
+                        { name: 'Platin', value: 0.2, change: (indicators.platinum?.change || 0) * mult, price: indicators.platinum?.price },
+                        { name: 'Doğalgaz', value: 0.3, change: (indicators.naturalGas?.change || 0) * mult, price: indicators.naturalGas?.price },
+                        { name: 'Buğday', value: 0.1, change: (indicators.wheat?.change || 0) * mult, price: indicators.wheat?.price },
+                        { name: 'Mısır', value: 0.08, change: (indicators.corn?.change || 0) * mult, price: indicators.corn?.price },
+                        { name: 'Kahve', value: 0.02, change: (indicators.coffee?.change || 0) * mult, price: indicators.coffee?.price },
+                        { name: 'Diğer', value: 0.0, change: (indicators.gold?.change || 0) * mult } // Placeholder for balance
                     ]
                 },
                 {
@@ -59,8 +66,8 @@ class FlowService {
                     color: 'cyan',
                     unit: 'T$',
                     subAssets: [
-                        { name: 'Bitcoin', value: 1.3, change: (indicators.btc?.change || 0) * mult },
-                        { name: 'Ethereum', value: 0.4, change: (indicators.eth?.change || 0) * mult },
+                        { name: 'Bitcoin', value: 1.3, change: (indicators.btc?.change || 0) * mult, price: indicators.btc?.price },
+                        { name: 'Ethereum', value: 0.4, change: (indicators.eth?.change || 0) * mult, price: indicators.eth?.price },
                         { name: 'Diğer', value: 0.9, change: (indicators.btc?.change || 0) * 0.8 * mult }
                     ]
                 },
@@ -73,23 +80,27 @@ class FlowService {
                     color: 'green',
                     unit: 'T$',
                     subAssets: [
-                        { name: 'ABD (S&P500)', value: 45.0, change: (indicators.sp500?.change || 0) * mult },
-                        { name: 'Nasdaq', value: 20.0, change: (indicators.nasdaq?.change || 0) * mult },
-                        { name: 'Avrupa (STOXX)', value: 15.0, change: (indicators.stoxx?.change || 0) * mult },
-                        { name: 'Çin (SSE)', value: 12.0, change: (indicators.sse?.change || 0) * mult },
-                        { name: 'Türkiye (BIST)', value: 0.35, change: (indicators.bist100?.change || 0) * mult }
+                        { name: 'ABD (S&P500)', value: 45.0, change: (indicators.sp500?.change || 0) * mult, price: indicators.sp500?.price },
+                        { name: 'Nasdaq', value: 20.0, change: (indicators.nasdaq?.change || 0) * mult, price: indicators.nasdaq?.price },
+                        { name: 'Avrupa (STOXX)', value: 15.0, change: (indicators.stoxx?.change || 0) * mult, price: indicators.stoxx?.price },
+                        { name: 'Çin (SSE)', value: 12.0, change: (indicators.sse?.change || 0) * mult, price: indicators.sse?.price },
+                        { name: 'Türkiye (BIST)', value: 0.35, change: (indicators.bist100?.change || 0) * mult, price: indicators.bist100?.price }
                     ]
                 },
                 {
                     id: 'bonds',
                     name: 'TAHVİLLER',
-                    value: this.calcValue(baseValues.bonds, (indicators.bonds?.change || 0) * mult * -1),
+                    value: this.calcValue(baseValues.bonds + 50, (indicators.bonds?.change || 0) * mult * -1), // Added 50T for global bonds
                     change: (indicators.bonds?.change || 0) * mult,
-                    flowAmount: Math.abs(baseValues.bonds * (indicators.bonds?.change || 0) / 100) * 0.5 * mult,
+                    flowAmount: Math.abs((baseValues.bonds + 50) * (indicators.bonds?.change || 0) / 100) * 0.5 * mult,
                     color: 'indigo',
                     unit: 'T$',
                     subAssets: [
-                        { name: 'ABD 10Y Tahvil', value: baseValues.bonds, change: (indicators.bonds?.change || 0) * mult }
+                        { name: 'ABD 10Y', value: baseValues.bonds, change: (indicators.bonds?.change || 0) * mult, price: indicators.bonds?.price },
+                        { name: 'Japonya 10Y', value: 15.0, change: (indicators.japan10y?.change || 0) * mult, price: indicators.japan10y?.price },
+                        { name: 'Almanya 10Y', value: 10.0, change: (indicators.germany10y?.change || 0) * mult, price: indicators.germany10y?.price },
+                        { name: 'İngiltere 10Y', value: 8.0, change: (indicators.uk10y?.change || 0) * mult, price: indicators.uk10y?.price },
+                        { name: 'Türkiye 10Y', value: 0.15, change: (indicators.turkey10y?.change || 0) * mult, price: indicators.turkey10y?.price }
                     ]
                 }
             ],
