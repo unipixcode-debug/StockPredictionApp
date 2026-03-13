@@ -3,8 +3,9 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshCon
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Activity, TrendingUp, TrendingDown, Clock, Search, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { Config } from '@/constants/Config';
 
-const API_BASE = 'http://192.168.1.7:5000/api';
+const API_BASE = `${Config.API_BASE}${Config.ENDPOINTS.PREDICTIONS}`;
 
 interface Prediction {
     id: string;

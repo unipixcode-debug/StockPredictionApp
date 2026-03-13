@@ -10,12 +10,13 @@ import {
     ArrowDown, ArrowUp, ChevronRight, BarChart2, Zap, X
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { Config } from '@/constants/Config';
+
+const API_BASE = `${Config.API_BASE}${Config.ENDPOINTS.MARKET_FLOW}`;
 
 interface SubAsset { name: string; value?: number; change: number; symbol?: string; }
 interface Asset { id: string; name: string; value: number; change: number; flowAmount?: number; color: string; unit: string; subAssets?: SubAsset[]; }
 interface MarketData { assets: Asset[]; indicators: { vix: { price: number; change: number }; dxy: { price: number; change: number }; }; }
-
-const API_BASE = 'http://192.168.1.7:5000/api/market/flow';
 
 const TIMEFRAMES = [
     { id: '1S', label: '1S' }, { id: '4S', label: '4S' }, { id: '1G', label: '1G' },
@@ -384,7 +385,7 @@ const s = StyleSheet.create({
     indicatorChange: { fontSize: 11, fontWeight: '700', marginTop: 2 } as TextStyle,
 
     // Asset Card
-    assetCard: { borderRadius: 28, borderWidth: 1.5, marginBottom: 8, padding: 20 } as ViewStyle,
+    assetCard: { borderRadius: 28, borderWidth: 1.5, marginBottom: 4, padding: 18 } as ViewStyle,
     assetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 } as ViewStyle,
     assetName: { fontSize: 18, fontWeight: '900', color: 'white', textTransform: 'uppercase', letterSpacing: 0.3 } as TextStyle,
     assetHeadRight: { flexDirection: 'row', gap: 8, alignItems: 'center' } as ViewStyle,
@@ -410,7 +411,7 @@ const s = StyleSheet.create({
     subChange: { fontSize: 13, fontWeight: '800' } as TextStyle,
 
     // Flow Arrow
-    arrow: { alignItems: 'center', justifyContent: 'center', paddingVertical: 10 } as ViewStyle,
+    arrow: { alignItems: 'center', justifyContent: 'center', paddingVertical: 4 } as ViewStyle,
     arrowAmt: { fontSize: 15, fontWeight: '900', marginTop: 2 } as TextStyle,
     arrowPct: { fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginTop: 2 } as TextStyle,
 
