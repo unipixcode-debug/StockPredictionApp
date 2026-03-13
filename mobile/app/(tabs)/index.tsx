@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, StyleSheet, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, StyleSheet, Modal, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Activity, TrendingUp, TrendingDown, Clock, Search, ChevronRight, BrainCircuit, Trash2, Play, RefreshCw, X } from 'lucide-react-native';
+import { Activity, TrendingUp, TrendingDown, Clock, Search, ChevronRight, BrainCircuit, Trash2, Play, RefreshCw, X, LogOut } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Config } from '@/constants/Config';
 import { TextInput } from 'react-native';
@@ -43,6 +43,10 @@ const DashboardScreen = () => {
     const acceptDisclaimer = () => {
         disclaimerShown = true;
         setShowDisclaimer(false);
+    };
+
+    const handleExitApp = () => {
+        BackHandler.exitApp();
     };
 
     const fetchData = async () => {
@@ -144,9 +148,14 @@ const DashboardScreen = () => {
                             </View>
                             <Text style={styles.headerTitle}>PredictPro</Text>
                         </View>
-                        <TouchableOpacity style={styles.iconButton} onPress={onRefresh}>
-                            <RefreshCw size={22} color="white" className={refreshing ? 'animate-spin' : ''} />
-                        </TouchableOpacity>
+                        <View style={styles.headerActions}>
+                            <TouchableOpacity style={[styles.iconButton, { marginRight: 8 }]} onPress={onRefresh}>
+                                <RefreshCw size={22} color="white" />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.iconButton, { backgroundColor: 'rgba(248, 113, 113, 0.1)' }]} onPress={handleExitApp}>
+                                <LogOut size={22} color="#f87171" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* AI Analysis Search Box */}
@@ -319,6 +328,7 @@ const styles = StyleSheet.create({
     headerTitleContainer: { flexDirection: 'row', alignItems: 'center' },
     logoBadge: { width: 40, height: 40, backgroundColor: 'rgba(34, 211, 238, 0.1)', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
     headerTitle: { fontSize: 24, fontWeight: '800', color: 'white', letterSpacing: -0.5 },
+    headerActions: { flexDirection: 'row', alignItems: 'center' },
     iconButton: { padding: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 99 },
     statsRow: { marginBottom: 32 },
     statCard: { width: 140, padding: 20, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginRight: 16 },
