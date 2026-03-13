@@ -71,7 +71,7 @@ class PredictionEngine {
 
             // Generate Model Comparison scores (AI vs ML) for different timeframes
             const timeframes = ['1S', '2S', '4S', '1G', '1Hafta', '1Ay'];
-            const sentimentMultiplier = (finalScore - 45) * 2; // Map ~50 to 0, 100 to +100, 0 to -100
+            const sentimentMultiplier = isNaN(finalScore) ? 0 : (finalScore - 45) * 2; // Map ~50 to 0, 100 to +100, 0 to -100
             
             const modelComparison = timeframes.map((tf, index) => {
                 const aiVol = (Math.random() - 0.5) * 40;
@@ -80,9 +80,9 @@ class PredictionEngine {
                 let aiScore = sentimentMultiplier + aiVol;
                 let mlScore = sentimentMultiplier + mlVol;
 
-                // Ensure they don't exceed -100 to +100
-                aiScore = Math.max(-100, Math.min(100, aiScore));
-                mlScore = Math.max(-100, Math.min(100, mlScore));
+                // Ensure they don't exceed -100 to +100 and are NEVER NaN
+                aiScore = isNaN(aiScore) ? 0 : Math.max(-100, Math.min(100, aiScore));
+                mlScore = isNaN(mlScore) ? 0 : Math.max(-100, Math.min(100, mlScore));
 
                 return { 
                     timeframe: tf, 
