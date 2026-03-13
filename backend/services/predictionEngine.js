@@ -71,12 +71,24 @@ class PredictionEngine {
 
             // Generate Model Comparison scores (AI vs ML) for different timeframes
             const timeframes = ['1S', '2S', '4S', '1G', '1Hafta', '1Ay'];
+            const sentimentMultiplier = (finalScore - 45) * 2; // Map ~50 to 0, 100 to +100, 0 to -100
+            
             const modelComparison = timeframes.map((tf, index) => {
-                const volatility = Math.floor(Math.random() * 20) - 10;
-                const mlVolatility = Math.floor(Math.random() * 30) - 15;
-                const aiScore = Math.max(10, Math.min(100, finalScore + (volatility * (index + 1) * 0.3)));
-                const mlScore = Math.max(10, Math.min(100, finalScore + (mlVolatility * (index + 1) * 0.4)));
-                return { timeframe: tf, ai: Math.round(aiScore), ml: Math.round(mlScore) };
+                const aiVol = (Math.random() - 0.5) * 40;
+                const mlVol = (Math.random() - 0.5) * 20;
+                
+                let aiScore = sentimentMultiplier + aiVol;
+                let mlScore = sentimentMultiplier + mlVol;
+
+                // Ensure they don't exceed -100 to +100
+                aiScore = Math.max(-100, Math.min(100, aiScore));
+                mlScore = Math.max(-100, Math.min(100, mlScore));
+
+                return { 
+                    timeframe: tf, 
+                    ai: Math.round(aiScore), 
+                    ml: Math.round(mlScore) 
+                };
             });
 
             // 6. AI Reasoning (Akıl Yürütme)

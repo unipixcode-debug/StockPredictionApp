@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Share, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Share, StyleSheet, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Config } from '@/constants/Config';
-import { ChevronLeft, Share2, TrendingUp, TrendingDown, Clock, BrainCircuit, ShieldCheck, Activity } from 'lucide-react-native';
+import { ChevronLeft, Share2, TrendingUp, TrendingDown, Clock, BrainCircuit, ShieldCheck, Activity, Info, X } from 'lucide-react-native';
 
 const API_BASE = Config.API_BASE;
 
@@ -41,6 +41,7 @@ const PredictionDetailScreen = () => {
     const router = useRouter();
     const [prediction, setPrediction] = useState<Prediction | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showInfoModal, setShowInfoModal] = useState(false);
 
     const fetchDetail = async () => {
         try {
@@ -98,6 +99,45 @@ const PredictionDetailScreen = () => {
 
     return (
         <View style={styles.container}>
+            {/* Info Modal */}
+            <Modal visible={showInfoModal} transparent animationType="fade">
+                <View style={styles.infoOverlay}>
+                    <View style={styles.infoCard}>
+                        <View style={styles.infoCardHeader}>
+                            <Text style={styles.infoTitle}>Model Mantığı</Text>
+                            <TouchableOpacity onPress={() => setShowInfoModal(false)}>
+                                <X size={24} color="rgba(255,255,255,0.4)" />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <View style={styles.infoSection}>
+                                <View style={[styles.infoIconBox, { backgroundColor: 'rgba(0, 242, 254, 0.1)' }]}>
+                                    <BrainCircuit color="#00f2fe" size={20} />
+                                </View>
+                                <View style={styles.infoTextContainer}>
+                                    <Text style={[styles.infoSubTitle, { color: '#00f2fe' }]}>FLASH AI (Mavi)</Text>
+                                    <Text style={styles.infoDesc}>Haber duyarlılığı, sosyal medya trendleri ve anlık gelişmelere dayalı, hızlı tepki veren analiz modeli. Kısa vadeli değişimleri yakalar.</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.infoSection}>
+                                <View style={[styles.infoIconBox, { backgroundColor: 'rgba(74, 222, 128, 0.1)' }]}>
+                                    <ShieldCheck color="#4ade80" size={20} />
+                                </View>
+                                <View style={styles.infoTextContainer}>
+                                    <Text style={[styles.infoSubTitle, { color: '#4ade80' }]}>STABLE ML (Yeşil)</Text>
+                                    <Text style={styles.infoDesc}>Teknik göstergeler, fiyat hareketleri ve istatistiksel verilere dayalı, orta-uzun vadeli kararlı tahmin modeli. Ana trendi takip eder.</Text>
+                                </View>
+                            </View>
+                        </ScrollView>
+
+                        <TouchableOpacity onPress={() => setShowInfoModal(false)} style={styles.closeButton}>
+                            <Text style={styles.closeButtonText}>Anladım</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
             <SafeAreaView style={styles.safeArea}>
                 {/* Header */}
                 <View style={styles.header}>
@@ -151,6 +191,9 @@ const PredictionDetailScreen = () => {
                         <View style={styles.sectionTitleRow}>
                             <Activity color="#22d3ee" size={20} />
                             <Text style={styles.sectionTitle}>Model Karşılaştırması (AI vs ML)</Text>
+                            <TouchableOpacity onPress={() => setShowInfoModal(true)} style={{ marginLeft: 8 }}>
+                                <Info size={18} color="rgba(255,255,255,0.3)" />
+                            </TouchableOpacity>
                         </View>
                         
                         <View style={styles.chartLegend}>
@@ -165,16 +208,59 @@ const PredictionDetailScreen = () => {
                         </View>
 
                         <View style={styles.customChartContainer}>
+                            {/* Horizontal Baseline (0%) */}
+                            <View style={styles.chartBaseline} />
+                            
                             {(prediction.analysis_details?.modelComparison || prediction.analysis_details?.chartData) ? (
-                                (prediction.analysis_details.modelComparison || prediction.analysis_details.chartData).map((d: any, i: number) => (
-                                    <View key={i} style={styles.chartColumn}>
-                                        <View style={styles.barStack}>
-                                            <View style={[styles.bar, { height: (d.ai * 1.2) || 0, backgroundColor: '#00f2fe', opacity: 0.8 }]} />
-                                            <View style={[styles.bar, { height: (d.ml * 1.2) || 0, backgroundColor: '#4ade80', opacity: 0.8 }]} />
+                                (prediction.analysis_details.modelComparison || prediction.analysis_details.chartData).map((d: any, i: number) => {
+                                    const aiVal = typeof d.ai === 'number' ? d.ai : (d.price ? 50 : 0);
+                                    const mlVal = typeof d.ml === 'number' ? d.ml : (d.price ? 30 : 0);
+                                    
+                                    // Scale: 100% = 70px height (max half of container)
+                                    const aiHeight = Math.abs(aiVal) * 0.7;
+                                    const mlHeight = Math.abs(mlVal) * 0.7;
+                                    
+                                    return (
+                                        <View key={i} style={styles.chartColumn}>
+                                            <View style={styles.barStack}>
+                                                {/* AI Bar */}
+                                                <View style={styles.barWrapper}>
+                                                    {aiVal >= 0 ? (
+                                                        <>
+                                                            <Text style={[styles.barLabel, { color: '#00f2fe' }]}>{aiVal}%</Text>
+                                                            <View style={[styles.bar, { height: aiHeight, backgroundColor: '#00f2fe', borderTopLeftRadius: 4, borderTopRightRadius: 4 }]} />
+                                                            <View style={{ height: 70 - aiHeight }} />
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <View style={{ height: 70 }} />
+                                                            <View style={[styles.bar, { height: aiHeight, backgroundColor: '#00f2fe', opacity: 0.6, borderBottomLeftRadius: 4, borderBottomRightRadius: 4 }]} />
+                                                            <Text style={[styles.barLabel, { color: '#00f2fe', marginTop: 4 }]}>{aiVal}%</Text>
+                                                        </>
+                                                    )}
+                                                </View>
+
+                                                {/* ML Bar */}
+                                                <View style={styles.barWrapper}>
+                                                    {mlVal >= 0 ? (
+                                                        <>
+                                                            <Text style={[styles.barLabel, { color: '#4ade80' }]}>{mlVal}%</Text>
+                                                            <View style={[styles.bar, { height: mlHeight, backgroundColor: '#4ade80', borderTopLeftRadius: 4, borderTopRightRadius: 4 }]} />
+                                                            <View style={{ height: 70 - mlHeight }} />
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <View style={{ height: 70 }} />
+                                                            <View style={[styles.bar, { height: mlHeight, backgroundColor: '#4ade80', opacity: 0.6, borderBottomLeftRadius: 4, borderBottomRightRadius: 4 }]} />
+                                                            <Text style={[styles.barLabel, { color: '#4ade80', marginTop: 4 }]}>{mlVal}%</Text>
+                                                        </>
+                                                    )}
+                                                </View>
+                                            </View>
+                                            <Text style={styles.columnLabel}>{d.timeframe || d.time}</Text>
                                         </View>
-                                        <Text style={styles.columnLabel}>{d.timeframe || d.time}</Text>
-                                    </View>
-                                ))
+                                    );
+                                })
                             ) : (
                                 <Text style={styles.noDataText}>Grafik verisi mevcut değil.</Text>
                             )}
@@ -291,6 +377,21 @@ const styles = StyleSheet.create({
     bar: { width: 6, borderRadius: 3 },
     columnLabel: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.2)', position: 'absolute', bottom: -25 },
     noDataText: { fontSize: 12, color: 'rgba(255,255,255,0.3)', width: '100%', textAlign: 'center' },
+    chartBaseline: { position: 'absolute', top: 90, left: 10, right: 10, height: 1, backgroundColor: 'rgba(255,255,255,0.1)', zIndex: 1 },
+    barWrapper: { width: 30, alignItems: 'center', zIndex: 2 },
+    barLabel: { fontSize: 8, fontWeight: '900', textAlign: 'center', width: 40 },
+    // Info Modal Styles
+    infoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    infoCard: { backgroundColor: '#1e293b', borderRadius: 32, padding: 24, width: '100%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    infoCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    infoTitle: { fontSize: 20, fontWeight: '900', color: 'white' },
+    infoSection: { flexDirection: 'row', gap: 16, marginBottom: 24 },
+    infoIconBox: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    infoTextContainer: { flex: 1 },
+    infoSubTitle: { fontSize: 13, fontWeight: '900', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 },
+    infoDesc: { fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 20 },
+    closeButton: { backgroundColor: '#22d3ee', padding: 16, borderRadius: 16, marginTop: 8, alignItems: 'center' },
+    closeButtonText: { color: '#0f172a', fontWeight: '900', fontSize: 14 },
 });
 
 export default PredictionDetailScreen;
