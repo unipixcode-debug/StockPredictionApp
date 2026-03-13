@@ -16,6 +16,19 @@ ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS credits INTEGER DEFAULT 100;
 -- Add tier column if missing
 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'FREE';
 
+-- Create AdminLogs table
+CREATE TABLE IF NOT EXISTS "AdminLogs" (
+  "id" UUID PRIMARY KEY,
+  "adminId" UUID NOT NULL,
+  "adminName" VARCHAR(255) NOT NULL,
+  "action" VARCHAR(255) NOT NULL,
+  "targetId" VARCHAR(255),
+  "details" JSONB,
+  "ipAddress" VARCHAR(255),
+  "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL,
+  "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
 -- Create GlobalSettings table if it doesn't exist
 CREATE TABLE IF NOT EXISTS "GlobalSettings" (
   key VARCHAR(255) PRIMARY KEY,
