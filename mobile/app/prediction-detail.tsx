@@ -165,14 +165,14 @@ const PredictionDetailScreen = () => {
                         </View>
 
                         <View style={styles.customChartContainer}>
-                            {prediction.analysis_details?.chartData ? (
-                                prediction.analysis_details.chartData.map((d: any, i: number) => (
+                            {(prediction.analysis_details?.modelComparison || prediction.analysis_details?.chartData) ? (
+                                (prediction.analysis_details.modelComparison || prediction.analysis_details.chartData).map((d: any, i: number) => (
                                     <View key={i} style={styles.chartColumn}>
                                         <View style={styles.barStack}>
-                                            <View style={[styles.bar, { height: (d.ai * 1.2), backgroundColor: '#00f2fe', opacity: 0.8 }]} />
-                                            <View style={[styles.bar, { height: (d.ml * 1.2), backgroundColor: '#4ade80', opacity: 0.8 }]} />
+                                            <View style={[styles.bar, { height: (d.ai * 1.2) || 0, backgroundColor: '#00f2fe', opacity: 0.8 }]} />
+                                            <View style={[styles.bar, { height: (d.ml * 1.2) || 0, backgroundColor: '#4ade80', opacity: 0.8 }]} />
                                         </View>
-                                        <Text style={styles.columnLabel}>{d.timeframe}</Text>
+                                        <Text style={styles.columnLabel}>{d.timeframe || d.time}</Text>
                                     </View>
                                 ))
                             ) : (

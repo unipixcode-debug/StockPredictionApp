@@ -54,26 +54,30 @@ class PredictionEngine {
             }
 
             // Generate Simulated ML Chart Data (Points for a line chart)
-            const chartData = [];
+            const priceHistory = [];
             const points = 20;
             for (let i = 0; i < points; i++) {
                 const isFuture = i > points * 0.7; // Last 30% is prediction
                 let price;
                 if (!isFuture) {
-                    // Random walk for history
                     price = currentPrice * (1 + (Math.random() - 0.5) * 0.02);
                 } else {
-                    // Path towards target for prediction
                     const progress = (i - points * 0.7) / (points * 0.3);
                     const trend = direction === 'BUY' ? 1 : (direction === 'SELL' ? -1 : 0);
                     price = currentPrice + (targetPrice - currentPrice) * progress + (Math.random() - 0.5) * 0.01 * currentPrice;
                 }
-                chartData.push({
-                    time: i,
-                    price: price,
-                    isPrediction: isFuture
-                });
+                priceHistory.push({ time: i, price: price, isPrediction: isFuture });
             }
+
+            // Generate Model Comparison scores (AI vs ML) for different timeframes
+            const timeframes = ['1S', '2S', '4S', '1G', '1Hafta', '1Ay'];
+            const modelComparison = timeframes.map((tf, index) => {
+                const volatility = Math.floor(Math.random() * 20) - 10;
+                const mlVolatility = Math.floor(Math.random() * 30) - 15;
+                const aiScore = Math.max(10, Math.min(100, finalScore + (volatility * (index + 1) * 0.3)));
+                const mlScore = Math.max(10, Math.min(100, finalScore + (mlVolatility * (index + 1) * 0.4)));
+                return { timeframe: tf, ai: Math.round(aiScore), ml: Math.round(mlScore) };
+            });
 
             // 6. AI Reasoning (Akıl Yürütme)
             let reasoning = "Analiz yapılıyor...";
@@ -110,7 +114,8 @@ class PredictionEngine {
                     vix: globalIndicators?.vix?.price,
                     goldChange: globalIndicators?.gold?.change,
                     summary: reasoning,
-                    chartData: chartData, // Professional ML path
+                    chartData: priceHistory, // For line charts
+                    modelComparison: modelComparison, // For AI vs ML bars
                     originalSummary: `${symbol} için ${direction} sinyali. Haber puanı: ${sentimentScore}, Pazar baskısı: ${pressureScore}`
                 }
             });

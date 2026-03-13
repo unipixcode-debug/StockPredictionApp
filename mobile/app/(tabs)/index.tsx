@@ -30,7 +30,15 @@ const DashboardScreen = () => {
     const [searchSymbol, setSearchSymbol] = useState('');
     const [filter, setFilter] = useState('HEPSİ');
     const [showDisclaimer, setShowDisclaimer] = useState(!disclaimerShown);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const router = useRouter();
+
+    const symbolSuggestions = [
+        { name: 'BTC-USD', market: 'Crypto' }, { name: 'ETH-USD', market: 'Crypto' }, { name: 'SOL-USD', market: 'Crypto' }, { name: 'XRPUSD', market: 'Crypto' },
+        { name: 'AAPL', market: 'US Stock' }, { name: 'NVDA', market: 'US Stock' }, { name: 'TSLA', market: 'US Stock' }, { name: 'MSFT', market: 'US Stock' },
+        { name: 'THYAO.IS', market: 'BIST' }, { name: 'ASELS.IS', market: 'BIST' }, { name: 'EREGL.IS', market: 'BIST' }, { name: 'KCHOL.IS', market: 'BIST' },
+        { name: 'XAUUSD', market: 'Commodity' }, { name: 'GC=F', market: 'Commodity' }, { name: 'SI=F', market: 'Commodity' }, { name: 'BRENT', market: 'Commodity' }, { name: 'EURUSD', market: 'FX' }
+    ];
 
     const acceptDisclaimer = () => {
         disclaimerShown = true;
@@ -148,12 +156,18 @@ const DashboardScreen = () => {
                                 placeholder="Sembol ör: XRPUSD, BTC-USD"
                                 placeholderTextColor="rgba(255,255,255,0.3)"
                                 value={searchSymbol}
-                                onChangeText={setSearchSymbol}
+                                onChangeText={(val) => {
+                                    setSearchSymbol(val);
+                                    setShowSuggestions(val.length > 0);
+                                }}
+                                onFocus={() => {
+                                    if (searchSymbol.length > 0) setShowSuggestions(true);
+                                }}
                                 style={styles.searchInput}
                                 autoCapitalize="characters"
                             />
                             {searchSymbol.length > 0 && (
-                                <TouchableOpacity onPress={() => setSearchSymbol('')} style={styles.clearButton}>
+                                <TouchableOpacity onPress={() => { setSearchSymbol(''); setShowSuggestions(false); }} style={styles.clearButton}>
                                     <X size={16} color="rgba(255,255,255,0.4)" />
                                 </TouchableOpacity>
                             )}
@@ -170,6 +184,29 @@ const DashboardScreen = () => {
                             )}
                         </TouchableOpacity>
                     </View>
+
+                    {/* Symbol Suggestions Dropdown */}
+                    {showSuggestions && (
+                        <View style={styles.suggestionsContainer}>
+                            {symbolSuggestions
+                                .filter(s => s.name.toLowerCase().includes(searchSymbol.toLowerCase()))
+                                .slice(0, 6)
+                                .map((s) => (
+                                    <TouchableOpacity 
+                                        key={s.name} 
+                                        onPress={() => {
+                                            setSearchSymbol(s.name);
+                                            setShowSuggestions(false);
+                                        }}
+                                        style={styles.suggestionItem}
+                                    >
+                                        <Text style={styles.suggestionName}>{s.name}</Text>
+                                        <Text style={styles.suggestionMarket}>{s.market}</Text>
+                                    </TouchableOpacity>
+                                ))
+                            }
+                        </View>
+                    )}
 
                     {/* Market Summary Cards */}
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsRow}>
@@ -302,6 +339,10 @@ const styles = StyleSheet.create({
     searchInput: { flex: 1, color: 'white', fontWeight: '700', fontSize: 14 },
     clearButton: { padding: 4 },
     analyzeButton: { width: 50, height: 50, backgroundColor: '#22d3ee', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    suggestionsContainer: { backgroundColor: 'rgba(30, 41, 59, 0.95)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 4, paddingVertical: 8, marginBottom: 20, marginTop: -24, zIndex: 1000 },
+    suggestionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+    suggestionName: { color: 'white', fontWeight: '800', fontSize: 14 },
+    suggestionMarket: { color: 'rgba(22, 211, 238, 0.6)', fontWeight: '700', fontSize: 10, textTransform: 'uppercase' },
     deleteButton: { padding: 4, marginLeft: 8 },
     notificationCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(34, 211, 238, 0.1)', padding: 16, borderRadius: 20, marginBottom: 20, borderLeftWidth: 4, borderLeftColor: '#22d3ee' },
     notificationTitle: { fontSize: 14, fontWeight: '900', color: 'white', marginBottom: 2 },
