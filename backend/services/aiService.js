@@ -81,7 +81,7 @@ class AIService {
                 console.log(`Attempting with AI Provider: ${provider.name}...`);
                 
                 if (provider.type === 'GEMINI') {
-                    const modelName = modelOverride || "gemini-1.5-flash";
+                    const modelName = modelOverride || "gemini-2.5-flash";
                     const genModel = provider.instance.getGenerativeModel({ model: modelName });
                     
                     let contents = [];
@@ -257,7 +257,7 @@ class AIService {
                 : messages;
 
             console.log("ChatBot: Generating content via Gemini Pool (2.5 Flash)...");
-            return await this.generateContent(prompt, "gemini-1.5-flash");
+            return await this.generateContent(prompt, "gemini-2.5-flash");
         } catch (error) {
             console.error('ChatBot AI error:', error.message);
             throw error;
@@ -338,7 +338,7 @@ class AIService {
             Article Text:
             ${textToSummarize.substring(0, 15000)}`;
 
-            const responseText = await this.generateContent(prompt, "gemini-1.5-flash");
+            const responseText = await this.generateContent(prompt, "gemini-2.5-flash");
             
             try {
                 let cleanJson = responseText.trim();
