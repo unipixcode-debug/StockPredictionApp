@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Palette, Lock, History, Terminal, CheckCircle2, RefreshCw, Zap, Cpu, Wifi, WifiOff, AlertTriangle, Bot
+  Palette, Lock, History, Terminal, CheckCircle2, RefreshCw, Zap, Cpu, Wifi, WifiOff, AlertTriangle, Bot, Star, Plus, Trash2, Coins
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from './api';
