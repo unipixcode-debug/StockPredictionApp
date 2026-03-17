@@ -82,69 +82,65 @@ class AIService {
                 
                 if (provider.type === 'GEMINI') {
                     const modelName = modelOverride || "gemini-1.5-flash";
-                    const model = provider.instance.getGenerativeModel({ model: modelName });
+                    const genModel = provider.instance.getGenerativeModel({ model: modelName });
                     
                     let contents = [];
-                    let systemMsg = "";
 
                     if (Array.isArray(prompt)) {
-                        // 1. Extract System Message & Map to Gemini Roles
-                        const rawContents = [];
+                        let currentRole = 'user';
+                        let systemContent = "";
+                        let historyItems = [];
+
                         prompt.forEach(m => {
                             if (m.role === 'system') {
-                                systemMsg = m.content;
+                                systemContent += m.content + "\n\n";
                             } else {
-                                rawContents.push({
-                                    role: m.role === 'assistant' ? 'model' : 'user',
-                                    text: m.content
-                                });
+                                const role = m.role === 'assistant' ? 'model' : 'user';
+                                historyItems.push({ role, text: m.content });
                             }
                         });
 
-                        // 2. Merge Consecutive Roles (Gemini Requirement)
-                        if (rawContents.length > 0) {
-                            let merged = [];
-                            let current = rawContents[0];
-                            
-                            for (let i = 1; i < rawContents.length; i++) {
-                                if (rawContents[i].role === current.role) {
-                                    current.text += "\n\n" + rawContents[i].text;
+                        // Merge same-role consecutive blocks
+                        let merged = [];
+                        if (historyItems.length > 0) {
+                            let last = historyItems[0];
+                            for (let i = 1; i < historyItems.length; i++) {
+                                if (historyItems[i].role === last.role) {
+                                    last.text += "\n\n" + historyItems[i].text;
                                 } else {
-                                    merged.push(current);
-                                    current = rawContents[i];
+                                    merged.push(last);
+                                    last = historyItems[i];
                                 }
                             }
-                            merged.push(current);
-
-                            // 3. Ensure first message is 'user' (Gemini requirement)
-                            if (merged[0].role === 'model') {
-                                // If history starts with model, prepend an empty user message or combine with system
-                                merged.unshift({ role: 'user', text: "Conversation history follows:" });
-                            }
-
-                            contents = merged.map(m => ({
-                                role: m.role,
-                                parts: [{ text: m.text }]
-                            }));
+                            merged.push(last);
                         }
 
-                        // 4. Prepend System Message to the first user message
-                        if (systemMsg && contents.length > 0) {
-                            // Find the first user message to attach system instruction
-                            const firstUserIdx = contents.findIndex(c => c.role === 'user');
-                            if (firstUserIdx !== -1) {
-                                contents[firstUserIdx].parts[0].text = `INSTRUKTOR: ${systemMsg}\n\nUSER MESSAGE: ${contents[firstUserIdx].parts[0].text}`;
+                        // Prepend system to first user message
+                        if (systemContent && merged.length > 0) {
+                            const firstUser = merged.find(m => m.role === 'user');
+                            if (firstUser) {
+                                firstUser.text = `[SYSTEM INSTRUCTION]\n${systemContent}\n[END SYSTEM INSTRUCTION]\n\n${firstUser.text}`;
                             }
                         }
+
+                        // Ensure starts with user
+                        if (merged.length > 0 && merged[0].role === 'model') {
+                            merged.unshift({ role: 'user', text: '.' });
+                        }
+
+                        contents = merged.map(m => ({
+                            role: m.role,
+                            parts: [{ text: String(m.text) }]
+                        }));
                     } else {
-                        // Simple string prompt
-                        contents = [{ role: "user", parts: [{ text: prompt }] }];
+                        // For health checks and simple prompts, use simple string array
+                        contents = [{ role: 'user', parts: [{ text: String(prompt) }] }];
                     }
 
-                    if (contents.length === 0) throw new Error("Empty contents for Gemini");
+                    if (contents.length === 0) throw new Error("No Gemini contents generated");
 
-                    console.log("DEBUG: GEMINI PAYLOAD:", JSON.stringify(contents, null, 2));
-                    const result = await model.generateContent({ contents });
+                    // Use the most compatible call structure
+                    const result = await genModel.generateContent({ contents });
                     const response = await result.response;
                     return response.text();
                 }
