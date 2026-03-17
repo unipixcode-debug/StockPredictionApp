@@ -40,7 +40,11 @@ const Prediction = sequelize.define('Prediction', {
         allowNull: false
     },
     analysis_details: {
-        type: DataTypes.JSONB, // Store correlations (VIX, Gold) & Sentiment snippets
+        type: DataTypes.JSONB, 
+        allowNull: true
+    },
+    userId: {
+        type: DataTypes.STRING,
         allowNull: true
     }
 }, {

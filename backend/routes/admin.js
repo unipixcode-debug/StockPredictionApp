@@ -311,39 +311,14 @@ router.get('/ai-status', async (req, res) => {
         const start = Date.now();
         try {
             const testPrompt = 'Reply with just: OK';
-            let response = '';
-
-            if (provider.type === 'GEMINI') {
-                const model = provider.instance.getGenerativeModel({ model: 'gemini-1.5-flash' });
-                const result = await model.generateContent(testPrompt);
-                response = (await result.response.text()).substring(0, 20);
-            } else if (provider.type === 'OPENAI') {
-                const r = await provider.instance.chat.completions.create({
-                    model: 'gpt-3.5-turbo',
-                    messages: [{ role: 'user', content: testPrompt }],
-                    max_tokens: 5
-                });
-                response = r.choices[0].message.content.substring(0, 20);
-            } else if (provider.type === 'DEEPSEEK') {
-                const r = await axios.post('https://api.deepseek.com/v1/chat/completions', {
-                    model: 'deepseek-chat',
-                    messages: [{ role: 'user', content: testPrompt }],
-                    max_tokens: 5
-                }, {
-                    headers: { 'Authorization': `Bearer ${provider.key}` },
-                    timeout: 8000 // 8s timeout
-                });
-                response = r.data.choices[0].message.content.substring(0, 20);
-            } else {
-                results.push({ name: provider.name, type: provider.type, status: 'skipped', ms: 0 });
-                continue;
-            }
-
+            // Use the unified service method which supports ALL types (Ollama, Anthropic, etc.)
+            const response = await aiService.generateContent(testPrompt, null, provider.id);
+            
             results.push({
                 name: provider.name,
                 type: provider.type,
                 status: 'ok',
-                response,
+                response: response.substring(0, 20),
                 ms: Date.now() - start
             });
         } catch (e) {
@@ -362,7 +337,8 @@ router.get('/ai-status', async (req, res) => {
         checked: new Date().toISOString(),
         providers: results,
         healthy: results.filter(r => r.status === 'ok').length,
-        total: results.length
+        total: results.length,
+        userCredits: req.user?.credits || 0
     });
 });
 

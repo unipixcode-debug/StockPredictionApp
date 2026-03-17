@@ -1,0 +1,86 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from './api';
+
+const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkUser();
+  }, []);
+
+  const checkUser = async () => {
+    try {
+      const userData = await api.get('/auth/current_user');
+      setUser(userData || null);
+    } catch (e) {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGoogle = () => {
+    const getBaseUrl = () => {
+      const url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      return url.replace('/api', '');
+    };
+    
+    window.location.href = `${getBaseUrl()}/api/auth/google`;
+  };
+
+  const logout = async () => {
+    localStorage.removeItem('chat_history');
+    setUser(null);
+    const getBaseUrl = () => {
+      const url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      return url.replace('/api', '');
+    };
+    if (window.location.href.includes('google')) {
+        window.location.href = `${getBaseUrl()}/api/auth/logout`;
+    }
+  };
+
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.className = theme;
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
+  const updateCredits = (newCredits) => {
+    if (newCredits === undefined || newCredits === null) return;
+    setUser(prev => prev ? { ...prev, credits: newCredits } : { credits: newCredits });
+  };
+
+  const toggleSubscription = async (feature, action) => {
+    try {
+      const response = await api.post('/auth/toggle-subscription', { feature, action });
+      if (response.success) {
+        setUser(prev => ({ 
+            ...prev, 
+            credits: response.user.credits,
+            newsletterSubscribed: response.user.newsletterSubscribed,
+            moneyFlowSubscribed: response.user.moneyFlowSubscribed,
+            autoPredictionSubscribed: response.user.autoPredictionSubscribed
+        }));
+        return true;
+      }
+    } catch (e) {
+      console.error('Subscription toggle failed:', e);
+      throw e;
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, theme, toggleTheme, loginWithGoogle, logout, updateCredits, toggleSubscription }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);

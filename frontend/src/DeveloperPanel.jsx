@@ -9,36 +9,24 @@ import { useLanguage } from './LanguageContext';
 
 const DeveloperPanel = () => {
   const { t } = useLanguage();
-  const [pricing, setPricing] = useState([]);
   const [systemCosts, setSystemCosts] = useState([]);
   const [adminLogs, setAdminLogs] = useState([]);
   const [users, setUsers] = useState([]);
   const [loadingAdminLogs, setLoadingAdminLogs] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [savingPrice, setSavingPrice] = useState(false);
-  const [priceSaved, setPriceSaved] = useState(false);
+  const [savingCost, setSavingCost] = useState(false);
+  const [costSaved, setCostSaved] = useState(false);
   const [userSearchTerm, setUserSearchTerm] = useState("");
   const [aiStatus, setAiStatus] = useState(null);
   const [loadingAiStatus, setLoadingAiStatus] = useState(false);
   const [aiStatusError, setAiStatusError] = useState(null);
 
   useEffect(() => {
-    fetchPricing();
     fetchSystemCosts();
     fetchAdminLogs();
     fetchUsers();
     fetchAiStatus();
   }, []);
-
-  const fetchPricing = async () => {
-    try {
-      const settings = await api.get('/admin/settings');
-      const pricingKeys = ['token_pack_1', 'token_pack_2', 'token_pack_3', 'token_pack_4'];
-      setPricing(settings.filter(s => pricingKeys.includes(s.key)));
-    } catch (e) {
-      console.error('Error fetching pricing:', e);
-    }
-  };
 
   const fetchSystemCosts = async () => {
     try {
@@ -88,33 +76,17 @@ const DeveloperPanel = () => {
     }
   };
 
-
-
-  const savePricing = async (key, value) => {
-    setSavingPrice(true);
-    try {
-      await api.post('/admin/settings', { key, value });
-      setPriceSaved(true);
-      setTimeout(() => setPriceSaved(false), 3000);
-      fetchPricing();
-    } catch (e) {
-      console.error('Error saving pricing:', e);
-    } finally {
-      setSavingPrice(false);
-    }
-  };
-
   const saveSystemCost = async (key, value) => {
-    setSavingPrice(true);
+    setSavingCost(true);
     try {
       await api.post('/admin/settings', { key, value: String(value) });
-      setPriceSaved(true);
-      setTimeout(() => setPriceSaved(false), 3000);
+      setCostSaved(true);
+      setTimeout(() => setCostSaved(false), 3000);
       fetchSystemCosts();
     } catch (e) {
       console.error('Error saving system cost:', e);
     } finally {
-      setSavingPrice(false);
+      setSavingCost(false);
     }
   };
 
@@ -140,80 +112,107 @@ const DeveloperPanel = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
 
-        {/* AI Provider Status */}
-        <div className="glass-card p-6 border-border/50 xl:col-span-2">
-          <div className="flex items-center justify-between mb-6">
-            <Link to="/ai-management" className="flex items-center space-x-3 group cursor-pointer transition-all hover:opacity-80">
-              <div className="p-3 rounded-2xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-all">
-                <Cpu className="text-blue-400" size={20} />
+        {/* AI Provider Status - Avant-Garde Command Center */}
+        <div className="glass-card p-8 border-border/50 xl:col-span-2 relative overflow-hidden group">
+          {/* Background Ambient Glow */}
+          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none group-hover:bg-primary/10 transition-all duration-700" />
+          
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-10 relative z-10">
+            <Link to="/ai-management" className="flex items-center space-x-6 group/link cursor-pointer">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full scale-0 group-hover/link:scale-150 transition-transform duration-500" />
+                <div className="p-5 rounded-[2rem] bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 relative">
+                  <Bot className="text-primary animate-pulse" size={28} />
+                </div>
               </div>
               <div>
-                <h3 className="text-lg font-black uppercase tracking-tight group-hover:text-primary transition-all">AI Provider Durumu</h3>
-                <p className="text-xs text-muted-foreground">Canlı API anahtarı sağlık kontrolü — yönetmek için tıkla</p>
+                <h3 className="text-3xl font-black uppercase italic tracking-tighter group-hover/link:text-primary transition-all leading-none">AI Command Center</h3>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-[0.3em] mt-2 font-black opacity-60">System Core & Neural Pulse</p>
               </div>
             </Link>
-            <button
-              onClick={fetchAiStatus}
-              disabled={loadingAiStatus}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-all"
-            >
-              <RefreshCw size={14} className={loadingAiStatus ? 'animate-spin' : ''} />
-              {loadingAiStatus ? 'Test Ediliyor...' : 'Yenile'}
-            </button>
-          </div>
-          {aiStatus ? (
-            <>
-              <div className="flex items-center gap-3 mb-4">
-                <span className={`text-sm font-bold px-3 py-1 rounded-full ${
-                  aiStatus.healthy === aiStatus.total ? 'bg-green-500/20 text-green-400' :
-                  aiStatus.healthy === 0 ? 'bg-red-500/20 text-red-400' :
-                  'bg-yellow-500/20 text-yellow-400'
-                }`}>
-                  {aiStatus.healthy}/{aiStatus.total} Provider Aktif
+
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Credits Mirror - Bespoke Hero Section */}
+              <div className="px-8 py-4 bg-secondary/20 border border-border shadow-2xl rounded-[1.5rem] flex flex-col items-center justify-center min-w-[140px] hover:border-cyan-500/50 transition-all">
+                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[.2em] mb-1">Kalan Kredi</span>
+                <span className="text-3xl font-black text-cyan-400 tracking-tighter italic">
+                  {aiStatus?.userCredits || 0}
                 </span>
-                <span className="text-xs text-muted-foreground">{new Date(aiStatus.checked).toLocaleTimeString('tr-TR')} tarihinde kontrol edildi</span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {aiStatus.providers.map(p => (
-                  <div key={p.name} className={`p-4 rounded-xl border ${
-                    p.status === 'ok' ? 'bg-green-500/5 border-green-500/20' :
-                    p.status === 'quota_exceeded' ? 'bg-yellow-500/5 border-yellow-500/20' :
-                    p.status === 'skipped' ? 'bg-gray-500/5 border-gray-500/20' :
-                    'bg-red-500/5 border-red-500/20'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      {p.status === 'ok' ? <Wifi size={14} className="text-green-400" /> :
-                       p.status === 'quota_exceeded' ? <AlertTriangle size={14} className="text-yellow-400" /> :
-                       <WifiOff size={14} className="text-red-400" />}
-                      <span className="text-sm font-bold">{p.name}</span>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={fetchAiStatus}
+                  disabled={loadingAiStatus}
+                  className="flex items-center justify-center gap-2 px-6 py-3 text-xs font-black uppercase tracking-widest bg-primary/10 text-primary border border-primary/20 rounded-2xl hover:bg-primary/20 transition-all shadow-lg hover:shadow-primary/10"
+                >
+                  <RefreshCw size={14} className={loadingAiStatus ? 'animate-spin' : ''} />
+                  {loadingAiStatus ? 'SYNCING...' : 'FORCE SYNC'}
+                </button>
+                <div className="px-3 py-1 flex items-center justify-center space-x-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground bg-white/5 rounded-full">
+                   <div className={`w-1.5 h-1.5 rounded-full ${aiStatus?.healthy > 0 ? 'bg-emerald-500 animate-ping' : 'bg-rose-500'}`} />
+                   <span>Last Pulse: {aiStatus ? new Date(aiStatus.checked).toLocaleTimeString('tr-TR') : 'Never'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {aiStatus ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 relative z-10">
+              {aiStatus.providers.map((p, idx) => (
+                <motion.div 
+                  key={p.name} 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className={`p-5 rounded-3xl border transition-all duration-500 overflow-hidden relative ${
+                    p.status === 'ok' ? 'bg-emerald-500/[0.03] border-emerald-500/20 hover:border-emerald-500/50' :
+                    p.status === 'quota_exceeded' ? 'bg-amber-500/[0.03] border-amber-500/20 hover:border-amber-500/50' :
+                    'bg-rose-500/[0.03] border-rose-500/20 hover:border-rose-500/50'
+                  }`}
+                >
+                  {/* Staggered Content for Avant-Garde Feel */}
+                  <div className="flex justify-between items-start mb-4">
+                    <div className={`p-2 rounded-xl scale-90 ${p.status === 'ok' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                       {p.status === 'ok' ? <Wifi size={16} /> : <WifiOff size={16} />}
                     </div>
-                    <div className={`text-xs font-semibold ${
-                      p.status === 'ok' ? 'text-green-400' :
-                      p.status === 'quota_exceeded' ? 'text-yellow-400' :
-                      'text-red-400'
+                    <span className="text-[9px] font-black opacity-20 uppercase font-mono tracking-tighter">NODE_{idx + 1}</span>
+                  </div>
+
+                  <h4 className="text-xs font-black uppercase tracking-tight mb-1 truncate" title={p.name}>{p.name}</h4>
+                  <div className="flex items-center space-x-2">
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${
+                      p.status === 'ok' ? 'text-emerald-400' : 'text-rose-400'
                     }`}>
-                      {p.status === 'ok' ? `✓ OK (${p.ms}ms)` :
-                       p.status === 'quota_exceeded' ? '⚠ Kota Aşıldı' :
-                       '✗ Hata'}
+                      {p.status === 'ok' ? 'ACTIVE' : 'OFFLINE'}
+                    </span>
+                    {p.status === 'ok' && (
+                      <span className="text-[9px] opacity-40 font-mono">({p.ms}ms)</span>
+                    )}
+                  </div>
+
+                  {p.error && p.status !== 'ok' && (
+                    <div className="mt-3 pt-3 border-t border-white/5">
+                       <p className="text-[9px] text-rose-400/50 leading-tight line-clamp-2 uppercase italic font-medium" title={p.error}>
+                          {p.error}
+                       </p>
                     </div>
-                    {p.status === 'quota_exceeded' && (
-                      <div className="text-[10px] text-yellow-400/60 mt-1">Rate limit — birazdan deneyin</div>
-                    )}
-                    {p.status === 'error' && p.error && (
-                      <div className="text-[10px] text-red-400/60 mt-1 truncate" title={p.error}>{p.error.substring(0, 50)}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
+                  )}
+                </motion.div>
+              ))}
+            </div>
           ) : (
-            <div className="text-center text-muted-foreground py-8 text-sm">
-              {loadingAiStatus ? "Provider'lar test ediliyor..." : (
-                aiStatusError ? (
-                  <div className="text-red-400 font-bold">
-                    Hata: {aiStatusError}
-                  </div>
-                ) : "Durumu görmek için Yenile'ye tıklayın"
+            <div className="text-center text-muted-foreground py-20 border-2 border-dashed border-border/30 rounded-3xl">
+              {loadingAiStatus ? (
+                <div className="flex flex-col items-center gap-4">
+                  <RefreshCw className="animate-spin text-primary/30" size={40} />
+                  <p className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">Pinging Neural Network...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-4">
+                  <AlertTriangle className="opacity-20" size={40} />
+                  <p className="text-xs font-black uppercase tracking-widest opacity-40">System Idle. Initiate Sync.</p>
+                </div>
               )}
             </div>
           )}
@@ -257,57 +256,6 @@ const DeveloperPanel = () => {
           </div>
         </div>
 
-        {/* Token Pricing Settings */}
-        <div className="premium-card p-6 border-2 border-amber-500/20 bg-amber-500/5">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="p-3 rounded-2xl bg-amber-500/10">
-              <Lock className="text-amber-400" size={20} />
-            </div>
-            <div>
-              <h3 className="text-lg font-black uppercase tracking-tight">Geliştirici: Token Fiyatları</h3>
-              <p className="text-xs text-muted-foreground">Bu bölüm yalnızca geliştirici rolü tarafından görülebilir.</p>
-            </div>
-            {priceSaved && (
-              <span className="ml-auto text-xs text-emerald-400 font-black flex items-center space-x-1">
-                <CheckCircle2 size={14} /> <span>Kaydedildi</span>
-              </span>
-            )}
-          </div>
-          <div className="space-y-4">
-            {pricing.map((p) => (
-              <div key={p.key} className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 p-4 rounded-2xl bg-secondary/10 border border-border">
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-foreground">
-                    {p.description || (
-                      p.key === 'token_pack_1' ? '100 Token Paketi' :
-                      p.key === 'token_pack_2' ? '500 Token Paketi' :
-                      p.key === 'token_pack_3' ? '1000 Token Paketi' :
-                      p.key === 'token_pack_4' ? '5000 Token Paketi' : p.key
-                    )}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground font-mono">{p.key}</p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-muted-foreground font-bold">$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={p.value}
-                    onChange={(e) => setPricing(prev => prev.map(x => x.key === p.key ? {...x, value: e.target.value} : x))}
-                    className="w-24 bg-secondary/30 border border-border rounded-xl px-3 py-2 text-sm font-bold text-center focus:outline-none focus:border-amber-500/50"
-                  />
-                  <button
-                    onClick={() => savePricing(p.key, p.value)}
-                    disabled={savingPrice}
-                    className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-black hover:bg-amber-500/20 transition-all whitespace-nowrap"
-                  >
-                    {savingPrice ? '...' : 'Kaydet'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
 
       </div>
 

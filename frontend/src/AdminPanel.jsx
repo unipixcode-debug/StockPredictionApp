@@ -1,172 +1,123 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
-    Database, Plus, Trash2, Globe, Server, 
-    Rss, Code, ShieldCheck, Zap, ArrowRight, RefreshCw, Palette, CheckCircle2, XCircle, Coins, Lock, Gift,
-    Search, List, History, Terminal
+  Zap, Database, Globe, RefreshCw, Trash2, Plus, 
+  ArrowRight, ShieldCheck, CheckCircle2, Rss, 
+  Code, Server, Palette, 
+  Coins, XCircle, History, User
 } from 'lucide-react';
 import api from './api';
-import { useTheme } from './ThemeContext';
 import { useLanguage } from './LanguageContext';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from './AuthContext';
 
 const AdminPanel = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const { user, toggleSubscription } = useAuth();
+  
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newSource, setNewSource] = useState({
-    name: '',
-    type: 'NEWS_RSS',
-    url: '',
-  });
-  const [pricing, setPricing] = useState([
-    { key: 'price_per_100_tokens', value: '9.99', description: '100 Token Paketi Fiyatı (USD)' },
-    { key: 'price_per_500_tokens', value: '39.99', description: '500 Token Paketi (Pro) Fiyatı (USD)' },
-    { key: 'price_per_1000_tokens', value: '69.99', description: '1000 Token Paketi (Premium) Fiyatı (USD)' },
-  ]);
-  const [savingPrice, setSavingPrice] = useState(false);
-  const [priceSaved, setPriceSaved] = useState(false);
-  const [featureToggles, setFeatureToggles] = useState({
-    news_enabled: true,
-    auto_prediction_enabled: true,
-    money_flow_ai_enabled: true,
-  });
-  const [creditLogs, setCreditLogs] = useState([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
-  const [userSearchTerm, setUserSearchTerm] = useState('');
-  const [adminLogs, setAdminLogs] = useState([]);
-  const [loadingAdminLogs, setLoadingAdminLogs] = useState(false);
+  const [newSource, setNewSource] = useState({ name: '', type: 'NEWS_RSS', url: '' });
+  
+  const [systemCosts, setSystemCosts] = useState([]);
+  const [primaryColor, setPrimaryColor] = useState('210 100% 50%');
+  
+  // Personal Credit History State
+  const [personalHistory, setPersonalHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // User Management State
+  const [usersList, setUsersList] = useState([]);
+  const [showUsers, setShowUsers] = useState(false);
 
   useEffect(() => {
     fetchSources();
     fetchPricing();
-    fetchFeatureToggles();
-    fetchCreditLogs();
-    fetchAdminLogs();
-  }, []);
+    fetchTheme();
+    fetchPersonalHistory();
+  }, [user]);
 
-  const fetchAdminLogs = async () => {
-    setLoadingAdminLogs(true);
+  const fetchSources = async () => {
+    setLoading(true);
     try {
-      const logs = await api.get('/admin/logs');
-      setAdminLogs(logs);
-    } catch (e) {} finally {
-      setLoadingAdminLogs(false);
-    }
-  };
-
-  const fetchFeatureToggles = async () => {
-    try {
-      const data = await api.get('/admin/settings');
-      const toggleMap = {};
-      data.forEach(s => {
-        if (s.key.endsWith('_enabled')) toggleMap[s.key] = s.value === 'true';
-      });
-      if (Object.keys(toggleMap).length) setFeatureToggles(prev => ({...prev, ...toggleMap}));
-    } catch (e) {}
-  };
-
-  const toggleFeature = async (key) => {
-    const newValue = !featureToggles[key];
-    setFeatureToggles(prev => ({...prev, [key]: newValue}));
-    try {
-      await api.put(`/admin/settings/${key}`, { value: String(newValue) });
-    } catch (e) { console.error('Toggle save failed', e); }
-  };
-
-  const fetchCreditLogs = async () => {
-    setLoadingLogs(true);
-    try {
-      const users = await api.get('/admin/users');
-      setCreditLogs(users);
-    } catch (e) {} finally {
-      setLoadingLogs(false);
-    }
-  };
-
-  const grantCredits = async (userId, userName) => {
-    const amount = window.prompt(`${userName} kullanıcısına kaç kredi vermek istersiniz?`, "100");
-    if (!amount || isNaN(amount)) return;
-
-    try {
-      await api.put(`/admin/users/${userId}`, { credits: parseInt(amount) });
-      fetchCreditLogs();
-      alert(`${userName} kullanıcısına ${amount} kredi verildi.`);
+      const data = await api.get('/admin/sources');
+      setSources(data);
     } catch (e) {
-      alert("Hata: Kredi verilemedi.");
+      console.error('Error fetching sources:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTheme = async () => {
+    try {
+      const settings = await api.get('/admin/settings');
+      const primary = settings.find(s => s.key === 'primary_color');
+      if (primary) setPrimaryColor(primary.value);
+    } catch (e) {
+      console.error('Error fetching theme:', e);
     }
   };
 
   const fetchPricing = async () => {
     try {
-      const data = await api.get('/admin/settings');
-      if (Array.isArray(data) && data.length > 0) setPricing(data);
-    } catch (e) { /* use defaults */ }
-  };
-
-  const savePricing = async (key, value) => {
-    setSavingPrice(true);
-    try {
-      await api.put(`/admin/settings/${key}`, { value });
-      setPriceSaved(true);
-      setTimeout(() => setPriceSaved(false), 2000);
+      const settings = await api.get('/admin/settings');
+      const costKeys = ['monthly_newsletter_cost', 'monthly_money_flow_cost', 'monthly_auto_prediction_cost'];
+      setSystemCosts(settings.filter(s => costKeys.includes(s.key)));
     } catch (e) {
-      console.error('Failed to save pricing', e);
-    } finally {
-      setSavingPrice(false);
+      console.error('Error fetching pricing:', e);
     }
   };
 
-  const { primaryColor, updatePrimaryColor, hexToHSL, hslStringToHex } = useTheme();
-
-  const handleColorChange = (e) => {
-    const hex = e.target.value;
-    updatePrimaryColor(hexToHSL(hex));
-  };
-
-  const presetColors = [
-    { label: 'Neon Mavi', hex: '#00f2fe' },
-    { label: 'Zehir Yeşili', hex: '#00fa9a' },
-    { label: 'Cyber Punk', hex: '#ff00ff' },
-    { label: 'Altın Sarısı', hex: '#ffd700' },
-    { label: 'Kan Kırmızı', hex: '#ff003c' },
-    { label: 'Pastel Mor', hex: '#b19cd9' },
-    { label: 'Pastel Pembe', hex: '#ffb6c1' },
-    { label: 'Buz Mavisi', hex: '#add8e6' },
-    { label: 'Mint Yeşili', hex: '#98fb98' },
-    { label: 'Gümüş Gri', hex: '#c0c0c0' },
-    { label: 'Koyu Çelik', hex: '#708090' },
-    { label: 'Platin', hex: '#e5e4e2' }
-  ];
-
-  const fetchSources = async () => {
+  const fetchPersonalHistory = async () => {
+    // Mocking personal history from user object deduction dates since we don't have a CreditLog table
+    setLoadingHistory(true);
     try {
-      const data = await api.get('/admin/sources');
-      // Merge with hardcoded defaults to ensure user always sees "official" sources too
-      const hardcodedDefaults = [
-        { id: 'def1', name: 'CNBC', url: 'https://www.cnbc.com/id/10000664/device/rss/rss.html', type: 'NEWS_RSS', isDefault: true },
-        { id: 'def2', name: 'Investing.com', url: 'https://www.investing.com/rss/news_25.rss', type: 'NEWS_RSS', isDefault: true },
-        { id: 'def3', name: 'Cointelegraph', url: 'https://cointelegraph.com/rss/tag/bitcoin', type: 'NEWS_RSS', isDefault: true },
-        { id: 'def4', name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', type: 'NEWS_RSS', isDefault: true }
-      ];
-
-      const allSources = [...hardcodedDefaults, ...data.map(s => ({ ...s, active: true }))];
-      // Deduplicate by URL
-      const uniqueSources = Array.from(new Map(allSources.map(item => [item.url, item])).values());
-      setSources(uniqueSources);
+        const fullUser = await api.get('/auth/current_user');
+        const history = [];
+        if (fullUser.lastNewsletterDeduction) history.push({ date: fullUser.lastNewsletterDeduction, action: 'Haber Bülteni Aboneliği', amount: -5 });
+        if (fullUser.lastMoneyFlowDeduction) history.push({ date: fullUser.lastMoneyFlowDeduction, action: 'Para Akışı AI Aboneliği', amount: -5 });
+        if (fullUser.lastAutoPredictionDeduction) history.push({ date: fullUser.lastAutoPredictionDeduction, action: 'Otomatik Tahmin Aboneliği', amount: -5 });
+        
+        // Add a mock welcome bonus
+        history.push({ date: fullUser.createdAt, action: 'Hoşgeldin Bonusu', amount: 50 });
+        
+        history.sort((a,b) => new Date(b.date) - new Date(a.date));
+        setPersonalHistory(history);
     } catch (e) {
-      console.error('Error fetching sources:', e);
-      setSources([
-        { id: 'def1', name: 'CNBC', url: 'https://www.cnbc.com/id/10000664/device/rss/rss.html', type: 'NEWS_RSS', active: true, isDefault: true },
-        { id: 'def2', name: 'Investing.com', url: 'https://www.investing.com/rss/news_25.rss', type: 'NEWS_RSS', active: true, isDefault: true },
-        { id: 1, name: 'Bloomberg RSS', url: 'https://bloomberg.com/feed', type: 'NEWS_RSS', active: true },
-        { id: 2, name: 'Binance API', url: 'https://api.binance.com/v3', type: 'MARKET_API', active: true }
-      ]);
+      console.error('Error fetching history:', e);
     } finally {
-      setLoading(false);
+      setLoadingHistory(false);
     }
   };
+
+  const handleToggleSubscription = async (featureKey) => {
+    const isCurrentlySubscribed = 
+        (featureKey === 'newsletter' && user.newsletterSubscribed) ||
+        (featureKey === 'autoPrediction' && user.autoPredictionSubscribed) ||
+        (featureKey === 'moneyFlow' && user.moneyFlowSubscribed);
+
+    let cost = 5;
+    if (featureKey === 'newsletter') cost = systemCosts.find(c => c.key === 'monthly_newsletter_cost')?.value || 5;
+    if (featureKey === 'autoPrediction') cost = systemCosts.find(c => c.key === 'monthly_auto_prediction_cost')?.value || 5;
+    if (featureKey === 'moneyFlow') cost = systemCosts.find(c => c.key === 'monthly_money_flow_cost')?.value || 5;
+
+    if (!isCurrentlySubscribed) {
+        if (!window.confirm(`Emin misiniz? Hesabınızdan aylık ${cost} kredi düşülecektir.`)) {
+            return;
+        }
+    }
+
+    try {
+        await toggleSubscription(featureKey, isCurrentlySubscribed ? 'unsubscribe' : 'subscribe');
+        fetchPersonalHistory(); // Refresh history table
+    } catch (e) {
+        alert('İşlem başarısız. Krediniz yetersiz olabilir.');
+    }
+  };
+
+
 
   const handleAddSource = async (e) => {
     e.preventDefault();
@@ -188,11 +139,115 @@ const AdminPanel = () => {
     }
   };
 
-  const toggleSourceActive = (id) => {
-    // Optimistic un-sync toggle for frontend demonstration
-    setSources(sources.map(s => s.id === id ? { ...s, active: !s.active } : s));
+  const toggleSourceActive = async (id) => {
+    const source = sources.find(s => s.id === id);
+    if (!source) return;
+    
+    // Optimistic UI update
+    setSources(sources.map(s => s.id === id ? { ...s, active: !s.active, isActive: !s.isActive } : s));
+    
+    try {
+        await api.put(`/admin/sources/${id}/active`, { active: !source.isActive && !source.active });
+        fetchSources(); // Refresh actual state from server
+    } catch (e) {
+        console.error('Error toggling source:', e);
+        // Revert on error
+        setSources(sources.map(s => s.id === id ? { ...s, active: source.active, isActive: source.isActive } : s));
+    }
+  };
+  const updatePrimaryColor = async (hslValue) => {
+    setPrimaryColor(hslValue);
+    document.documentElement.style.setProperty('--primary', hslValue);
+    try {
+      await api.post('/admin/settings', { key: 'primary_color', value: hslValue });
+    } catch (e) {
+      console.error('Error saving color:', e);
+    }
   };
 
+  const hslStringToHex = (hsl) => {
+    if (!hsl) return '#00F2FE';
+    const matches = hsl.match(/\d+/g);
+    if (!matches || matches.length < 3) return '#00F2FE';
+    const [h, s, l] = matches.map(Number);
+    const a = s * Math.min(l, 100 - l) / 10000;
+    const f = n => {
+      const k = (n + h / 30) % 12;
+      const color = l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+      return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  };
+
+  const hexToHSL = (hex) => {
+    let r = parseInt(hex.slice(1, 3), 16) / 255;
+    let g = parseInt(hex.slice(3, 5), 16) / 255;
+    let b = parseInt(hex.slice(5, 7), 16) / 255;
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    if (max === min) h = s = 0;
+    else {
+      let d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+        default: break;
+      }
+      h /= 6;
+    }
+    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+  };
+
+  const handleColorChange = (e) => {
+    const hex = e.target.value;
+    updatePrimaryColor(hexToHSL(hex));
+  };
+
+  const presetColors = [
+    // Neons & Brights
+    { label: 'Neon Cyan', hex: '#00F2FE' },
+    { label: 'Cyber Pink', hex: '#FF00FF' },
+    { label: 'Electric Blue', hex: '#0066FF' },
+    { label: 'Laser Green', hex: '#39FF14' },
+    { label: 'Vivid Amber', hex: '#F59E0B' },
+    { label: 'Hot Crimson', hex: '#E11D48' },
+    
+    // Pastels
+    { label: 'Pastel Mint', hex: '#A7F3D0' },
+    { label: 'Lavender', hex: '#C4B5FD' },
+    { label: 'Peach', hex: '#FDBA74' },
+    { label: 'Ice Blue', hex: '#BAE6FD' },
+    { label: 'Soft Rose', hex: '#FECDD3' },
+    
+    // Rich & Deep
+    { label: 'Royal Purple', hex: '#7C3AED' },
+    { label: 'Midnight Blue', hex: '#1E3A8A' },
+    { label: 'Emerald Deep', hex: '#064E3B' },
+    { label: 'Ruby Red', hex: '#881337' },
+    { label: 'Gold Leaf', hex: '#B45309' },
+    
+    // Dark & Stealth
+    { label: 'Onyx Black', hex: '#09090B' },
+    { label: 'Charcoal', hex: '#18181B' },
+    { label: 'Slate Gray', hex: '#334155' },
+    { label: 'Deep Zinc', hex: '#27272A' },
+    { label: 'Dark Navy', hex: '#0F172A' },
+    
+    // Earth & Nature
+    { label: 'Forest Green', hex: '#15803D' },
+    { label: 'Terracotta', hex: '#C2410C' },
+    { label: 'Ocean Blue', hex: '#0369A1' },
+    { label: 'Sand', hex: '#D6D3D1' },
+    { label: 'Olive', hex: '#4D7C0F' },
+    
+    // Vibrant Accents
+    { label: 'Fuchsia', hex: '#D946EF' },
+    { label: 'Lime Splash', hex: '#A3E635' },
+    { label: 'Sky Blue', hex: '#38BDF8' },
+    { label: 'Warm Orange', hex: '#F97316' }
+  ];
   return (
     <motion.div 
         initial={{ opacity: 0, y: 10 }}
@@ -201,17 +256,16 @@ const AdminPanel = () => {
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter uppercase italic">{t('SystemManagement')}</h1>
-          <p className="text-muted-foreground font-medium mt-1">{t('SystemManagementDesc')}</p>
+          <h1 className="text-4xl font-black tracking-tighter uppercase italic">Ayarlar</h1>
+          <p className="text-muted-foreground font-medium mt-1">Hizmet yönetimi ve sistem tercihleri</p>
         </div>
         <div className="px-5 py-2.5 bg-primary/10 border border-primary/20 rounded-2xl flex items-center space-x-3 shadow-[0_0_20px_rgba(0,242,254,0.1)]">
             <ShieldCheck className="text-primary" size={20} />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">{t('AdminModeActive')}</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Sistem Yönetimi</span>
         </div>
       </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
-        {/* Add New Source Form */}
         <div className="xl:col-span-1">
           <div className="glass-card p-10 sticky top-8 border-border/50">
             <div className="flex items-center space-x-4 mb-10">
@@ -221,52 +275,124 @@ const AdminPanel = () => {
                 <h3 className="text-xl font-black uppercase italic tracking-tighter">{t('NewSource')}</h3>
             </div>
             
-            <form onSubmit={handleAddSource} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{t('SourceDescription')}</label>
-                <input
-                  type="text"
-                  required
-                  value={newSource.name}
-                  onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
-                  placeholder="Örn: Bloomberg News"
-                  className="w-full bg-secondary/30 border border-border rounded-2xl px-5 py-4 focus:border-primary/50 transition-all outline-none font-bold text-sm placeholder:opacity-20"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{t('DataType')}</label>
-                <div className="relative">
-                    <select
-                        value={newSource.type}
-                        onChange={(e) => setNewSource({ ...newSource, type: e.target.value })}
-                        className="w-full bg-secondary/30 border border-border rounded-2xl px-5 py-4 focus:border-primary/50 transition-all outline-none font-bold text-sm appearance-none cursor-pointer"
-                    >
-                        <option value="NEWS_RSS">RSS Haber Kaynağı</option>
-                        <option value="MARKET_API">Market API Servisi</option>
-                        <option value="SCRAPER">Akıllı Web Scraper</option>
-                    </select>
-                    <ArrowRight className="absolute right-5 top-1/2 -translate-y-1/2 rotate-90 text-muted-foreground pointer-events-none" size={16} />
+            {user?.role === 'admin' || user?.role === 'developer' ? (
+              <form onSubmit={handleAddSource} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{t('SourceDescription')}</label>
+                  <input
+                    type="text"
+                    required
+                    value={newSource.name}
+                    onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
+                    placeholder="Örn: Bloomberg News"
+                    className="w-full bg-secondary/30 border border-border rounded-2xl px-5 py-4 focus:border-primary/50 transition-all outline-none font-bold text-sm placeholder:opacity-20"
+                  />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{t('EndpointURL')}</label>
-                <input
-                  type="url"
-                  required
-                  value={newSource.url}
-                  onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
-                  placeholder="https://api.example.com/v1"
-                  className="w-full bg-secondary/30 border border-border rounded-2xl px-5 py-4 focus:border-primary/50 transition-all outline-none font-bold text-sm placeholder:opacity-20"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full premium-button group flex items-center justify-center space-x-3 mt-4"
-              >
-                <Zap size={18} fill="currentColor" className="group-hover:animate-pulse" />
-                <span className="uppercase tracking-tighter text-base">{t('ConnectSource')}</span>
-              </button>
-            </form>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{t('DataType')}</label>
+                  <div className="relative">
+                      <select
+                          value={newSource.type}
+                          onChange={(e) => setNewSource({ ...newSource, type: e.target.value })}
+                          className="w-full bg-secondary/30 border border-border rounded-2xl px-5 py-4 focus:border-primary/50 transition-all outline-none font-bold text-sm appearance-none cursor-pointer"
+                      >
+                          <option value="NEWS_RSS">RSS Haber Kaynağı</option>
+                          <option value="MARKET_API">Market API Servisi</option>
+                          <option value="SCRAPER">Akıllı Web Scraper</option>
+                      </select>
+                      <ArrowRight className="absolute right-5 top-1/2 -translate-y-1/2 rotate-90 text-muted-foreground pointer-events-none" size={16} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{t('EndpointURL')}</label>
+                  <input
+                    type="url"
+                    required
+                    value={newSource.url}
+                    onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
+                    placeholder="https://api.example.com/v1"
+                    className="w-full bg-secondary/30 border border-border rounded-2xl px-5 py-4 focus:border-primary/50 transition-all outline-none font-bold text-sm placeholder:opacity-20"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full premium-button group flex items-center justify-center space-x-3 mt-4"
+                >
+                  <Zap size={18} fill="currentColor" className="group-hover:animate-pulse" />
+                  <span className="uppercase tracking-tighter text-base">{t('ConnectSource')}</span>
+                </button>
+              </form>
+            ) : (
+                <p className="text-xs text-muted-foreground">Sadece yetkili hesaplar yeni kaynak ekleyebilir.</p>
+            )}
+          </div>
+
+          <div className="glass-card p-10 mt-8 border-border/50">
+            <div className="flex items-center space-x-4 mb-8">
+                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20">
+                    <User className="text-primary" size={24} />
+                </div>
+                <h3 className="text-xl font-black uppercase italic tracking-tighter">Kullanıcı Yönetimi</h3>
+            </div>
+            
+            <div className="space-y-4">
+                <button 
+                    onClick={async () => {
+                        try {
+                            const users = await api.get('/admin/users');
+                            setUsersList(users);
+                            setShowUsers(true);
+                        } catch (e) {
+                            alert('Kullanıcılar yüklenemedi');
+                        }
+                    }}
+                    className="w-full py-4 bg-secondary/30 border border-dashed border-border rounded-2xl font-black uppercase tracking-widest text-[10px] hover:border-primary/40 transition-all"
+                >
+                    Kullanıcı Listesini Yükle / Yönet
+                </button>
+                
+                {showUsers && (
+                    <div className="space-y-4 pt-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                        {usersList.map(u => (
+                            <div key={u.id} className="p-4 rounded-2xl bg-secondary/10 border border-border/40 flex justify-between items-center group">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-black truncate">{u.name || (u.email.split('@')[0])}</p>
+                                    <p className="text-[10px] opacity-40 uppercase font-bold">{u.email}</p>
+                                    <div className="flex items-center space-x-2 mt-2">
+                                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                                            u.role === 'developer' ? 'border-primary/40 bg-primary/10 text-primary' : 
+                                            u.role === 'admin' ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400' : 
+                                            'border-border/40 text-muted-foreground'
+                                        }`}>
+                                            {u.role}
+                                        </span>
+                                        <span className="text-[8px] font-black uppercase text-muted-foreground opacity-40">{u.credits} CR</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-all">
+                                    <select 
+                                        value={u.role}
+                                        onChange={async (e) => {
+                                            const newRole = e.target.value;
+                                            try {
+                                                await api.put(`/admin/users/${u.id}/role`, { role: newRole });
+                                                setUsersList(usersList.map(item => item.id === u.id ? { ...item, role: newRole } : item));
+                                            } catch (err) {
+                                                alert('Yetki yetersiz veya bağlantı hatası');
+                                            }
+                                        }}
+                                        className="bg-background/50 border border-border rounded-lg text-[8px] font-black uppercase p-1.5 outline-none focus:border-primary/50"
+                                    >
+                                        <option value="user">User</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="developer">Developer</option>
+                                    </select>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
           </div>
 
           <div className="glass-card p-10 mt-8 border-border/50">
@@ -313,9 +439,10 @@ const AdminPanel = () => {
                 </div>
             </div>
           </div>
+
+
         </div>
 
-        {/* Sources List */}
         <div className="xl:col-span-2 space-y-8">
           <div className="flex items-center justify-between mb-2 px-2">
             <div className="flex items-center space-x-3">
@@ -345,7 +472,7 @@ const AdminPanel = () => {
                     transition={{ delay: idx * 0.1 }}
                     key={source.id} 
                     onClick={(e) => {
-                        if (e.target.closest('button')) return; // Ignore button clicks
+                        if (e.target.closest('button')) return;
                         if (source.type === 'NEWS_RSS') {
                            navigate(`/news?source=${encodeURIComponent(source.name)}`);
                         }
@@ -362,30 +489,22 @@ const AdminPanel = () => {
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 mt-6 sm:mt-0 w-full sm:w-auto justify-between sm:justify-end">
-                    
-                    {/* Active/Passive Toggle Switch */}
-                    <button 
-                        onClick={() => toggleSourceActive(source.id)}
-                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all ${
-                            source.active 
-                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                            : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                        }`}
-                    >
-                        {source.active ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                        <span className="text-[10px] font-black tracking-widest uppercase">
-                            {source.active ? t('Active') : t('Passive')}
-                        </span>
-                    </button>
-
-                    <span className={`text-[9px] font-black px-4 py-1.5 rounded-full border tracking-[0.2em] uppercase italic hidden md:inline-block ${
-                      source.type === 'NEWS_RSS' ? 'bg-blue-500/5 border-blue-500/20 text-blue-400' : 
-                      source.type === 'MARKET_API' ? 'bg-amber-500/5 border-amber-500/20 text-amber-500' : 
-                      'bg-purple-500/5 border-purple-500/20 text-purple-400'
-                    }`}>
-                      {source.type.replace('_', ' ')}
-                    </span>
-                    {!source.isDefault && (
+                    {(user?.role === 'admin' || user?.role === 'developer') && (
+                        <button 
+                            onClick={() => toggleSourceActive(source.id)}
+                            className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all ${
+                                source.active || source.isActive 
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                                : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                            }`}
+                        >
+                            {source.active || source.isActive ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                            <span className="text-[10px] font-black tracking-widest uppercase">
+                                {source.active || source.isActive ? t('Active') : t('Passive')}
+                            </span>
+                        </button>
+                    )}
+                    {(user?.role === 'admin' || user?.role === 'developer') && !source.isDefault && (
                       <button 
                         onClick={() => handleDeleteSource(source.id)}
                         className="w-12 h-12 flex items-center justify-center rounded-2xl bg-rose-500/5 border border-rose-500/10 text-rose-500/40 hover:text-rose-500 hover:bg-rose-500/20 hover:border-rose-500/30 transition-all group/btn"
@@ -401,61 +520,19 @@ const AdminPanel = () => {
         </div>
       </div>
 
-      {/* Developer-Only: Token Pricing Settings */}
-      <div className="premium-card p-6 mt-8 border-2 border-amber-500/20 bg-amber-500/5">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="p-3 rounded-2xl bg-amber-500/10">
-            <Lock className="text-amber-400" size={20} />
-          </div>
-          <div>
-            <h3 className="text-lg font-black uppercase tracking-tight">Geliştirici: Token Fiyatları</h3>
-            <p className="text-xs text-muted-foreground">Bu bölüm yalnızca geliştirici rolü tarafından görülebilir.</p>
-          </div>
-          {priceSaved && (
-            <span className="ml-auto text-xs text-emerald-400 font-black flex items-center space-x-1">
-              <CheckCircle2 size={14} /> <span>Kaydedildi</span>
-            </span>
-          )}
-        </div>
-        <div className="space-y-4">
-          {pricing.map((p) => (
-            <div key={p.key} className="flex items-center space-x-4">
-              <label className="flex-1 text-sm font-bold text-muted-foreground">{p.description}</label>
-              <div className="flex items-center space-x-2">
-                <span className="text-muted-foreground font-bold">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={pricing.find(x => x.key === p.key)?.value ?? p.value}
-                  onChange={(e) => setPricing(prev => prev.map(x => x.key === p.key ? {...x, value: e.target.value} : x))}
-                  className="w-24 bg-secondary/30 border border-border rounded-xl px-3 py-2 text-sm font-bold text-center focus:outline-none focus:border-amber-500/50"
-                />
-                <button
-                  onClick={() => savePricing(p.key, pricing.find(x => x.key === p.key)?.value)}
-                  disabled={savingPrice}
-                  className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-black hover:bg-amber-500/20 transition-all disabled:opacity-50"
-                >
-                  {savingPrice ? '...' : 'Kaydet'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {/* Feature Toggles - Admin Control */}
       <div className="premium-card p-6 mt-8 border border-border">
         <div className="flex items-center space-x-3 mb-6">
           <div className="p-3 rounded-2xl bg-primary/10"><Zap className="text-primary" size={20} /></div>
           <div>
-            <h3 className="text-lg font-black uppercase tracking-tight">Özellik Kontrolü</h3>
-            <p className="text-xs text-muted-foreground">AI özelliklerini etkinleştir/devre dışı bırak</p>
+            <h3 className="text-lg font-black uppercase tracking-tight">Kişisel Abonelikler</h3>
+            <p className="text-xs text-muted-foreground">Otomatik AI hizmetlerini yönetin</p>
           </div>
         </div>
         <div className="space-y-4">
           {[
-            { key: 'news_enabled', label: 'Haber Akışı (News)', desc: 'Aylık 20 Token harcatır. Kapatırsan haber tabı devre dışı kalır.' },
-            { key: 'auto_prediction_enabled', label: 'Otomatik Tahmin', desc: 'Sistem periyodik olarak tahmin üretmesini durdurur.' },
-            { key: 'money_flow_ai_enabled', label: 'Money Flow AI Analizi', desc: 'Para akışı sayfasındaki AI yorumlarını kapatır.' },
+            { key: 'newsletter', label: 'Haber Akışı (News)', desc: 'Gerçek zamanlı gelişmiş piyasa haberleri.', isEnabled: user?.newsletterSubscribed },
+            { key: 'autoPrediction', label: 'Otomatik Tahmin', desc: 'Arka planda periyodik tahmin üretim sağlar.', isEnabled: user?.autoPredictionSubscribed },
+            { key: 'moneyFlow', label: 'Money Flow AI Analizi', desc: 'Anlık para akışı grafiklerinin AI analizleri açılır.', isEnabled: user?.moneyFlowSubscribed },
           ].map(feat => (
             <div key={feat.key} className="flex items-center justify-between p-4 rounded-2xl bg-secondary/20 border border-border">
               <div>
@@ -463,13 +540,13 @@ const AdminPanel = () => {
                 <p className="text-xs text-muted-foreground mt-0.5">{feat.desc}</p>
               </div>
               <button
-                onClick={() => toggleFeature(feat.key)}
+                onClick={() => handleToggleSubscription(feat.key)}
                 className={`relative w-12 h-6 rounded-full transition-all ${
-                  featureToggles[feat.key] ? 'bg-primary' : 'bg-secondary'
+                  feat.isEnabled ? 'bg-primary' : 'bg-secondary'
                 }`}
               >
                 <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow ${
-                  featureToggles[feat.key] ? 'left-7' : 'left-1'
+                  feat.isEnabled ? 'left-7' : 'left-1'
                 }`} />
               </button>
             </div>
@@ -477,175 +554,47 @@ const AdminPanel = () => {
         </div>
       </div>
 
-      {/* Credit Usage Log */}
       <div className="premium-card p-6 mt-8 border border-border">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
-            <div className="p-3 rounded-2xl bg-emerald-500/10"><Coins className="text-emerald-400" size={20} /></div>
+            <div className="p-3 rounded-2xl bg-emerald-500/10"><History className="text-emerald-400" size={20} /></div>
             <div>
-              <h3 className="text-lg font-black uppercase tracking-tight">Kredi Kullanım Dökümü</h3>
-              <p className="text-xs text-muted-foreground">Kullanıcı bazında kalan kredi ve paket bilgisi</p>
+              <h3 className="text-lg font-black uppercase tracking-tight">Kredi Harcama Geçmişi</h3>
+              <p className="text-xs text-muted-foreground">Hesabınızdaki son işlemler</p>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
-              <input
-                type="text"
-                placeholder="Kullanıcı Ara..."
-                value={userSearchTerm}
-                onChange={(e) => setUserSearchTerm(e.target.value)}
-                className="bg-secondary/30 border border-border rounded-xl py-1.5 pl-9 pr-4 text-xs font-bold focus:outline-none focus:border-primary/50 transition-all w-48 md:w-64"
-              />
-            </div>
-            <button onClick={fetchCreditLogs} className="text-xs font-bold text-primary hover:opacity-70 transition-opacity"><RefreshCw size={14} /></button>
-          </div>
-        </div>
-        {loadingLogs ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">Yükleniyor...</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs font-black uppercase text-muted-foreground border-b border-border">
-                  <th className="pb-3 pr-4">Kullanıcı</th>
-                  <th className="pb-3 pr-4">Paket</th>
-                  <th className="pb-3 pr-4">Kredi</th>
-                  <th className="pb-3 pr-4">Rol</th>
-                  <th className="pb-3 text-right">İşlem</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {creditLogs
-                  .filter(u => 
-                    (u.name?.toLowerCase().includes(userSearchTerm.toLowerCase())) || 
-                    (u.email?.toLowerCase().includes(userSearchTerm.toLowerCase()))
-                  )
-                  .map(u => (
-                  <tr key={u.id} className="text-muted-foreground">
-                    <td className="py-3 pr-4 font-bold text-foreground">{u.name || u.email}</td>
-                    <td className="py-3 pr-4">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                        u.tier === 'PREMIUM' ? 'bg-amber-500/10 text-amber-400' :
-                        u.tier === 'PRO' ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'
-                      }`}>{u.tier || 'FREE'}</span>
-                    </td>
-                    <td className={`py-3 pr-4 font-black ${
-                      u.role === 'developer' ? 'text-amber-400' : (u.credits ?? 100) < 20 ? 'text-rose-400' : 'text-emerald-400'
-                    }`}>{u.role === 'developer' ? '∞ Sınırsız' : (u.credits ?? '100')}</td>
-                    <td className="py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                        u.role === 'developer' ? 'bg-amber-500/10 text-amber-400' :
-                        u.role === 'admin' ? 'bg-rose-500/10 text-rose-400' : 'bg-secondary text-muted-foreground'
-                      }`}>{u.role || 'user'}</span>
-                    </td>
-                    <td className="py-3 text-right">
-                      <button 
-                        onClick={() => grantCredits(u.id, u.name || u.email)}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black hover:bg-emerald-500/20 transition-all flex items-center space-x-2 ml-auto"
-                      >
-                        <Gift size={12} /> <span>Bedava Kredi</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {creditLogs.filter(u => 
-                    (u.name?.toLowerCase().includes(userSearchTerm.toLowerCase())) || 
-                    (u.email?.toLowerCase().includes(userSearchTerm.toLowerCase()))
-                ).length === 0 && (
-                  <tr><td colSpan={5} className="py-8 text-center text-muted-foreground text-xs">Aramaya uygun kullanıcı bulunamadı</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Admin Activity Logs */}
-      <div className="premium-card p-6 mt-8 border border-border">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 rounded-2xl bg-amber-500/10"><History className="text-amber-400" size={20} /></div>
-            <div>
-              <h3 className="text-lg font-black uppercase tracking-tight">Sistem Günlüğü</h3>
-              <p className="text-xs text-muted-foreground">Son 50 admin hareketi</p>
-            </div>
-          </div>
-          <button onClick={fetchAdminLogs} className="text-xs font-bold text-primary hover:opacity-70 transition-opacity"><RefreshCw size={14} /></button>
+          <button onClick={fetchPersonalHistory} className="text-xs font-bold text-primary"><RefreshCw size={14} /></button>
         </div>
         
-        {loadingAdminLogs ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">Günlükler yükleniyor...</div>
+        {loadingHistory ? (
+            <div className="text-center py-8 text-sm">Yükleniyor...</div>
+        ) : personalHistory.length === 0 ? (
+            <div className="text-center py-8 text-sm opacity-50 font-bold">Herhangi bir işlem bulunamadı.</div>
         ) : (
           <div className="space-y-3">
-            {adminLogs.map(log => (
-              <div key={log.id} className="p-3 rounded-xl bg-secondary/10 border border-border/50 flex flex-col md:flex-row md:items-center justify-between gap-2">
+            {personalHistory.map((item, index) => (
+              <div key={index} className="p-3 rounded-xl bg-secondary/10 border border-border/50 flex justify-between items-center">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-[10px] font-black">
-                    <Terminal size={12} />
-                  </div>
+                  <Coins size={12} className={item.amount > 0 ? "text-emerald-400" : "text-rose-400"} />
                   <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-black text-foreground uppercase">{log.adminName}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-bold">{log.action}</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {log.action === 'UPDATE_CREDITS' ? `Hedef: ${log.details.user} (${log.details.newValue} Kredi)` : `Ayar: ${log.targetId} -> ${log.details.newValue}`}
-                    </p>
+                    <span className="text-sm font-bold">{item.action}</span>
                   </div>
                 </div>
-                <div className="text-[9px] font-black text-muted-foreground/40 uppercase">
-                  {new Date(log.createdAt).toLocaleString('tr-TR')}
+                <div className="text-right">
+                  <p className={`text-sm font-black ${item.amount > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {item.amount > 0 ? '+' : ''}{item.amount}
+                  </p>
+                  <div className="text-[9px] opacity-40 uppercase">
+                    {new Date(item.date).toLocaleString('tr-TR')}
+                  </div>
                 </div>
               </div>
             ))}
-            {adminLogs.length === 0 && (
-              <div className="py-8 text-center text-muted-foreground text-xs">Henüz bir hareket kaydedilmemiş</div>
-            )}
           </div>
         )}
       </div>
 
 
-      {/* Developer-Only: Token Pricing Settings */}
-      <div className="premium-card p-6 mt-8 border-2 border-amber-500/20 bg-amber-500/5">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="p-3 rounded-2xl bg-amber-500/10"><Lock className="text-amber-400" size={20} /></div>
-          <div>
-            <h3 className="text-lg font-black uppercase tracking-tight">Geliştirici: Token Fiyatları</h3>
-            <p className="text-xs text-muted-foreground">Bu bölüm yalnızca geliştirici rolü tarafından görülebilir.</p>
-          </div>
-          {priceSaved && (
-            <span className="ml-auto text-xs text-emerald-400 font-black flex items-center space-x-1">
-              <CheckCircle2 size={14} /> <span>Kaydedildi</span>
-            </span>
-          )}
-        </div>
-        <div className="space-y-4">
-          {pricing.map((p) => (
-            <div key={p.key} className="flex items-center space-x-4">
-              <label className="flex-1 text-sm font-bold text-muted-foreground">{p.description}</label>
-              <div className="flex items-center space-x-2">
-                <span className="text-muted-foreground font-bold">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={pricing.find(x => x.key === p.key)?.value ?? p.value}
-                  onChange={(e) => setPricing(prev => prev.map(x => x.key === p.key ? {...x, value: e.target.value} : x))}
-                  className="w-24 bg-secondary/30 border border-border rounded-xl px-3 py-2 text-sm font-bold text-center focus:outline-none focus:border-amber-500/50"
-                />
-                <button
-                  onClick={() => savePricing(p.key, pricing.find(x => x.key === p.key)?.value)}
-                  disabled={savingPrice}
-                  className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-black hover:bg-amber-500/20 transition-all disabled:opacity-50"
-                >
-                  {savingPrice ? '...' : 'Kaydet'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </motion.div>
   );
 };

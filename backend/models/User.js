@@ -38,8 +38,40 @@ const User = sequelize.define('User', {
     },
     credits: {
         type: DataTypes.INTEGER,
-        defaultValue: 100,  // Free tier starts with 100 credits (5 analyses)
+        defaultValue: 50,  // New users start with 50 credits (configurable)
         allowNull: false
+    },
+    newsletterSubscribed: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    moneyFlowSubscribed: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    autoPredictionSubscribed: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    lastNewsletterDeduction: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    lastMoneyFlowDeduction: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    lastAutoPredictionDeduction: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    phone: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    bio: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 }, {
     timestamps: true,
