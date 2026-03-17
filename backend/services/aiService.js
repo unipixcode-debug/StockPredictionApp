@@ -81,32 +81,69 @@ class AIService {
                 console.log(`Attempting with AI Provider: ${provider.name}...`);
                 
                 if (provider.type === 'GEMINI') {
-                    // Use verified gemini-1.5-flash
-                    const model = provider.instance.getGenerativeModel({ model: modelOverride || "gemini-1.5-flash" });
+                    const modelName = modelOverride || "gemini-1.5-flash";
+                    const model = provider.instance.getGenerativeModel({ model: modelName });
                     
                     let contents = [];
-                    let systemInstruction = "";
+                    let systemMsg = "";
 
                     if (Array.isArray(prompt)) {
+                        // 1. Extract System Message & Map to Gemini Roles
+                        const rawContents = [];
                         prompt.forEach(m => {
                             if (m.role === 'system') {
-                                systemInstruction = m.content;
+                                systemMsg = m.content;
                             } else {
-                                contents.push({
+                                rawContents.push({
                                     role: m.role === 'assistant' ? 'model' : 'user',
-                                    parts: [{ text: m.content }]
+                                    text: m.content
                                 });
                             }
                         });
-                        
-                        // Prepend system instruction to first user message (compatibility approach)
-                        if (systemInstruction && contents.length > 0) {
-                            contents[0].parts[0].text = `SYSTEM: ${systemInstruction}\n\n${contents[0].parts[0].text}`;
+
+                        // 2. Merge Consecutive Roles (Gemini Requirement)
+                        if (rawContents.length > 0) {
+                            let merged = [];
+                            let current = rawContents[0];
+                            
+                            for (let i = 1; i < rawContents.length; i++) {
+                                if (rawContents[i].role === current.role) {
+                                    current.text += "\n\n" + rawContents[i].text;
+                                } else {
+                                    merged.push(current);
+                                    current = rawContents[i];
+                                }
+                            }
+                            merged.push(current);
+
+                            // 3. Ensure first message is 'user' (Gemini requirement)
+                            if (merged[0].role === 'model') {
+                                // If history starts with model, prepend an empty user message or combine with system
+                                merged.unshift({ role: 'user', text: "Conversation history follows:" });
+                            }
+
+                            contents = merged.map(m => ({
+                                role: m.role,
+                                parts: [{ text: m.text }]
+                            }));
+                        }
+
+                        // 4. Prepend System Message to the first user message
+                        if (systemMsg && contents.length > 0) {
+                            // Find the first user message to attach system instruction
+                            const firstUserIdx = contents.findIndex(c => c.role === 'user');
+                            if (firstUserIdx !== -1) {
+                                contents[firstUserIdx].parts[0].text = `INSTRUKTOR: ${systemMsg}\n\nUSER MESSAGE: ${contents[firstUserIdx].parts[0].text}`;
+                            }
                         }
                     } else {
+                        // Simple string prompt
                         contents = [{ role: "user", parts: [{ text: prompt }] }];
                     }
 
+                    if (contents.length === 0) throw new Error("Empty contents for Gemini");
+
+                    // console.log("GEMINI PAYLOAD:", JSON.stringify(contents).substring(0, 500));
                     const result = await model.generateContent({ contents });
                     const response = await result.response;
                     return response.text();
