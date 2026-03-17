@@ -9,16 +9,35 @@ const Credits = () => {
     const { language } = useLanguage();
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [apiPackages, setApiPackages] = useState([]);
+
+    React.useEffect(() => {
+        fetchPackages();
+    }, []);
+
+    const fetchPackages = async () => {
+        try {
+            const data = await api.get('/admin/packages');
+            setApiPackages(data);
+        } catch (error) {
+            console.error('Error fetching packages:', error);
+        }
+    };
+
+    const getSetting = (key, defaultValue) => {
+        const setting = apiPackages.find(s => s.key === key);
+        return setting ? setting.value : defaultValue;
+    };
 
     const packages = [
         {
             id: 'starter',
             name: 'Starter',
-            credits: 100,
-            price: '₺49.99',
+            credits: parseInt(getSetting('pkg_starter_tokens', '100')),
+            price: getSetting('pkg_starter_price', '₺49.99'),
             icon: <Zap className="text-blue-400" size={24} />,
             features: [
-                '100 AI Analysis',
+                `${getSetting('pkg_starter_tokens', '100')} AI Analysis`,
                 'Basic Predictions',
                 'Daily Market News'
             ],
@@ -27,11 +46,11 @@ const Credits = () => {
         {
             id: 'pro',
             name: 'Pro',
-            credits: 500,
-            price: '₺199.99',
+            credits: parseInt(getSetting('pkg_pro_tokens', '500')),
+            price: getSetting('pkg_pro_price', '₺199.99'),
             icon: <Star className="text-amber-400" size={24} />,
             features: [
-                '500 AI Analysis',
+                `${getSetting('pkg_pro_tokens', '500')} AI Analysis`,
                 'Priority Processing',
                 'Advance Technical Analysis',
                 'Early Data Access'
@@ -41,11 +60,11 @@ const Credits = () => {
         {
             id: 'whale',
             name: 'Whale',
-            credits: 2000,
-            price: '₺699.99',
+            credits: parseInt(getSetting('pkg_whale_tokens', '2000')),
+            price: getSetting('pkg_whale_price', '₺699.99'),
             icon: <Crown className="text-purple-400" size={24} />,
             features: [
-                '2000 AI Analysis',
+                `${getSetting('pkg_whale_tokens', '2000')} AI Analysis`,
                 'Dedicated Support',
                 'Deep Learning Insights',
                 'Custom Strategy Bot'

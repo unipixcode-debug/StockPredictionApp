@@ -23,12 +23,15 @@ const DeveloperPanel = () => {
   const [aiStatus, setAiStatus] = useState(null);
   const [loadingAiStatus, setLoadingAiStatus] = useState(false);
   const [aiStatusError, setAiStatusError] = useState(null);
+  const [packageSettings, setPackageSettings] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
 
   useEffect(() => {
     fetchSystemCosts();
     fetchAdminLogs();
     fetchUsers();
     fetchAiStatus();
+    fetchPackages();
   }, []);
 
   const fetchSystemCosts = async () => {
@@ -76,6 +79,29 @@ const DeveloperPanel = () => {
       setAiStatusError(e.response?.data?.error || e.message);
     } finally {
       setLoadingAiStatus(false);
+    }
+  };
+
+  const fetchPackages = async () => {
+    setLoadingPackages(true);
+    try {
+      const data = await api.get('/admin/packages');
+      setPackageSettings(data);
+    } catch (e) {
+      console.error('Error fetching packages:', e);
+    } finally {
+      setLoadingPackages(false);
+    }
+  };
+
+  const savePackageSetting = async (key, value) => {
+    try {
+      await api.post('/admin/packages', { key, value });
+      setCostSaved(true);
+      setTimeout(() => setCostSaved(false), 3000);
+      fetchPackages();
+    } catch (e) {
+      console.error('Error saving package setting:', e);
     }
   };
 
@@ -278,7 +304,49 @@ const DeveloperPanel = () => {
           </div>
         </div>
 
-
+        {/* Token Paket Yönetimi (Fiyatlandırma) */}
+        <div className="glass-card p-6 border-border/50">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="p-3 rounded-2xl bg-cyan-500/10">
+              <Star className="text-cyan-400" size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black uppercase tracking-tight">Paket & Fiyatlandırma</h3>
+              <p className="text-xs text-muted-foreground">Token Store paketlerini yönetin</p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            {loadingPackages ? (
+              <div className="text-center py-4 text-xs opacity-50">Yükleniyor...</div>
+            ) : (
+              packageSettings.map(setting => (
+                <div key={setting.key} className="flex justify-between items-center p-3 rounded-xl bg-secondary/10 border border-border/50">
+                  <div className="flex-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider opacity-50 block mb-1">
+                      {setting.description || setting.key}
+                    </span>
+                    <input
+                      type="text"
+                      value={setting.value}
+                      onChange={(e) => setPackageSettings(prev => prev.map(s => s.key === setting.key ? {...s, value: e.target.value} : s))}
+                      className="bg-transparent border-none text-sm font-bold focus:outline-none w-full"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => savePackageSetting(setting.key, setting.value)}
+                    className="text-[10px] font-black uppercase bg-cyan-500/20 text-cyan-400 px-3 py-1.5 rounded-lg hover:bg-cyan-500/30 transition-all"
+                  >
+                    Güncelle
+                  </button>
+                </div>
+              ))
+            )}
+            {packageSettings.length === 0 && !loadingPackages && (
+              <div className="text-center py-4 text-xs opacity-50">Henüz paket ayarı bulunamadı.</div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Admin Activity Logs */}
