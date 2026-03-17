@@ -11,28 +11,42 @@ import api from './api';
 const Chatbot = () => {
     const { user, updateCredits } = useAuth();
     const { t, language } = useLanguage();
-    const [messages, setMessages] = useState(() => {
-        const saved = localStorage.getItem('chat_history');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-            } catch (e) {
-                console.error("Failed to parse chat history", e);
-            }
-        }
-        return [
-            { 
-                role: 'assistant', 
-                content: language === 'TR' 
-                    ? 'Merhaba! Ben PredictPro AI asistanıyım. Piyasa verileri, haberler ve tahminler hakkında size analiz sunabilirim. Sohbet başına 1 kredi kullanılır. Nasıl yardımcı olabilirim?' 
-                    : 'Hello! I am PredictPro AI assistant. I can provide analysis on market data, news, and predictions. 1 credit used per chat. How can I help you?'
-            }
-        ];
-    });
+    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef(null);
+
+    // Initial message
+    const initialAssistantMsg = { 
+        role: 'assistant', 
+        content: language === 'TR' 
+            ? 'Merhaba! Ben PredictPro AI asistanıyım. Piyasa verileri, haberler ve tahminler hakkında size analiz sunabilirim. Sohbet başına 1 kredi kullanılır. Nasıl yardımcı olabilirim?' 
+            : 'Hello! I am PredictPro AI assistant. I can provide analysis on market data, news, and predictions. 1 credit used per chat. How can I help you?'
+    };
+
+    useEffect(() => {
+        // Fetch history from server
+        const fetchHistory = async () => {
+            try {
+                const response = await api.get('/ai/history');
+                // api.js interceptor returns response.data directly
+                if (response && Array.isArray(response)) {
+                    if (response.length === 0) {
+                        setMessages([initialAssistantMsg]);
+                    } else {
+                        // Map DB structure to chat structure
+                        setMessages(response.map(m => ({ role: m.role, content: m.content })));
+                    }
+                } else {
+                    setMessages([initialAssistantMsg]);
+                }
+            } catch (error) {
+                console.error("Failed to fetch chat history", error);
+                setMessages([initialAssistantMsg]);
+            }
+        };
+        fetchHistory();
+    }, [language]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -40,10 +54,6 @@ const Chatbot = () => {
 
     useEffect(() => {
         scrollToBottom();
-        // Persist history to localStorage
-        if (messages.length > 0) {
-            localStorage.setItem('chat_history', JSON.stringify(messages));
-        }
     }, [messages]);
 
     const handleSend = async (e) => {
@@ -66,46 +76,42 @@ const Chatbot = () => {
         setLoading(true);
 
         try {
+            // Context strategy: Send last 6 messages
             const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
             const response = await api.post('/ai/chat', { message: input, history });
             
-            // Check if response exists and has the expected properties
-            // Note: api.js interceptor returns response.data directly!
             if (response && response.credits !== undefined) {
                 updateCredits(response.credits);
             }
             
             if (response && response.reply) {
                 setMessages(prev => [...prev, { role: 'assistant', content: response.reply }]);
-            } else {
-                throw new Error("AI response format is invalid");
             }
         } catch (error) {
-            console.error("Chat Error Detailed:", {
-                message: error.message,
-                status: error.response?.status,
-                data: error.response?.data
-            });
-            setMessages(prev => [...prev, { 
-                role: 'assistant', 
-                content: language === 'TR' 
-                    ? `Sohbet sırasında bir hata oluştu: ${error.message}` 
-                    : `An error occurred during chat: ${error.message}`
-            }]);
+            console.error("Chat Error:", error);
+            const status = error.response?.status;
+            let errorMsg = language === 'TR' 
+                ? 'Sohbet sırasında bir hata oluştu.' 
+                : 'An error occurred during chat.';
+
+            if (status === 503) {
+                errorMsg = language === 'TR'
+                    ? 'AI Hizmeti şu an meşgul. Krediniz düşülmedi. Lütfen biraz bekleyip tekrar deneyin.'
+                    : 'AI Service is currently busy. Your credits were not deducted. Please try again in a moment.';
+            } else if (status === 403) {
+                errorMsg = language === 'TR' ? 'Yetersiz kredi!' : 'Insufficient credits!';
+            }
+
+            setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
         } finally {
             setLoading(false);
         }
     };
 
     const clearChat = () => {
-        const initialMsg = [{ 
-            role: 'assistant', 
-            content: language === 'TR' 
-                ? 'Sohbet temizlendi. Size nasıl yardımcı olabilirim?' 
-                : 'Chat cleared. How can I help you?' 
-        }];
-        setMessages(initialMsg);
-        localStorage.setItem('chat_history', JSON.stringify(initialMsg));
+        if (!window.confirm(language === 'TR' ? "Sohbet geçmişini temizlemek istediğinize emin misiniz?" : "Are you sure you want to clear chat history?")) return;
+        setMessages([initialAssistantMsg]);
+        // Note: Full server-side clear could be added as a separate DELETE route
     };
 
     return (
