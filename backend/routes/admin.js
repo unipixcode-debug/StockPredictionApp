@@ -318,6 +318,7 @@ router.get('/ai-status', async (req, res) => {
                 name: provider.name,
                 type: provider.type,
                 status: 'ok',
+                quota: provider.quotaRemaining,
                 response: response.substring(0, 20),
                 ms: Date.now() - start
             });

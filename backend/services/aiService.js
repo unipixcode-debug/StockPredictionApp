@@ -82,7 +82,7 @@ class AIService {
                 
                 if (provider.type === 'GEMINI') {
                     // Use verified gemini-2.5-flash
-                    const model = provider.instance.getGenerativeModel({ model: modelOverride || "gemini-2.5-flash" });
+                    const model = provider.instance.getGenerativeModel({ model: modelOverride || "gemini-1.5-flash" });
                     const result = await model.generateContent(prompt);
                     const response = await result.response;
                     return response.text();
@@ -110,7 +110,8 @@ class AIService {
 
                 if (provider.type === 'OLLAMA') {
                     // key is treated as base URL for Ollama
-                    const baseUrl = provider.key || 'http://localhost:11434';
+                    let baseUrl = provider.key || 'http://localhost:11434';
+                    if (!baseUrl.startsWith('http')) baseUrl = `http://${baseUrl}`;
                     const response = await axios.post(`${baseUrl}/api/generate`, {
                         model: modelOverride || "llama3",
                         prompt: typeof prompt === 'string' ? prompt : JSON.stringify(prompt),
@@ -195,7 +196,7 @@ class AIService {
                 : messages;
 
             console.log("ChatBot: Generating content via Gemini Pool (2.5 Flash)...");
-            return await this.generateContent(prompt, "gemini-2.5-flash");
+            return await this.generateContent(prompt, "gemini-1.5-flash");
         } catch (error) {
             console.error('ChatBot AI error:', error.message);
             throw error;
@@ -276,7 +277,7 @@ class AIService {
             Article Text:
             ${textToSummarize.substring(0, 15000)}`;
 
-            const responseText = await this.generateContent(prompt, "gemini-2.5-flash");
+            const responseText = await this.generateContent(prompt, "gemini-1.5-flash");
             
             try {
                 let cleanJson = responseText.trim();

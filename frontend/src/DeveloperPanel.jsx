@@ -150,7 +150,7 @@ const DeveloperPanel = () => {
             <div className="flex flex-wrap items-center gap-4">
               {/* Credits Mirror - Bespoke Hero Section */}
               <div className="px-8 py-4 bg-secondary/20 border border-border shadow-2xl rounded-[1.5rem] flex flex-col items-center justify-center min-w-[140px] hover:border-cyan-500/50 transition-all">
-                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[.2em] mb-1">Kalan Kredi</span>
+                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[.2em] mb-1">Hesap Bakiyesi</span>
                 <span className="text-3xl font-black text-cyan-400 tracking-tighter italic">
                   {aiStatus?.userCredits || 0}
                 </span>
@@ -187,6 +187,12 @@ const DeveloperPanel = () => {
                     'bg-rose-500/[0.03] border-rose-500/20 hover:border-rose-500/50'
                   }`}
                 >
+                  {/* Quota Badge if exists */}
+                  {p.quota && (
+                    <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[8px] font-black text-cyan-400">
+                      {p.quota}
+                    </div>
+                  )}
                   {/* Staggered Content for Avant-Garde Feel */}
                   <div className="flex justify-between items-start mb-4">
                     <div className={`p-2 rounded-xl scale-90 ${p.status === 'ok' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
