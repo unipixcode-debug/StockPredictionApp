@@ -143,7 +143,7 @@ class AIService {
 
                     if (contents.length === 0) throw new Error("Empty contents for Gemini");
 
-                    // console.log("GEMINI PAYLOAD:", JSON.stringify(contents).substring(0, 500));
+                    console.log("DEBUG: GEMINI PAYLOAD:", JSON.stringify(contents, null, 2));
                     const result = await model.generateContent({ contents });
                     const response = await result.response;
                     return response.text();
