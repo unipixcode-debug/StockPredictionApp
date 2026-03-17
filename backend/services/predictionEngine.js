@@ -73,7 +73,7 @@ class PredictionEngine {
             let reasoning = "";
             try {
                 const prompt = `Provide 2 sentences in Turkish analyzing ${symbol} (${market}). Current trend is ${direction}. Score: ${Math.round(finalScore)}/100. Be professional.`;
-                reasoning = await aiService.generateContent(prompt, "gemini-1.5-flash");
+                reasoning = await aiService.generateContent(prompt, null);
             } catch (aiErr) {
                 reasoning = `${symbol} için ${direction} sinyali. Güven: %${Math.round(finalScore)}. Pazar baskısı: ${pressureScore}`;
             }
