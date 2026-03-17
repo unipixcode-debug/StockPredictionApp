@@ -196,7 +196,9 @@ const AIProviderManagement = () => {
                             exit={{ opacity: 0, scale: 0.95 }}
                             className="glass-card w-full max-w-md p-8 border border-border shadow-2xl relative"
                         >
-                            <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-8 text-primary">Yeni Sağlayıcı</h2>
+                            <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-8 text-primary">
+                                {editingProvider ? 'Sağlayıcıyı Düzenle' : 'Yeni Sağlayıcı'}
+                            </h2>
                             <form onSubmit={handleAdd} className="space-y-5">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">İsim</label>
@@ -205,16 +207,16 @@ const AIProviderManagement = () => {
                                         required
                                         className="premium-input w-full"
                                         placeholder="Örn: Gemini Pro 2"
-                                        value={newProvider.name}
-                                        onChange={(e) => setNewProvider({...newProvider, name: e.target.value})}
+                                        value={editingProvider ? editingProvider.name : newProvider.name}
+                                        onChange={(e) => editingProvider ? setEditingProvider({...editingProvider, name: e.target.value}) : setNewProvider({...newProvider, name: e.target.value})}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Tip</label>
                                     <select 
                                         className="premium-input w-full bg-background"
-                                        value={newProvider.type}
-                                        onChange={(e) => setNewProvider({...newProvider, type: e.target.value})}
+                                        value={editingProvider ? editingProvider.type : newProvider.type}
+                                        onChange={(e) => editingProvider ? setEditingProvider({...editingProvider, type: e.target.value}) : setNewProvider({...newProvider, type: e.target.value})}
                                     >
                                         <option value="GEMINI">GOOGLE GEMINI</option>
                                         <option value="DEEPSEEK">DEEPSEEK</option>
@@ -230,14 +232,14 @@ const AIProviderManagement = () => {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">API Key</label>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">API Key / URL</label>
                                     <input 
                                         type="password" 
                                         required
                                         className="premium-input w-full"
-                                        placeholder={newProvider.type === 'OLLAMA' ? 'http://localhost:11434' : 'sk-...'}
-                                        value={newProvider.apiKey}
-                                        onChange={(e) => setNewProvider({...newProvider, apiKey: e.target.value})}
+                                        placeholder={(editingProvider ? editingProvider.type : newProvider.type) === 'OLLAMA' ? 'http://localhost:11434' : 'sk-...'}
+                                        value={editingProvider ? editingProvider.apiKey : newProvider.apiKey}
+                                        onChange={(e) => editingProvider ? setEditingProvider({...editingProvider, apiKey: e.target.value}) : setNewProvider({...newProvider, apiKey: e.target.value})}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -246,14 +248,14 @@ const AIProviderManagement = () => {
                                         type="number" 
                                         required
                                         className="premium-input w-full"
-                                        value={newProvider.priority}
-                                        onChange={(e) => setNewProvider({...newProvider, priority: parseInt(e.target.value)})}
+                                        value={editingProvider ? editingProvider.priority : newProvider.priority}
+                                        onChange={(e) => editingProvider ? setEditingProvider({...editingProvider, priority: parseInt(e.target.value)}) : setNewProvider({...newProvider, priority: parseInt(e.target.value)})}
                                     />
                                 </div>
                                 <div className="pt-6 flex space-x-3">
                                     <button 
                                         type="button"
-                                        onClick={() => setIsModalOpen(false)}
+                                        onClick={() => { setIsModalOpen(false); setEditingProvider(null); }}
                                         className="flex-1 px-6 py-3 rounded-xl border border-border font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-colors"
                                     >
                                         İPTAL
@@ -262,7 +264,7 @@ const AIProviderManagement = () => {
                                         type="submit"
                                         className="flex-1 premium-button px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest"
                                     >
-                                        EKLE
+                                        {editingProvider ? 'GÜNCELLE' : 'EKLE'}
                                     </button>
                                 </div>
                             </form>
