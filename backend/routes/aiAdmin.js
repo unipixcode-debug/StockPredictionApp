@@ -31,7 +31,7 @@ router.post('/providers', async (req, res) => {
     }
 });
 
-// PATCH update provider (toggle active, change key, priority etc)
+// PATCH/PUT update provider (toggle active, change key, priority etc)
 router.patch('/providers/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -39,10 +39,25 @@ router.patch('/providers/:id', async (req, res) => {
         if (!provider) return res.status(404).json({ error: 'Provider not found' });
         
         await provider.update(req.body);
-        // Refresh aiService pool
         await aiService.initProviders();
         res.json(provider);
     } catch (error) {
+        console.error('Error updating provider:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.put('/providers/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const provider = await AIProvider.findByPk(id);
+        if (!provider) return res.status(404).json({ error: 'Provider not found' });
+        
+        await provider.update(req.body);
+        await aiService.initProviders();
+        res.json(provider);
+    } catch (error) {
+        console.error('Error updating provider (PUT):', error);
         res.status(500).json({ error: error.message });
     }
 });
