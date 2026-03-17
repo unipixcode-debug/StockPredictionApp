@@ -143,15 +143,15 @@ const DeveloperPanel = () => {
         {/* AI Provider Status */}
         <div className="glass-card p-6 border-border/50 xl:col-span-2">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 rounded-2xl bg-blue-500/10">
+            <Link to="/ai-management" className="flex items-center space-x-3 group cursor-pointer transition-all hover:opacity-80">
+              <div className="p-3 rounded-2xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-all">
                 <Cpu className="text-blue-400" size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-black uppercase tracking-tight">AI Provider Durumu</h3>
-                <p className="text-xs text-muted-foreground">Canlı API anahtarı sağlık kontrolü — analiz başarısız olursa nedeni burada görünür</p>
+                <h3 className="text-lg font-black uppercase tracking-tight group-hover:text-primary transition-all">AI Provider Durumu</h3>
+                <p className="text-xs text-muted-foreground">Canlı API anahtarı sağlık kontrolü — yönetmek için tıkla</p>
               </div>
-            </div>
+            </Link>
             <button
               onClick={fetchAiStatus}
               disabled={loadingAiStatus}
