@@ -198,7 +198,7 @@ Respond ONLY with the integer number.
 News:
 ${newsSummaries}`;
 
-            const responseText = await aiService.generateContent(prompt, "gemini-1.5-flash");
+            const responseText = await aiService.generateContent(prompt, null);
             const score = parseInt(responseText.trim(), 10);
 
             if (!isNaN(score) && score >= 0 && score <= 100) {
