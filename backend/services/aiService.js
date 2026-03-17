@@ -97,31 +97,76 @@ class AIService {
                 }
 
                 if (provider.type === 'DEEPSEEK') {
-                    // Prevent passing gemini model strings to deepseek
                     const dsModel = (modelOverride && modelOverride.includes('deepseek')) ? modelOverride : "deepseek-chat";
                     const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
                         model: dsModel,
-                        messages: Array.isArray(prompt) ? prompt : [{ role: "user", content: prompt }]
+                        messages: Array.isArray(prompt) ? (typeof prompt[0] === 'object' ? prompt : prompt.map(p => ({role:'user', content: p}))) : [{ role: "user", content: prompt }]
                     }, {
                         headers: { 'Authorization': `Bearer ${provider.key}` },
-                        timeout: 10000 // 10s timeout
+                        timeout: 20000 
+                    });
+                    return response.data.choices[0].message.content;
+                }
+
+                if (provider.type === 'OLLAMA') {
+                    // key is treated as base URL for Ollama
+                    const baseUrl = provider.key || 'http://localhost:11434';
+                    const response = await axios.post(`${baseUrl}/api/generate`, {
+                        model: modelOverride || "llama3",
+                        prompt: typeof prompt === 'string' ? prompt : JSON.stringify(prompt),
+                        stream: false
+                    }, { timeout: 30000 });
+                    return response.data.response;
+                }
+
+                if (provider.type === 'ANTHROPIC') {
+                    const response = await axios.post('https://api.anthropic.com/v1/messages', {
+                        model: modelOverride || "claude-3-5-sonnet-20240620",
+                        max_tokens: 1024,
+                        messages: [{ role: "user", content: typeof prompt === 'string' ? prompt : JSON.stringify(prompt) }]
+                    }, {
+                        headers: { 
+                            'x-api-key': provider.key,
+                            'anthropic-version': '2023-06-01',
+                            'content-type': 'application/json'
+                        },
+                        timeout: 20000
+                    });
+                    return response.data.content[0].text;
+                }
+
+                // OpenAI Compatible Providers
+                const openAiCompatible = {
+                    'GROQ': 'https://api.groq.com/openai/v1',
+                    'MISTRAL': 'https://api.mistral.ai/v1',
+                    'PERPLEXITY': 'https://api.perplexity.ai',
+                    'COHERE': 'https://api.cohere.ai/v1',
+                    'XAI': 'https://api.x.ai/v1'
+                };
+
+                if (openAiCompatible[provider.type]) {
+                    const baseUrl = openAiCompatible[provider.type];
+                    const response = await axios.post(`${baseUrl}/chat/completions`, {
+                        model: modelOverride || (provider.type === 'GROQ' ? 'llama3-8b-8192' : 'mistral-large-latest'),
+                        messages: [{ role: "user", content: typeof prompt === 'string' ? prompt : JSON.stringify(prompt) }]
+                    }, {
+                        headers: { 'Authorization': `Bearer ${provider.key}` },
+                        timeout: 15000
                     });
                     return response.data.choices[0].message.content;
                 }
 
                 if (provider.type === 'OPENROUTER') {
-                    // Chatbot has its own dedicated method, mostly skip here for background tasks
-                    if (!modelOverride) continue; 
                     const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
                         model: modelOverride || "deepseek/deepseek-chat",
-                        messages: Array.isArray(prompt) ? prompt : [{ role: "user", content: prompt }]
+                        messages: Array.isArray(prompt) ? (typeof prompt[0] === 'object' ? prompt : prompt.map(p => ({role:'user', content: p}))) : [{ role: "user", content: prompt }]
                     }, {
                         headers: { 
                             'Authorization': `Bearer ${provider.key}`,
-                            'HTTP-Referer': 'https://stockpredictionapp.com', // Optional but recommended
-                            'X-Title': 'PredictPro'
+                            'HTTP-Referer': 'https://unipixcode.xyz',
+                            'X-Title': 'Unipix Prediction'
                         },
-                        timeout: 15000 // 15s timeout
+                        timeout: 20000
                     });
                     return response.data.choices[0].message.content;
                 }

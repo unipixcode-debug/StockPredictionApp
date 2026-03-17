@@ -8,6 +8,7 @@ const AIProviderManagement = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newProvider, setNewProvider] = useState({ name: '', type: 'GEMINI', apiKey: '', priority: 1, isActive: true });
+    const [editingProvider, setEditingProvider] = useState(null);
     const [refreshingId, setRefreshingId] = useState(null);
 
     useEffect(() => {
@@ -29,13 +30,23 @@ const AIProviderManagement = () => {
     const handleAdd = async (e) => {
         e.preventDefault();
         try {
-            await api.post('/admin/ai/providers', newProvider);
+            if (editingProvider) {
+                await api.put(`/admin/ai/providers/${editingProvider.id}`, editingProvider);
+                setEditingProvider(null);
+            } else {
+                await api.post('/admin/ai/providers', newProvider);
+            }
             setIsModalOpen(false);
             setNewProvider({ name: '', type: 'GEMINI', apiKey: '', priority: 1, isActive: true });
             fetchProviders();
         } catch (error) {
-            alert('Sağlayıcı eklenemedi: ' + error.message);
+            alert('İşlem başarısız: ' + error.message);
         }
+    };
+
+    const startEdit = (provider) => {
+        setEditingProvider({ ...provider });
+        setIsModalOpen(true);
     };
 
     const handleToggle = async (id, currentStatus) => {
@@ -133,6 +144,12 @@ const AIProviderManagement = () => {
                                         <Power size={14} />
                                     </button>
                                     <button 
+                                        onClick={() => startEdit(p)}
+                                        className="p-2 rounded-lg text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                                    >
+                                        <Key size={14} />
+                                    </button>
+                                    <button 
                                         onClick={() => handleDelete(p.id)}
                                         className="p-2 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
                                     >
@@ -199,9 +216,16 @@ const AIProviderManagement = () => {
                                         value={newProvider.type}
                                         onChange={(e) => setNewProvider({...newProvider, type: e.target.value})}
                                     >
-                                        <option value="GEMINI">GEMINI</option>
+                                        <option value="GEMINI">GOOGLE GEMINI</option>
                                         <option value="DEEPSEEK">DEEPSEEK</option>
-                                        <option value="OPENAI">OPENAI</option>
+                                        <option value="OPENAI">OPENAI (GPT)</option>
+                                        <option value="OLLAMA">OLLAMA</option>
+                                        <option value="ANTHROPIC">ANTHROPIC (CLAUDE)</option>
+                                        <option value="GROQ">GROQ</option>
+                                        <option value="MISTRAL">MISTRAL AI</option>
+                                        <option value="PERPLEXITY">PERPLEXITY</option>
+                                        <option value="COHERE">COHERE</option>
+                                        <option value="XAI">XAI (GROK)</option>
                                         <option value="OPENROUTER">OPENROUTER</option>
                                     </select>
                                 </div>
@@ -211,7 +235,7 @@ const AIProviderManagement = () => {
                                         type="password" 
                                         required
                                         className="premium-input w-full"
-                                        placeholder="sk-..."
+                                        placeholder={newProvider.type === 'OLLAMA' ? 'http://localhost:11434' : 'sk-...'}
                                         value={newProvider.apiKey}
                                         onChange={(e) => setNewProvider({...newProvider, apiKey: e.target.value})}
                                     />
