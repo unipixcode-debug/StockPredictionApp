@@ -33,7 +33,7 @@ class AIService {
                 // Gemini Pool
                 const geminiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3, process.env.GEMINI_API_KEY_4, process.env.GEMINI_API_KEY_5].filter(Boolean);
                 geminiKeys.forEach((key, i) => {
-                    seedData.push({ name: `Gemini-${i+1}`, type: 'GEMINI', apiKey: key, priority: 1 });
+                    seedData.push({ name: `Gemini-${i+1}`, type: 'GEMINI', apiKey: key.trim(), priority: 1 });
                 });
 
                 if (seedData.length > 0) {
@@ -48,8 +48,9 @@ class AIService {
                     id: p.id,
                     name: p.name,
                     type: p.type,
-                    key: p.apiKey,
+                    key: p.apiKey.trim(),
                     priority: p.priority,
+                    cooldownUntil: 0
                 };
 
                 if (p.type === 'GEMINI') {
@@ -78,10 +79,15 @@ class AIService {
 
         for (const provider of targetProviders) {
             try {
+                if (provider.cooldownUntil && provider.cooldownUntil > Date.now()) {
+                    console.log(`Skipping ${provider.name} (on cooldown due to quota)...`);
+                    continue;
+                }
+
                 console.log(`Attempting with AI Provider: ${provider.name}...`);
                 
                 if (provider.type === 'GEMINI') {
-                    const modelName = modelOverride || "gemini-2.5-flash";
+                    const modelName = modelOverride || "gemini-flash-latest";
                     const genModel = provider.instance.getGenerativeModel({ model: modelName });
                     
                     let contents = [];
@@ -234,7 +240,9 @@ class AIService {
                 }
 
             } catch (error) {
-                console.error(`AI Provider ${provider.name} failed:`, error.message);
+                if (this.isQuotaError(error)) {
+                    provider.cooldownUntil = Date.now() + 30000; // 30s cooldown
+                }
                 lastError = error;
                 // Continue to next provider...
             }
@@ -256,8 +264,8 @@ class AIService {
                 ? messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n')
                 : messages;
 
-            console.log("ChatBot: Generating content via Gemini Pool (2.5 Flash)...");
-            return await this.generateContent(prompt, "gemini-2.5-flash");
+            console.log("ChatBot: Generating content via Gemini Pool (Flash Latest)...");
+            return await this.generateContent(prompt, "gemini-flash-latest");
         } catch (error) {
             console.error('ChatBot AI error:', error.message);
             throw error;
@@ -338,7 +346,7 @@ class AIService {
             Article Text:
             ${textToSummarize.substring(0, 15000)}`;
 
-            const responseText = await this.generateContent(prompt, "gemini-2.5-flash");
+            const responseText = await this.generateContent(prompt, "gemini-flash-latest");
             
             try {
                 let cleanJson = responseText.trim();
