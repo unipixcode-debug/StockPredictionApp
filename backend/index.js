@@ -13,6 +13,7 @@ const User = require('./models/User');
 const Prediction = require('./models/Prediction');
 const DataSource = require('./models/DataSource');
 const NewsSummary = require('./models/NewsSummary');
+const ChatMessage = require('./models/ChatMessage');
 
 const predictionRoutes = require('./routes/predictions');
 const adminRoutes = require('./routes/admin');

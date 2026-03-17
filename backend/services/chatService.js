@@ -6,49 +6,69 @@ const Prediction = require('../models/Prediction');
 class ChatService {
     async processUserMessage(message, history = []) {
         try {
-            // 1. Gather Context
-            const globalIndicators = await marketDataService.getGlobalIndicators();
-            const pressure = marketDataService.calculateMarketPressure(globalIndicators);
-            const latestPredictions = await Prediction.findAll({
-                limit: 5,
-                order: [['createdAt', 'DESC']]
-            });
-            // Fetch news in EN to avoid AI translation overhead (translation takes 12+ seconds)
-            const topNewsPromise = newsService.fetchLatestNews('', 'EN');
-            const topNews = await Promise.race([
-                topNewsPromise,
-                new Promise(resolve => setTimeout(() => resolve([]), 4000)) // 4s max wait
-            ]);
+            // 1. Gather Context with individual timeouts/fallbacks
+            let globalIndicators = null;
+            let pressure = 50;
+            let latestPredictions = [];
+            let topNews = [];
 
-            // 2. Format Context for AI
+            try {
+                const indicatorsPromise = marketDataService.getGlobalIndicators();
+                globalIndicators = await Promise.race([
+                    indicatorsPromise,
+                    new Promise(resolve => setTimeout(() => resolve(null), 3000))
+                ]);
+                if (globalIndicators) {
+                    pressure = marketDataService.calculateMarketPressure(globalIndicators);
+                }
+            } catch (e) { console.warn("Chat context: indicators failed."); }
+
+            try {
+                latestPredictions = await Prediction.findAll({
+                    limit: 5,
+                    order: [['createdAt', 'DESC']]
+                });
+            } catch (e) { console.warn("Chat context: predictions failed."); }
+
+            try {
+                // Short timeout for news, we don't want to block the whole chat
+                const newsPromise = newsService.fetchLatestNews('', 'EN');
+                topNews = await Promise.race([
+                    newsPromise,
+                    new Promise(resolve => setTimeout(() => resolve([]), 4000))
+                ]);
+            } catch (e) { console.warn("Chat context: news failed."); }
+
+            // 2. Format Context
             const contextText = this.formatContext(globalIndicators, pressure, latestPredictions, topNews);
 
-            // 3. Build System Prompt
+            // 3. Prompt Construction
             const systemPrompt = `Sen, PredictPro platformunun yapay zeka finans asistanısın. 
 Görevin, kullanıcılara sunulan güncel pazar verileri, haberler ve sistem tahminleri ışığında bilgilendirici analizler sunmaktır.
 
-KRİTİK KURALLAR:
-1. KESİNLİKLE YATIRIM TAVSİYESİ VERME. Her yanıtının sonunda veya başında "Bu bilgiler kesinlikle yatırım tavsiyesi değildir." ibaresini kullan.
-2. Sadece sana sağlanan güncel verileri ve genel finansal bilgilerini kullan.
-3. Yanıtlarını profesyonel, objektif ve yardımcı bir tonda tut.
-4. Karmaşık terimleri basitçe açıkla.
-5. Kullanıcıya grafikler, duyarlılık skorları ve piyasa baskısı hakkında yorum yap.
+KURALLAR:
+1. YATIRIM TAVSİYESİ VERME.
+2. Profesyonel ve yardımcı ton kullan.
+3. Elindeki verileri (Piyasa baskısı: ${pressure}/100 vb.) kullanarak konuş.
 
-GÜNCEL SİSTEM VERİLERİ (CONTEXT):
+GÜNCEL VERİLER:
 ${contextText}`;
 
-            // 4. Call AI
-            const messages = [
+            // 4. Generate Content
+            // We pass the full history directly to generateContent which now handles arrays
+            const promptForAI = [
                 { role: "system", content: systemPrompt },
                 ...history,
                 { role: "user", content: message }
             ];
 
-            const response = await aiService.generateChatContent(messages);
+            const response = await aiService.generateContent(promptForAI, "gemini-1.5-flash");
             return response;
+
         } catch (error) {
-            console.error("ChatService Error:", error.message, error.stack);
-            return "Üzgünüm, şu an bağlantı kuramıyorum. Lütfen daha sonra tekrar deneyin.";
+            console.error("ChatService Error:", error.message);
+            // Re-throw so the route knows it failed
+            throw error;
         }
     }
 

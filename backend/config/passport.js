@@ -25,44 +25,52 @@ passport.use(new GoogleStrategy({
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
-      // Check if user already exists
-      console.log('--- Passport Strategy: Checking user for googleId:', profile.id);
+      const email = profile.emails[0].value;
+      console.log(`[AUTH] Google login attempt: ${email} (ID: ${profile.id})`);
+      
+      // 1. Try by googleId
       let user = await User.findOne({ where: { googleId: profile.id } });
 
+      // 2. Fallback to Email (Prevents duplicating accounts if user logs in with same email but Google metadata changes)
+      if (!user) {
+        console.log(`[AUTH] User not found by googleId, searching by email: ${email}`);
+        user = await User.findOne({ where: { email } });
+        
+        if (user) {
+          console.log(`[AUTH] User found by email, linking googleId: ${profile.id}`);
+          await user.update({ googleId: profile.id });
+        }
+      }
+
       if (user) {
-        console.log('--- Passport Strategy: User found:', user.email);
+        console.log(`[AUTH] Login successful: ${user.email} (UUID: ${user.id})`);
         return done(null, user);
       }
 
-      console.log('--- Passport Strategy: User not found, creating new account for:', profile.emails[0].value);
+      console.log(`[AUTH] Account not found, creating new profile for: ${email}`);
 
-      // Fetch Welcome Bonus from settings
+      // Fetch Welcome Bonus
       let welcomeBonus = 50;
       try {
           const bonusSetting = await GlobalSetting.findByPk('welcome_bonus');
-          if (bonusSetting) {
-            welcomeBonus = parseInt(bonusSetting.value);
-            console.log('--- Passport Strategy: welcome_bonus from DB:', welcomeBonus);
-          } else {
-            console.log('--- Passport Strategy: welcome_bonus setting not found, using default 50');
-          }
+          welcomeBonus = bonusSetting ? parseInt(bonusSetting.value) : 50;
       } catch (e) {
-          console.warn('Could not fetch welcome_bonus setting, using default 50');
+          console.warn('[AUTH] Settings fetch failed, using default bonus.');
       }
 
-      // If not, create a new user
+      // 3. Create New User
       user = await User.create({
         googleId: profile.id,
-        email: profile.emails[0].value,
+        email: email,
         name: profile.displayName,
         credits: welcomeBonus,
-        role: 'user' // Default role
+        role: 'user'
       });
 
-      console.log('--- Passport Strategy: New user created with', welcomeBonus, 'credits');
+      console.log(`[AUTH] New account initialized: ${user.email} (UUID: ${user.id})`);
       done(null, user);
     } catch (err) {
-      console.error('--- Passport Strategy: Error creating user:', err);
+      console.error('[AUTH] Strategy error:', err);
       done(err, null);
     }
   }
