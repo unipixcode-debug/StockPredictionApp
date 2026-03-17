@@ -3,12 +3,15 @@ import { motion } from 'framer-motion';
 import { 
   Palette, Lock, History, Terminal, CheckCircle2, RefreshCw, Zap, Cpu, Wifi, WifiOff, AlertTriangle, Bot
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from './api';
 import { useLanguage } from './LanguageContext';
+import { useAuth } from './AuthContext';
 
 const DeveloperPanel = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [systemCosts, setSystemCosts] = useState([]);
   const [adminLogs, setAdminLogs] = useState([]);
   const [users, setUsers] = useState([]);
@@ -109,6 +112,19 @@ const DeveloperPanel = () => {
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary italic">AI Sağlayıcılarını Yönet</span>
         </Link>
       </header>
+
+      {/* Tab Navigation */}
+      <div className="flex items-center space-x-1 p-1 bg-secondary/20 rounded-[1.5rem] w-fit border border-border/40">
+        <button 
+            onClick={() => navigate('/admin')}
+            className="px-8 py-3 rounded-[1.2rem] text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
+        >
+           Genel Ayarlar
+        </button>
+        <button className="px-8 py-3 rounded-[1.2rem] text-xs font-black uppercase tracking-widest bg-amber-500 text-black shadow-lg shadow-amber-500/20">
+           Geliştirici (Core)
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
 
@@ -245,7 +261,7 @@ const DeveloperPanel = () => {
                   />
                   <button 
                     onClick={() => saveSystemCost(cost.key, cost.value)}
-                    disabled={savingPrice}
+                    disabled={savingCost}
                     className="text-[10px] font-black uppercase bg-primary/20 text-primary px-2 py-1 rounded hover:bg-primary/30 transition-all"
                   >
                     Kaydet

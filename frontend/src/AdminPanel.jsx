@@ -259,11 +259,34 @@ const AdminPanel = () => {
           <h1 className="text-4xl font-black tracking-tighter uppercase italic">Ayarlar</h1>
           <p className="text-muted-foreground font-medium mt-1">Hizmet yönetimi ve sistem tercihleri</p>
         </div>
-        <div className="px-5 py-2.5 bg-primary/10 border border-primary/20 rounded-2xl flex items-center space-x-3 shadow-[0_0_20px_rgba(0,242,254,0.1)]">
-            <ShieldCheck className="text-primary" size={20} />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Sistem Yönetimi</span>
+        <div className="flex items-center gap-3">
+            {user?.role === 'developer' && (
+                <Link to="/developer" className="px-5 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center space-x-3 hover:bg-amber-500/20 transition-all">
+                    <Database className="text-amber-400" size={18} />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Geliştirici Paneli</span>
+                </Link>
+            )}
+            <div className="px-5 py-2.5 bg-primary/10 border border-primary/20 rounded-2xl flex items-center space-x-3 shadow-[0_0_20px_rgba(0,242,254,0.1)]">
+                <ShieldCheck className="text-primary" size={20} />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Sistem Yönetimi</span>
+            </div>
         </div>
       </header>
+
+      {/* Tab Navigation */}
+      <div className="flex items-center space-x-1 p-1 bg-secondary/20 rounded-[1.5rem] w-fit border border-border/40">
+        <button className="px-8 py-3 rounded-[1.2rem] text-xs font-black uppercase tracking-widest bg-primary text-primary-foreground shadow-lg">
+           Genel Ayarlar
+        </button>
+        {user?.role === 'developer' && (
+            <button 
+                onClick={() => navigate('/developer')}
+                className="px-8 py-3 rounded-[1.2rem] text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
+            >
+               Geliştirici (Core)
+            </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
         <div className="xl:col-span-1">
