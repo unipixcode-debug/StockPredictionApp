@@ -62,8 +62,7 @@ ${contextText}`;
                 { role: "user", content: message }
             ];
 
-            const response = await aiService.generateContent(promptForAI, "gemini-1.5-flash");
-            return response;
+            return await aiService.generateContent(promptForAI, "gemini-1.5-flash");
 
         } catch (error) {
             console.error("ChatService Error:", error.message);

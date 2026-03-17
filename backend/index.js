@@ -14,6 +14,8 @@ const Prediction = require('./models/Prediction');
 const DataSource = require('./models/DataSource');
 const NewsSummary = require('./models/NewsSummary');
 const ChatMessage = require('./models/ChatMessage');
+const AIProvider = require('./models/AIProvider');
+const AdminLog = require('./models/AdminLog');
 
 const predictionRoutes = require('./routes/predictions');
 const adminRoutes = require('./routes/admin');

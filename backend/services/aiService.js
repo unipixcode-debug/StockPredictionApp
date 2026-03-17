@@ -81,17 +81,45 @@ class AIService {
                 console.log(`Attempting with AI Provider: ${provider.name}...`);
                 
                 if (provider.type === 'GEMINI') {
-                    // Use verified gemini-2.5-flash
+                    // Use verified gemini-1.5-flash
                     const model = provider.instance.getGenerativeModel({ model: modelOverride || "gemini-1.5-flash" });
-                    const result = await model.generateContent(prompt);
+                    
+                    let contents = [];
+                    let systemInstruction = "";
+
+                    if (Array.isArray(prompt)) {
+                        prompt.forEach(m => {
+                            if (m.role === 'system') {
+                                systemInstruction = m.content;
+                            } else {
+                                contents.push({
+                                    role: m.role === 'assistant' ? 'model' : 'user',
+                                    parts: [{ text: m.content }]
+                                });
+                            }
+                        });
+                        
+                        // Prepend system instruction to first user message (compatibility approach)
+                        if (systemInstruction && contents.length > 0) {
+                            contents[0].parts[0].text = `SYSTEM: ${systemInstruction}\n\n${contents[0].parts[0].text}`;
+                        }
+                    } else {
+                        contents = [{ role: "user", parts: [{ text: prompt }] }];
+                    }
+
+                    const result = await model.generateContent({ contents });
                     const response = await result.response;
                     return response.text();
                 }
 
                 if (provider.type === 'OPENAI') {
+                    const messages = Array.isArray(prompt) 
+                        ? (typeof prompt[0] === 'object' ? prompt : prompt.map(p => ({role:'user', content: p})))
+                        : [{ role: "user", content: prompt }];
+
                     const response = await provider.instance.chat.completions.create({
                         model: modelOverride || "gpt-3.5-turbo",
-                        messages: [{ role: "user", content: prompt }],
+                        messages: messages,
                     });
                     return response.choices[0].message.content;
                 }
