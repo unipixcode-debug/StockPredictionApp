@@ -1,3 +1,7 @@
+const express = require('express');
+const router = express.Router();
+const chatService = require('../services/chatService');
+const { protect } = require('../middleware/auth');
 const ChatMessage = require('../models/ChatMessage');
 
 // @desc    Get chat history
