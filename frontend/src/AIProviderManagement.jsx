@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Plus, Trash2, Power, Zap, RefreshCw, Key, ShieldCheck, Activity, BarChart3, AlertCircle, Box } from 'lucide-react';
+import { Bot, Plus, Trash2, Power, Zap, RefreshCw, Key, ShieldCheck, Activity, BarChart3, AlertCircle, Database } from 'lucide-react';
 import api from './api';
 
 const AIProviderManagement = () => {
@@ -95,7 +95,7 @@ const AIProviderManagement = () => {
                 </div>
             ) : providers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-40 space-y-4">
-                    <Box className="text-muted-foreground/20 w-16 h-16" />
+                    <Database className="text-muted-foreground/20 w-16 h-16" />
                     <p className="text-muted-foreground font-black uppercase tracking-widest italic opacity-30 text-xs text-center">
                         Hiç sağlayıcı bulunamadı.<br/>Ekleme butonunu kullanarak yeni bir API anahtarı ekleyin.
                     </p>
