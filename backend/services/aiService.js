@@ -6,78 +6,83 @@ const emailService = require('./emailService');
 class AIService {
     constructor() {
         this.providers = [];
+        this.isInitialized = false;
         this.initProviders();
     }
 
-    initProviders() {
+    async initProviders() {
         try {
-            // 1. Gemini Keys (Supports up to 5 as requested, plus the main one)
-            const geminiKeys = [
-                process.env.GEMINI_API_KEY,
-                process.env.GEMINI_API_KEY_1,
-                process.env.GEMINI_API_KEY_2,
-                process.env.GEMINI_API_KEY_3,
-                process.env.GEMINI_API_KEY_4,
-                process.env.GEMINI_API_KEY_5
-            ].filter(Boolean);
-
-            geminiKeys.forEach((key, index) => {
-                try {
-                    this.providers.push({
-                        name: `Gemini-${index + 1}`,
-                        type: 'GEMINI',
-                        key: key,
-                        priority: 1,
-                        instance: new GoogleGenerativeAI(key)
-                    });
-                } catch (e) {
-                    console.error(`Failed to init Gemini-${index + 1}:`, e.message);
-                }
+            const AIProvider = require('../models/AIProvider');
+            
+            // 1. Fetch from Database
+            let dbProviders = await AIProvider.findAll({
+                where: { isActive: true },
+                order: [['priority', 'ASC']]
             });
 
-            // 2. OpenAI
-            if (process.env.OPENAI_API_KEY) {
-                try {
-                    this.providers.push({
-                        name: 'OpenAI',
-                        type: 'OPENAI',
-                        key: process.env.OPENAI_API_KEY,
-                        priority: 2,
-                        instance: new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-                    });
-                } catch (e) {
-                    console.error(`Failed to init OpenAI:`, e.message);
+            // 2. Seed from ENV if DB is empty (First run)
+            if (dbProviders.length === 0) {
+                console.log('🌱 No AI providers in DB, seeding from ENV...');
+                const seedData = [];
+                
+                // Deepseek (Primary)
+                if (process.env.DEEPSEEK_API_KEY) {
+                    seedData.push({ name: 'Deepseek', type: 'DEEPSEEK', apiKey: process.env.DEEPSEEK_API_KEY, priority: 0 });
+                }
+                
+                // Gemini Pool
+                const geminiKeys = [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3, process.env.GEMINI_API_KEY_4, process.env.GEMINI_API_KEY_5].filter(Boolean);
+                geminiKeys.forEach((key, i) => {
+                    seedData.push({ name: `Gemini-${i+1}`, type: 'GEMINI', apiKey: key, priority: 1 });
+                });
+
+                if (seedData.length > 0) {
+                    await AIProvider.bulkCreate(seedData);
+                    dbProviders = await AIProvider.findAll({ where: { isActive: true }, order: [['priority', 'ASC']] });
                 }
             }
 
-            // 3. Deepseek (via API)
-            if (process.env.DEEPSEEK_API_KEY) {
-                this.providers.push({
-                    name: 'Deepseek',
-                    type: 'DEEPSEEK',
-                    key: process.env.DEEPSEEK_API_KEY,
-                    priority: 3
-                });
-            }
+            // 3. Transform to instances
+            this.providers = dbProviders.map(p => {
+                const provider = {
+                    id: p.id,
+                    name: p.name,
+                    type: p.type,
+                    key: p.apiKey,
+                    priority: p.priority,
+                };
 
-            // Sort by priority
-            this.providers.sort((a, b) => a.priority - b.priority);
-            console.log(`AI Service initialized with ${this.providers.length} providers.`);
+                if (p.type === 'GEMINI') {
+                    provider.instance = new GoogleGenerativeAI(p.apiKey);
+                } else if (p.type === 'OPENAI') {
+                    provider.instance = new OpenAI({ apiKey: p.apiKey });
+                }
+                
+                return provider;
+            });
+
+            this.isInitialized = true;
+            console.log(`AI Service re-initialized with ${this.providers.length} providers from DB.`);
         } catch (error) {
             console.error("Critical error in AIService initialization:", error.message);
         }
     }
 
-    async generateContent(prompt, modelOverride = null) {
+    async generateContent(prompt, modelOverride = null, providerId = null) {
         let lastError = null;
 
-        for (const provider of this.providers) {
+        // If specific provider requested (health check)
+        const targetProviders = providerId 
+            ? this.providers.filter(p => p.id === providerId)
+            : this.providers;
+
+        for (const provider of targetProviders) {
             try {
                 console.log(`Attempting with AI Provider: ${provider.name}...`);
                 
                 if (provider.type === 'GEMINI') {
-                    // Correcting SDK usage: getGenerativeModel
-                    const model = provider.instance.getGenerativeModel({ model: modelOverride || "gemini-1.5-flash-latest" });
+                    // Use verified gemini-2.5-flash
+                    const model = provider.instance.getGenerativeModel({ model: modelOverride || "gemini-2.5-flash" });
                     const result = await model.generateContent(prompt);
                     const response = await result.response;
                     return response.text();
@@ -92,11 +97,31 @@ class AIService {
                 }
 
                 if (provider.type === 'DEEPSEEK') {
+                    // Prevent passing gemini model strings to deepseek
+                    const dsModel = (modelOverride && modelOverride.includes('deepseek')) ? modelOverride : "deepseek-chat";
                     const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
-                        model: modelOverride || "deepseek-chat",
-                        messages: [{ role: "user", content: prompt }]
+                        model: dsModel,
+                        messages: Array.isArray(prompt) ? prompt : [{ role: "user", content: prompt }]
                     }, {
-                        headers: { 'Authorization': `Bearer ${provider.key}` }
+                        headers: { 'Authorization': `Bearer ${provider.key}` },
+                        timeout: 10000 // 10s timeout
+                    });
+                    return response.data.choices[0].message.content;
+                }
+
+                if (provider.type === 'OPENROUTER') {
+                    // Chatbot has its own dedicated method, mostly skip here for background tasks
+                    if (!modelOverride) continue; 
+                    const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+                        model: modelOverride || "deepseek/deepseek-chat",
+                        messages: Array.isArray(prompt) ? prompt : [{ role: "user", content: prompt }]
+                    }, {
+                        headers: { 
+                            'Authorization': `Bearer ${provider.key}`,
+                            'HTTP-Referer': 'https://stockpredictionapp.com', // Optional but recommended
+                            'X-Title': 'PredictPro'
+                        },
+                        timeout: 15000 // 15s timeout
                     });
                     return response.data.choices[0].message.content;
                 }
@@ -114,6 +139,22 @@ class AIService {
         }
 
         throw new Error(`All AI providers failed. Last error: ${lastError?.message || 'Unknown'}`);
+    }
+
+    // Updated to use Gemini Pool for cost optimization
+    async generateChatContent(messages) {
+        try {
+            // Convert message array to a unified prompt for any provider in the pool
+            const prompt = Array.isArray(messages) 
+                ? messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n')
+                : messages;
+
+            console.log("ChatBot: Generating content via Gemini Pool (2.5 Flash)...");
+            return await this.generateContent(prompt, "gemini-2.5-flash");
+        } catch (error) {
+            console.error('ChatBot AI error:', error.message);
+            throw error;
+        }
     }
 
     isQuotaError(error) {
@@ -147,7 +188,7 @@ class AIService {
 
             const prompt = `Translate the following JSON array of news articles to Turkish. Ensure the output is valid, complete JSON. Do not cut off the output. Return ONLY the JSON array containing exactly the same 'id' fields and the translated 'title' and 'snippet' fields.\n\n${JSON.stringify(payload)}`;
             
-            const responseText = await this.generateContent(prompt, "gemini-1.5-flash-latest");
+            const responseText = await this.generateContent(prompt, null); // Use Gemini pool only
             
             // Clean up backticks if model ignored instruction
             let cleanJson = responseText.trim();
@@ -180,33 +221,35 @@ class AIService {
             console.log(`Summarizing article text length: ${textToSummarize.length}`);
             
             const prompt = `Read the following article text (or snippet). Provide a well-formatted Markdown summary in BOTH Turkish and English. Extract the key points and any market impact.
+            
+            Return ONLY a valid JSON object with the following structure:
+            {
+              "tr": "# 🇹🇷 Türkçe Özet\\n\\n**Özet:**\\n[summary text here...]",
+              "en": " # 🇬🇧 English Summary\\n\\n**Summary:**\\n[summary text here...]"
+            }
 
-Use the exact following structure:
+            Article Text:
+            ${textToSummarize.substring(0, 15000)}`;
 
-# 🇹🇷 Türkçe Özet
-
-**Özet:**
-[1-2 paragraph translated summary in Turkish]
-
-**Önemli Çıkarımlar:**
-- [Point 1]
-- [Point 2]
-
----
-
-# 🇬🇧 English Summary
-
-**Summary:**
-[1-2 paragraph summary in English]
-
-**Key Takeaways:**
-- [Point 1]
-- [Point 2]
-
-Article Text:
-${textToSummarize.substring(0, 15000)}
-`;
-            return await this.generateContent(prompt, "gemini-1.5-flash-latest");
+            const responseText = await this.generateContent(prompt, "gemini-2.5-flash");
+            
+            try {
+                let cleanJson = responseText.trim();
+                // Strip markdown code fences if present
+                if (cleanJson.startsWith('```')) {
+                    const nextLine = cleanJson.indexOf('\n');
+                    if (nextLine !== -1) {
+                        cleanJson = cleanJson.substring(nextLine + 1);
+                    } else {
+                        cleanJson = cleanJson.substring(3);
+                    }
+                    if (cleanJson.endsWith('```')) cleanJson = cleanJson.substring(0, cleanJson.lastIndexOf('```'));
+                }
+                return JSON.parse(cleanJson.trim());
+            } catch (pErr) {
+                console.warn("AI response not valid JSON, using fallback splitting");
+                return { tr: responseText, en: responseText };
+            }
         } catch (error) {
             console.error("AI Article Summarization Error:", error.message);
             throw error;

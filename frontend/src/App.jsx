@@ -1,8 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import { 
   Activity, BarChart3, User, Settings, Database, Moon, Sun, 
-  LayoutDashboard, Receipt, LineChart, LogOut, Newspaper
+  LayoutDashboard, Receipt, LineChart, LogOut, Newspaper, Bot, Coins, Sparkles
 } from 'lucide-react';
 
 import Dashboard from './Dashboard';
@@ -12,20 +12,34 @@ import AssetDetails from './AssetDetails';
 import MarketChart from './MarketChart';
 import Analysis from './Analysis';
 import News from './News';
+import DeveloperPanel from './DeveloperPanel';
+import Chatbot from './Chatbot';
+import Credits from './Credits';
+import Profile from './Profile';
+import AIProviderManagement from './AIProviderManagement';
 import { AuthProvider, useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <AppLayoutWrapper />
     </AuthProvider>
   );
 }
 
-function AppContent() {
+function AppLayoutWrapper() {
+  return (
+    <Router>
+      <AppLayout />
+    </Router>
+  );
+}
+
+function AppLayout() {
   const { user, loading, loginWithGoogle, theme, toggleTheme } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -40,8 +54,8 @@ function AppContent() {
   }
 
   return (
-    <Router>
-      <div className="flex min-h-screen bg-background text-foreground transition-colors duration-500 overflow-hidden">
+    <div className="flex min-h-screen bg-background text-foreground transition-colors duration-500 overflow-hidden">
+
         {/* Sidebar */}
         <aside className="fixed left-0 top-0 h-screen w-20 lg:w-72 border-r border-border flex flex-col p-6 space-y-10 z-50 bg-card/40 backdrop-blur-2xl">
           <div className="flex items-center space-x-4 px-2">
@@ -58,8 +72,18 @@ function AppContent() {
             <SidebarLink to="/" icon={<LayoutDashboard size={22} />} label={t('Dashboard')} />
             <SidebarLink to="/news" icon={<Newspaper size={22} />} label={t('News')} />
             <SidebarLink to="/flow" icon={<Receipt size={22} />} label={t('MoneyFlow')} />
-            <SidebarLink to="/admin" icon={<Database size={22} />} label={t('AdminPanel')} />
             <SidebarLink to="/analysis" icon={<LineChart size={22} />} label={t('Analysis')} />
+            <SidebarLink to="/chat" icon={<Bot size={22} />} label={t('AIChat')} />
+            <SidebarLink to="/credits" icon={<Coins size={22} />} label={language === 'TR' ? 'Kredi Al' : 'Buy Credits'} />
+            <SidebarLink to="/profile" icon={<User size={22} />} label="Profil" />
+            <SidebarLink to="/admin" icon={<Settings size={22} />} label="Ayarlar" />
+            
+            {user.role === 'developer' && (
+              <SidebarLink to="/developer" icon={<Database size={22} />} label="Geliştirici" />
+            )}
+            {(user.role === 'admin' || user.role === 'developer') && (
+              <SidebarLink to="/ai-management" icon={<Bot size={22} />} label="AI Yönetimi" />
+            )}
           </nav>
 
           <div className="space-y-4 pt-6 border-t border-border">
@@ -90,26 +114,33 @@ function AppContent() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/admin" element={<AdminPanel />} />
+              <Route path="/developer" element={<DeveloperPanel />} />
               <Route path="/flow" element={<MoneyFlow />} />
               <Route path="/flow/:assetId" element={<AssetDetails />} />
               <Route path="/chart/:symbol" element={<MarketChart />} />
               <Route path="/analysis" element={<Analysis />} />
               <Route path="/news" element={<News />} />
-              <Route path="/settings" element={<Placeholder title="Ayarlar" />} />
+              <Route path="/chat" element={<Chatbot />} />
+              <Route path="/credits" element={<Credits />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/ai-management" element={<AIProviderManagement />} />
             </Routes>
           </div>
         </main>
       </div>
-    </Router>
   );
 }
 
 function UserProfile() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   return (
-    <div className="flex items-center space-x-4 p-3 rounded-4xl bg-secondary/30 group relative cursor-pointer hover:bg-secondary/50 transition-all border border-border">
-      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-primary/20 p-0.5">
+    <div className="flex items-center space-x-4 p-3 rounded-4xl bg-secondary/30 group relative transition-all border border-border">
+      <div 
+        onClick={() => navigate('/profile')}
+        className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-primary/20 p-0.5 cursor-pointer hover:border-primary/50 transition-all"
+      >
         {user.picture ? (
           <img src={user.picture} alt={user.name} className="w-full h-full object-cover rounded-full" />
         ) : (
@@ -117,7 +148,23 @@ function UserProfile() {
         )}
       </div>
       <div className="hidden lg:block flex-1 min-w-0">
-        <p className="text-xs font-black truncate uppercase tracking-tight">{user.name}</p>
+        <div className="flex items-center justify-between">
+          <p 
+            onClick={() => navigate('/profile')}
+            className="text-[11px] font-black truncate uppercase tracking-tight max-w-[100px] cursor-pointer hover:text-primary transition-all"
+          >
+            {user.name}
+          </p>
+          <div 
+            onClick={() => navigate('/credits')}
+            className="flex items-center space-x-1.5 px-3 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 rounded-full border border-cyan-500/20 transition-all cursor-pointer"
+          >
+            <div className="w-2.5 h-2.5 rounded-full bg-cyan-500 flex items-center justify-center">
+                <Coins size={8} className="text-cyan-950" />
+            </div>
+            <span className="text-[11px] font-black text-cyan-500">{user.credits || 0}</span>
+          </div>
+        </div>
         <button 
           onClick={logout}
           className="flex items-center space-x-1 text-[9px] font-black text-primary/60 hover:text-primary transition-all uppercase tracking-widest mt-0.5"
@@ -125,6 +172,11 @@ function UserProfile() {
           <LogOut size={10} />
           <span>{t('Logout')}</span>
         </button>
+      </div>
+      
+      {/* Mobile Credit Bubble (Absolute positioned for small sidebar) */}
+      <div className="lg:hidden absolute -top-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg border-2 border-background">
+         <span className="text-[8px] font-black text-primary-foreground">{(user.credits || 0) > 99 ? '99+' : user.credits}</span>
       </div>
     </div>
   );

@@ -10,10 +10,11 @@ class PredictionEngine {
      * Bütüncül Tahmin Analizi
      * @param {string} symbol - Örn: 'AAPL', 'BTC-USD', 'THYAO.IS'
      * @param {string} market - 'US', 'CRYPTO', 'BIST'
+     * @param {string} userId - Owner user ID
      */
-    async generatePrediction(symbol, market) {
+    async generatePrediction(symbol, market, userId) {
         try {
-            console.log(`Analyzing ${symbol} in ${market} market...`);
+            console.log(`Analyzing ${symbol} for user ${userId || 'anonymous'} in ${market} market...`);
 
             // 1. Varlık Verilerini Çek - Emtia düzeltmesi (XAU-USD veya XAUUSD bazen hatalı veri döner)
             let fetchSymbol = symbol;
@@ -120,6 +121,7 @@ class PredictionEngine {
                 entryPrice: entryPrice,
                 targetPrice: targetPrice,
                 stopLoss: stopLoss,
+                userId: userId, // Added userId
                 analysis_details: {
                     sentiment: sentimentScore,
                     marketPressure: pressureScore,

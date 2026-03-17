@@ -12,13 +12,22 @@ const sequelize = require('./config/database');
 const User = require('./models/User');
 const Prediction = require('./models/Prediction');
 const DataSource = require('./models/DataSource');
+const NewsSummary = require('./models/NewsSummary');
 
 const predictionRoutes = require('./routes/predictions');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 const marketRoutes = require('./routes/market');
+const aiRoutes = require('./routes/ai');
+const aiAdminRoutes = require('./routes/aiAdmin');
+const cacheService = require('./services/cacheService');
+const creditService = require('./services/creditService');
 
 const app = express();
+
+// Start Background Tasks
+cacheService.startBackgroundUpdates();
+creditService.startBackgroundTasks();
 
 // Middleware
 app.use(express.json());
@@ -34,6 +43,21 @@ app.use(
     })
 );
 
+// Fix for passport 0.6.0+ with cookie-session
+app.use((req, res, next) => {
+    if (req.session && !req.session.regenerate) {
+        req.session.regenerate = (cb) => {
+            cb();
+        };
+    }
+    if (req.session && !req.session.save) {
+        req.session.save = (cb) => {
+            cb();
+        };
+    }
+    next();
+});
+
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -42,6 +66,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/predictions', predictionRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/admin/ai', aiAdminRoutes);
 
 // Basic Route for testing
 app.get('/', (req, res) => {

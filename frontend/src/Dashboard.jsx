@@ -124,7 +124,13 @@ const Dashboard = () => {
       if (error?.status === 403 || error?.response?.status === 403) {
         setErrorMsg(`⚡ Yetersiz Kredi! Mevcut: ${error?.response?.data?.credits ?? '?'} / Gereken: 20`);
       } else {
-        setErrorMsg("An error occurred during analysis. Please try again.");
+        // Try to get detailed error message from backend
+        const backendError = error?.response?.data?.error;
+        if (backendError) {
+             setErrorMsg(backendError);
+        } else {
+             setErrorMsg("An error occurred during analysis. Please try again.");
+        }
       }
       setTimeout(() => setErrorMsg(null), 7000);
     } finally {

@@ -14,8 +14,10 @@ export const AuthProvider = ({ children }) => {
   const checkUser = async () => {
     try {
       const userData = await api.get('/auth/current_user');
+      console.log('--- AuthContext: current_user data:', userData);
       setUser(userData || null);
     } catch (e) {
+      console.error('--- AuthContext: current_user fetch failed:', e);
       setUser(null);
     } finally {
       setLoading(false);
@@ -23,38 +25,22 @@ export const AuthProvider = ({ children }) => {
   };
 
   const loginWithGoogle = () => {
-    console.log('AuthContext: Attempting Login...');
-    // For development/debugging, we can add a mock login toggle if the backend is not ready
-    const useMock = true; // Set to true to bypass real Google OAuth
-
     const getBaseUrl = () => {
       const url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       return url.replace('/api', '');
     };
-
-    if (useMock) {
-      console.log('AuthContext: Using Mock Login');
-      setUser({
-        id: 'mock-user-123',
-        name: 'Geliştirici Hesabı',
-        email: 'dev@predictpro.com',
-        picture: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'
-      });
-      return;
-    }
     
     window.location.href = `${getBaseUrl()}/api/auth/google`;
   };
 
   const logout = async () => {
+    localStorage.removeItem('chat_history');
     setUser(null);
     const getBaseUrl = () => {
       const url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       return url.replace('/api', '');
     };
-    if (window.location.href.includes('google')) {
-        window.location.href = `${getBaseUrl()}/api/auth/logout`;
-    }
+    window.location.href = `${getBaseUrl()}/api/auth/logout`;
   };
 
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
@@ -66,8 +52,32 @@ export const AuthProvider = ({ children }) => {
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
+  const updateCredits = (newCredits) => {
+    if (newCredits === undefined || newCredits === null) return;
+    setUser(prev => prev ? { ...prev, credits: newCredits } : { credits: newCredits });
+  };
+
+  const toggleSubscription = async (feature, action) => {
+    try {
+      const response = await api.post('/auth/toggle-subscription', { feature, action });
+      if (response.success) {
+        setUser(prev => ({ 
+            ...prev, 
+            credits: response.user.credits,
+            newsletterSubscribed: response.user.newsletterSubscribed,
+            moneyFlowSubscribed: response.user.moneyFlowSubscribed,
+            autoPredictionSubscribed: response.user.autoPredictionSubscribed
+        }));
+        return true;
+      }
+    } catch (e) {
+      console.error('Subscription toggle failed:', e);
+      throw e;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, theme, toggleTheme, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, theme, toggleTheme, loginWithGoogle, logout, updateCredits, toggleSubscription }}>
       {children}
     </AuthContext.Provider>
   );

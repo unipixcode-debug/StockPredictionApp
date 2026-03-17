@@ -7,11 +7,16 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from './api';
+import { useAuth } from './AuthContext';
+import { useLanguage } from './LanguageContext';
 
 const Analysis = () => {
+  const { user, toggleSubscription } = useAuth();
+  const { t, language } = useLanguage();
   const [predictions, setPredictions] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [subscribing, setSubscribing] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -19,6 +24,10 @@ const Analysis = () => {
   }, []);
 
   const fetchAll = async () => {
+    if (!(user?.autoPredictionSubscribed || user?.role === 'admin' || user?.role === 'developer')) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [predsData, statsData] = await Promise.allSettled([
@@ -31,6 +40,28 @@ const Analysis = () => {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubscribe = async () => {
+    const cost = 5; 
+    const confirmMsg = language === 'TR' 
+        ? `Otomatik tahmin analizini aktif etmek üzeresiniz. Hesabınızdan hemen ${cost} kredi düşülecek ve her ay devam edecektir. Onaylıyor musunuz?`
+        : `You are about to activate auto-prediction analysis. ${cost} credits will be deducted immediately and every month thereafter. Do you confirm?`;
+    
+    if (!window.confirm(confirmMsg)) return;
+
+    setSubscribing(true);
+    try {
+        await toggleSubscription('autoPrediction', 'subscribe');
+    } catch (e) {
+        if (e.response?.status === 403) {
+            alert(language === 'TR' ? 'Yetersiz kredi!' : 'Insufficient credits!');
+        } else {
+            alert(language === 'TR' ? 'Hata oluştu.' : 'Error occurred.');
+        }
+    } finally {
+        setSubscribing(false);
     }
   };
 
@@ -59,6 +90,51 @@ const Analysis = () => {
 
   const fmtChange = (v) => v != null ? `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` : '–';
   const fmtPrice = (v) => v != null ? v.toFixed(2) : '–';
+
+  if (!user?.autoPredictionSubscribed && user?.role !== 'admin' && user?.role !== 'developer') {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-6">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-12 text-center flex flex-col items-center justify-center space-y-8 border-primary/20 bg-primary/5 max-w-2xl w-full"
+        >
+            <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center border border-primary/20 shadow-[0_0_30px_rgba(0,242,254,0.1)]">
+                <Zap className="text-primary" size={40} />
+            </div>
+            <div className="max-w-md">
+                <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-4">
+                    {language === 'TR' ? 'Tahmin Analizini Aktif Et' : 'Activate Prediction Analysis'}
+                </h2>
+                <p className="text-muted-foreground font-medium leading-relaxed">
+                    {language === 'TR' 
+                        ? 'Yapay zeka destekli periyodik tahmin üretim ve derinlemesine piyasa analizi özelliğini kullanmak için abone olun.' 
+                        : 'Subscribe to use AI-powered periodic prediction generation and in-depth market analysis feature.'}
+                </p>
+                <div className="mt-6 inline-flex items-center space-x-2 px-4 py-2 bg-secondary/50 rounded-full border border-border">
+                    <Coins className="text-primary" size={16} />
+                    <span className="text-sm font-black tracking-tight text-foreground">
+                        5 {language === 'TR' ? 'Kredi / Ay' : 'Credits / Month'}
+                    </span>
+                </div>
+            </div>
+            <button
+                onClick={handleSubscribe}
+                disabled={subscribing}
+                className="premium-button px-12 py-4 text-lg group overflow-hidden"
+            >
+                <span className="relative z-10 flex items-center space-x-3">
+                    {subscribing ? <RefreshCw className="animate-spin" size={20} /> : <Zap size={20} fill="currentColor" />}
+                    <span>{language === 'TR' ? 'HEMEN AKTİF ET' : 'ACTIVATE NOW'}</span>
+                </span>
+            </button>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-50">
+                {language === 'TR' ? 'İstediğiniz zaman iptal edebilirsiniz.' : 'Cancel anytime.'}
+            </p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <motion.div initial="hidden" animate="visible" variants={containerVariants} className="space-y-12">

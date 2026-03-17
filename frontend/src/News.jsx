@@ -5,7 +5,10 @@ import { Newspaper, ExternalLink, RefreshCw, Calendar, ArrowRight } from 'lucide
 import api from './api';
 import { useLanguage } from './LanguageContext';
 
+import { useAuth } from './AuthContext';
+
 const News = () => {
+  const { user, toggleSubscription } = useAuth();
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
   const { t, language } = useLanguage();
@@ -19,10 +22,37 @@ const News = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [articleContent, setArticleContent] = useState("");
   const [articleLoading, setArticleLoading] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
-    fetchNews();
-  }, [language]); // Fetch again when language changes
+    if (user?.newsletterSubscribed || user?.role === 'admin' || user?.role === 'developer') {
+        fetchNews();
+    } else {
+        setLoading(false);
+    }
+  }, [language, user?.newsletterSubscribed]); 
+
+  const handleSubscribe = async () => {
+    const cost = 5; 
+    const confirmMsg = language === 'TR' 
+        ? `Haber bültenini aktif etmek üzeresiniz. Hesabınızdan hemen ${cost} kredi düşülecek ve her ay devam edecektir. Onaylıyor musunuz?`
+        : `You are about to activate the newsletter. ${cost} credits will be deducted immediately and every month thereafter. Do you confirm?`;
+    
+    if (!window.confirm(confirmMsg)) return;
+
+    setSubscribing(true);
+    try {
+        await toggleSubscription('newsletter', 'subscribe');
+    } catch (e) {
+        if (e.response?.status === 403) {
+            alert(language === 'TR' ? 'Yetersiz kredi! Lütfen kredi yükleyin.' : 'Insufficient credits! Please buy more credits.');
+        } else {
+            alert(language === 'TR' ? 'Bir hata oluştu.' : 'An error occurred.');
+        }
+    } finally {
+        setSubscribing(false);
+    }
+  };
 
   useEffect(() => {
     if (sourceQuery) {
@@ -131,109 +161,153 @@ const News = () => {
         </button>
       </header>
 
-      {/* Sources Filter Bar */}
-      {!loading && sources.length > 1 && (
-        <div className="flex overflow-x-auto pb-4 space-x-3 scrollbar-hide -mx-6 px-6 md:mx-0 md:px-0">
-            {sources.map(source => (
-                <button
-                    key={source}
-                    onClick={() => setActiveSource(source)}
-                    className={`whitespace-nowrap px-6 py-2 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
-                        activeSource === source 
-                            ? 'bg-primary text-primary-foreground shadow-[0_0_20px_rgba(0,242,254,0.3)]'
-                            : 'bg-secondary/30 text-muted-foreground hover:bg-white/10 hover:text-foreground border border-border/50'
-                    }`}
-                >
-                    {source}
-                </button>
-            ))}
+      {!(user?.newsletterSubscribed || user?.role === 'admin' || user?.role === 'developer') ? (
+        <div className="flex flex-col items-center justify-center py-20 px-6">
+          <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="glass-card p-12 text-center flex flex-col items-center justify-center space-y-8 border-primary/20 bg-primary/5 max-w-2xl w-full"
+          >
+              <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center border border-primary/20 shadow-[0_0_30px_rgba(0,242,254,0.1)]">
+                  <Newspaper className="text-primary" size={40} />
+              </div>
+              <div className="max-w-md">
+                  <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-4">
+                      {language === 'TR' ? 'Haber Analizini Aktif Et' : 'Activate News Analysis'}
+                  </h2>
+                  <p className="text-muted-foreground font-medium leading-relaxed">
+                      {language === 'TR' 
+                          ? 'Yapay zeka destekli piyasa haberleri ve önem puanlaması özelliğini kullanmak için bültene abone olun.' 
+                          : 'Subscribe to our newsletter to use AI-powered market news and importance scoring feature.'}
+                  </p>
+                  <div className="mt-6 inline-flex items-center space-x-2 px-4 py-2 bg-secondary/50 rounded-full border border-border">
+                      <Coins className="text-primary" size={16} />
+                      <span className="text-sm font-black tracking-tight text-foreground">
+                          5 {language === 'TR' ? 'Kredi / Ay' : 'Credits / Month'}
+                      </span>
+                  </div>
+              </div>
+              <button
+                  onClick={handleSubscribe}
+                  disabled={subscribing}
+                  className="premium-button px-12 py-4 text-lg group overflow-hidden"
+              >
+                  <span className="relative z-10 flex items-center space-x-3">
+                      {subscribing ? <RefreshCw className="animate-spin" size={20} /> : <Zap size={20} fill="currentColor" />}
+                      <span>{language === 'TR' ? 'HEMEN AKTİF ET' : 'ACTIVATE NOW'}</span>
+                  </span>
+              </button>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-50">
+                  {language === 'TR' ? 'İstediğiniz zaman iptal edebilirsiniz.' : 'Cancel anytime.'}
+              </p>
+          </motion.div>
         </div>
-      )}
-
-      {loading ? (
+      ) : loading ? (
         <div className="flex items-center justify-center py-32">
             <RefreshCw className="animate-spin text-primary/30" size={48} />
         </div>
-      ) : filteredNews.length === 0 ? (
-        <div className="glass-card p-20 text-center flex flex-col items-center space-y-4 border-dashed border-border/50">
-            <Newspaper className="text-muted-foreground/20 w-16 h-16" />
-            <p className="text-muted-foreground font-black uppercase tracking-widest italic opacity-30 text-xs">{t('NoNews')}</p>
-        </div>
       ) : (
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
-        >
-          {filteredNews.map((item, idx) => (
+        <>
+          {sources.length > 1 && (
+            <div className="flex overflow-x-auto pb-6 space-x-3 scrollbar-hide -mx-6 px-6 md:mx-0 md:px-0">
+                {sources.map(source => (
+                    <button
+                        key={source}
+                        onClick={() => setActiveSource(source)}
+                        className={`whitespace-nowrap px-6 py-2 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+                            activeSource === source 
+                                ? 'bg-primary text-primary-foreground shadow-[0_0_20px_rgba(0,242,254,0.3)]'
+                                : 'bg-secondary/30 text-muted-foreground hover:bg-white/10 hover:text-foreground border border-border/50'
+                        }`}
+                    >
+                        {source}
+                    </button>
+                ))}
+            </div>
+          )}
+
+          {filteredNews.length === 0 ? (
+            <div className="glass-card p-20 text-center flex flex-col items-center space-y-4 border-dashed border-border/50">
+                <Newspaper className="text-muted-foreground/20 w-16 h-16" />
+                <p className="text-muted-foreground font-black uppercase tracking-widest italic opacity-30 text-xs">{t('NoNews')}</p>
+            </div>
+          ) : (
             <motion.div 
-                variants={itemVariants}
-                key={idx} 
-                className="glass-card p-8 flex flex-col group hover:-translate-y-2 transition-all duration-500 hover:shadow-2xl hover:border-primary/30 relative overflow-hidden"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
             >
-              {/* Decorative gradient blob */}
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors" />
+              {filteredNews.map((item, idx) => (
+                <motion.div 
+                    variants={itemVariants}
+                    key={idx} 
+                    className="glass-card p-8 flex flex-col group hover:-translate-y-2 transition-all duration-500 hover:shadow-2xl hover:border-primary/30 relative overflow-hidden"
+                >
+                  {/* Decorative gradient blob */}
+                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors" />
 
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-10 h-10 bg-secondary/50 rounded-xl flex items-center justify-center border border-border group-hover:border-primary/30 transition-all text-primary/70 group-hover:text-primary">
-                    <Newspaper size={18} />
-                </div>
-                <div className="flex flex-col">
-                    <span className="text-xs font-black uppercase tracking-widest text-primary mb-1">
-                        {item.sourceName || t('OtherSource')}
-                    </span>
-                    <div className="flex items-center space-x-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        <Calendar size={10} />
-                        <span>{formatDate(item.pubDate)}</span>
+                  <div className="flex items-center space-x-3 mb-6">
+                    <div className="w-10 h-10 bg-secondary/50 rounded-xl flex items-center justify-center border border-border group-hover:border-primary/30 transition-all text-primary/70 group-hover:text-primary">
+                        <Newspaper size={18} />
                     </div>
-                </div>
-                
-                {/* Importance Score Badge */}
-                <div className="ml-auto self-start">
-                    <div className={`
-                        flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-dashed
-                        ${item.importanceScore >= 80 ? 'bg-rose-500/10 border-rose-500/30 text-rose-500' : 
-                          item.importanceScore >= 60 ? 'bg-primary/10 border-primary/30 text-primary' : 
-                          'bg-secondary/50 border-border text-muted-foreground'}
-                    `}>
-                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                            item.importanceScore >= 80 ? 'bg-rose-500' : 
-                            item.importanceScore >= 60 ? 'bg-primary' : 'bg-muted-foreground'
-                        }`} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">
-                            {language === 'TR' ? 'ÖNEM:' : 'SCORE:'} {item.importanceScore || 50}
+                    <div className="flex flex-col">
+                        <span className="text-xs font-black uppercase tracking-widest text-primary mb-1">
+                            {item.sourceName || t('OtherSource')}
                         </span>
+                        <div className="flex items-center space-x-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                            <Calendar size={10} />
+                            <span>{formatDate(item.pubDate)}</span>
+                        </div>
                     </div>
-                </div>
-              </div>
+                    
+                    {/* Importance Score Badge */}
+                    <div className="ml-auto self-start">
+                        <div className={`
+                            flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-dashed
+                            ${item.importanceScore >= 80 ? 'bg-rose-500/10 border-rose-500/30 text-rose-500' : 
+                              item.importanceScore >= 60 ? 'bg-primary/10 border-primary/30 text-primary' : 
+                              'bg-secondary/50 border-border text-muted-foreground'}
+                        `}>
+                            <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                                item.importanceScore >= 80 ? 'bg-rose-500' : 
+                                item.importanceScore >= 60 ? 'bg-primary' : 'bg-muted-foreground'
+                            }`} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">
+                                {language === 'TR' ? 'ÖNEM:' : 'SCORE:'} {item.importanceScore || 50}
+                            </span>
+                        </div>
+                    </div>
+                  </div>
 
-              <h3 className="text-xl font-bold leading-snug mb-4 group-hover:text-primary transition-colors">
-                {item.title}
-              </h3>
-              
-              <p className="text-sm text-muted-foreground leading-relaxed flex-1 opacity-80 mb-8 line-clamp-3">
-                {item.contentSnippet || t('NoSnippet')}
-              </p>
+                  <h3 className="text-xl font-bold leading-snug mb-4 group-hover:text-primary transition-colors">
+                    {item.title}
+                  </h3>
+                  
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1 opacity-80 mb-8 line-clamp-3">
+                    {item.contentSnippet || t('NoSnippet')}
+                  </p>
 
-              <div className="pt-4 border-t border-border/50 mt-auto flex items-center justify-between">
-                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">{t('AIRead')}</span>
-                 <button 
-                    onClick={() => handleReadArticle(item)}
-                    className="flex items-center space-x-2 text-xs font-black uppercase tracking-widest text-primary hover:text-white transition-colors"
-                 >
-                    <span>{t('GoToSource')}</span>
-                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                 </button>
-              </div>
+                  <div className="pt-4 border-t border-border/50 mt-auto flex items-center justify-between">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">{t('AIRead')}</span>
+                     <button 
+                        onClick={() => handleReadArticle(item)}
+                        className="flex items-center space-x-2 text-xs font-black uppercase tracking-widest text-primary hover:text-white transition-colors"
+                     >
+                        <span>{t('GoToSource')}</span>
+                        <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                     </button>
+                  </div>
+                </motion.div>
+              ))}
             </motion.div>
-          ))}
-        </motion.div>
+          )}
+        </>
       )}
 
       {/* Article Reader Modal */}
       {selectedArticle && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-background/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4 sm:p-6 bg-background/80 backdrop-blur-sm">
            <motion.div 
                initial={{ opacity: 0, scale: 0.95 }}
                animate={{ opacity: 1, scale: 1 }}

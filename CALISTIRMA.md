@@ -2,9 +2,32 @@
 #   StockPredictionApp - Temiz Başlatma Kılavuzu
 # ============================================================
 #
-#  Her bileşeni AYRI bir terminal penceresinde çalıştır.
-#  Sıralama önemli: önce Backend, sonra Frontend, sonra Mobile.
+#  Sıralama: 0) PostgreSQL DB → 1) Backend → 2) Frontend → 3) Mobile
 # ============================================================
+
+
+# -----------------------------------------------------------
+# 0) PostgreSQL VERİTABANI (Her PC başlatmadan once)
+# -----------------------------------------------------------
+#   Veri dizini : C:\Projeler\PythonProje\db_data
+#   Port        : 5432
+#
+#   [A] Bat dosyası ile başlatmak (PowerShell'de):
+#       .\start_postgres.bat
+#
+#   [B] Direkt komut ile başlatmak (PowerShell):
+#       & "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe" start -D "C:\Projeler\PythonProje\db_data" -l "C:\Projeler\PythonProje\db_data\logfile"
+#
+#   [C] Durdurmak:
+#       & "C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe" stop -D "C:\Projeler\PythonProje\db_data"
+#
+#   [D] Çalışıyor mu kontrol:
+#       netstat -ano | findstr :5432
+#
+#   [E] psql ile veritabanına bağlan:
+#       & "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U erdem -d prediction_db
+#       (psql icinde -> tablo listesi: \dt   |   cikis: \q)
+# -----------------------------------------------------------
 
 
 # -----------------------------------------------------------

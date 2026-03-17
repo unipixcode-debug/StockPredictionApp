@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from './LanguageContext';
+import { useAuth } from './AuthContext';
 
 const FlowArrow = ({ direction, color, amount, percentage }) => {
     const { t } = useLanguage();
@@ -53,14 +54,38 @@ const FlowArrow = ({ direction, color, amount, percentage }) => {
 };
 
 const MoneyFlow = () => {
+    const { user, toggleSubscription } = useAuth();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [timeframe, setTimeframe] = useState('1G');
     const [expandedAsset, setExpandedAsset] = useState(null);
     const [lastRefresh, setLastRefresh] = useState(new Date());
     const [showGuide, setShowGuide] = useState(false);
+    const [subscribing, setSubscribing] = useState(false);
     const navigate = useNavigate();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
+
+    const handleSubscribe = async () => {
+        const cost = 5;
+        const confirmMsg = language === 'TR' 
+            ? `Para akışı analizini aktif etmek üzeresiniz. Hesabınızdan hemen ${cost} kredi düşülecek ve her ay devam edecektir. Onaylıyor musunuz?`
+            : `You are about to activate money flow analysis. ${cost} credits will be deducted immediately and every month thereafter. Do you confirm?`;
+        
+        if (!window.confirm(confirmMsg)) return;
+
+        setSubscribing(true);
+        try {
+            await toggleSubscription('moneyFlow', 'subscribe');
+        } catch (e) {
+            if (e.response?.status === 403) {
+                alert(language === 'TR' ? 'Yetersiz kredi! Lütfen kredi yükleyin.' : 'Insufficient credits!');
+            } else {
+                alert(language === 'TR' ? 'Hata oluştu.' : 'Error occurred.');
+            }
+        } finally {
+            setSubscribing(false);
+        }
+    };
 
     const timeframes = [
         { id: '1S', label: `1 ${t('Hour')}` },
@@ -74,6 +99,10 @@ const MoneyFlow = () => {
     ];
 
     const fetchData = async () => {
+        if (!(user?.moneyFlowSubscribed || user?.role === 'admin' || user?.role === 'developer')) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             const result = await api.get(`/market/flow?timeframe=${timeframe}`);
@@ -83,7 +112,6 @@ const MoneyFlow = () => {
             setLoading(false);
         } catch (error) {
             console.error('Flow fetch error:', error);
-            // Timeframe based mock multiplier
             const mult = timeframe === '1S' ? 0.1 : timeframe === '1G' ? 1 : timeframe === '1H' ? 2.5 : timeframe === '1A' ? 6 : timeframe === '1Y' ? 24 : 50;
             
             setData({
@@ -101,7 +129,7 @@ const MoneyFlow = () => {
 
     useEffect(() => {
         fetchData();
-    }, [timeframe]);
+    }, [timeframe, user?.moneyFlowSubscribed]);
 
     useEffect(() => {
         const interval = setInterval(fetchData, 60000);
@@ -112,7 +140,7 @@ const MoneyFlow = () => {
         navigate(`/chart/${symbol}?name=${encodeURIComponent(name)}`);
     };
 
-    if (loading || !data) {
+    if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="relative">
@@ -142,7 +170,6 @@ const MoneyFlow = () => {
                             <Info size={16} />
                         </button>
                     </div>
-                    {/* Timeframe Selector */}
                     <div className="flex bg-secondary/30 p-2 rounded-3xl border border-border backdrop-blur-md self-start">
                         {timeframes.map((tf) => (
                             <button 
@@ -194,9 +221,48 @@ const MoneyFlow = () => {
             </div>
 
             {/* Money Flow Schema */}
-            <div className="relative overflow-x-auto pb-20 py-8 scrollbar-hide">
-                <div className="flex items-start justify-center md:justify-start gap-4 lg:gap-6 min-w-[1400px] px-4 md:px-12 py-8">
-                    {data.assets.map((asset, index) => {
+            {!(user?.moneyFlowSubscribed || user?.role === 'admin' || user?.role === 'developer') ? (
+                <div className="flex flex-col items-center justify-center py-20 px-6">
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="glass-card p-12 text-center flex flex-col items-center justify-center space-y-8 border-primary/20 bg-primary/5 max-w-2xl w-full"
+                    >
+                        <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center border border-primary/20 shadow-[0_0_30px_rgba(0,242,254,0.1)]">
+                            <Landmark className="text-primary" size={40} />
+                        </div>
+                        <div className="max-w-md">
+                            <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-4">
+                                {language === 'TR' ? 'Para Akışı Analizini Aktif Et' : 'Activate Money Flow Analysis'}
+                            </h2>
+                            <p className="text-muted-foreground font-medium leading-relaxed">
+                                {language === 'TR' 
+                                    ? 'Global likidite hareketlerini ve varlık rotasyonlarını yapay zeka ile analiz etmek için bültene abone olun.' 
+                                    : 'Subscribe to analyze global liquidity movements and asset rotations with AI.'}
+                            </p>
+                            <div className="mt-6 inline-flex items-center space-x-2 px-4 py-2 bg-secondary/50 rounded-full border border-border">
+                                <Coins className="text-primary" size={16} />
+                                <span className="text-sm font-black tracking-tight text-foreground">
+                                    5 {language === 'TR' ? 'Kredi / Ay' : 'Credits / Month'}
+                                </span>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleSubscribe}
+                            disabled={subscribing}
+                            className="premium-button px-12 py-4 text-lg group overflow-hidden"
+                        >
+                            <span className="relative z-10 flex items-center space-x-3">
+                                {subscribing ? <RefreshCw className="animate-spin" size={20} /> : <Zap size={20} fill="currentColor" />}
+                                <span>{language === 'TR' ? 'HEMEN AKTİF ET' : 'ACTIVATE NOW'}</span>
+                            </span>
+                        </button>
+                    </motion.div>
+                </div>
+            ) : (
+                <div className="relative overflow-x-auto pb-20 py-8 scrollbar-hide">
+                    <div className="flex items-start justify-center md:justify-start gap-4 lg:gap-6 min-w-[1400px] px-4 md:px-12 py-8">
+                    {data?.assets?.map((asset, index) => {
                         const topSubAssets = asset.subAssets?.slice(0, 2) || [];
                         const hasMore = (asset.subAssets?.length || 0) > 2;
 
@@ -250,7 +316,6 @@ const MoneyFlow = () => {
                                             </div>
                                         </div>
 
-                                        {/* Top Sub-Assets Pill Wrapper */}
                                         <div className="flex flex-wrap gap-3 mb-6">
                                             {topSubAssets.map(sub => (
                                                 <div 
@@ -286,11 +351,9 @@ const MoneyFlow = () => {
                                             </button>
                                         </div>
 
-                                        {/* Background Decor */}
                                         <div className={`absolute top-[-20%] right-[-10%] w-48 h-48 blur-[100px] rounded-full opacity-10 ${asset.color === 'orange' ? 'bg-amber-500' : asset.color === 'cyan' ? 'bg-primary' : asset.color === 'green' ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
                                     </div>
 
-                                    {/* Drill-down Sub-assets */}
                                     <AnimatePresence>
                                         {expandedAsset === asset.id && asset.subAssets && (
                                             <motion.div 
@@ -353,6 +416,7 @@ const MoneyFlow = () => {
                     })}
                 </div>
             </div>
+            )}
 
             {/* Interpretation Guide Modal */}
             <AnimatePresence>
@@ -510,6 +574,5 @@ const MoneyFlow = () => {
         </motion.div>
     );
 };
-
 
 export default MoneyFlow;

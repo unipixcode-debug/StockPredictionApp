@@ -8,6 +8,7 @@ const { isAdmin } = require('../middleware/auth');
 
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios'); // Move here for consistency
 
 const fallbackFilePath = path.join(__dirname, '..', 'fallback_sources.json');
 
@@ -42,12 +43,10 @@ const saveFallback = () => {
 
 // Temporary bypass for local dev if DB/Auth is down
 const authCheck = (req, res, next) => {
-    // If auth is working, use it. If not, bypass for local dev.
-    if (req.isAuthenticated && req.isAuthenticated() && req.user?.role === 'admin') {
+    if (req.isAuthenticated && req.isAuthenticated() && (req.user?.role === 'admin' || req.user?.role === 'developer')) {
         return next();
     }
-    // Bypass for now so UI works without DB
-    return next();
+    return res.status(403).json({ error: 'Access denied. Admins only.' });
 };
 
 router.use(authCheck);
@@ -63,6 +62,16 @@ router.get('/sources', async (req, res) => {
         res.json(sources);
     } catch (error) {
         console.warn('DB Error in /sources. Using JSON fallback.');
+        res.json(memorySources);
+    }
+});
+
+// Alias for frontend compatibility
+router.get('/news-sources', async (req, res) => {
+    try {
+        const sources = await DataSource.findAll();
+        res.json(sources);
+    } catch (error) {
         res.json(memorySources);
     }
 });
@@ -91,6 +100,25 @@ router.delete('/sources/:id', async (req, res) => {
         memorySources = memorySources.filter(s => s.id != req.params.id);
         saveFallback();
         res.json({ message: 'Source deleted from fallback' });
+    }
+});
+
+// Kaynak aktiflik durumunu değiştir
+router.put('/sources/:id/active', async (req, res) => {
+    try {
+        const source = await DataSource.findByPk(req.params.id);
+        if (!source) return res.status(404).json({ error: 'Source not found' });
+        
+        await source.update({ isActive: req.body.active });
+        res.json({ message: 'Source active status updated', active: source.isActive, source });
+    } catch (error) {
+        console.warn('DB Error in PUT /sources/:id/active. Using JSON fallback.');
+        const idx = memorySources.findIndex(s => s.id == req.params.id);
+        if (idx !== -1) {
+            memorySources[idx].isActive = req.body.active;
+            saveFallback();
+        }
+        res.json({ message: 'Source active status updated in fallback' });
     }
 });
 
@@ -143,14 +171,51 @@ router.put('/users/:id/credits', async (req, res) => {
     }
 });
 
+// Update User Role (Admin/Developer)
+router.put('/users/:id/role', async (req, res) => {
+    try {
+        const { role } = req.body;
+        if (!['user', 'admin', 'developer'].includes(role)) {
+            return res.status(400).json({ error: 'Invalid role' });
+        }
+        
+        const user = await User.findByPk(req.params.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        
+        const prevRole = user.role;
+        await user.update({ role });
+
+        // Log the action
+        await AdminLog.create({
+            adminId: req.user?.id || 'dev-id',
+            adminName: req.user?.name || 'Admin',
+            action: 'UPDATE_ROLE',
+            targetId: user.id,
+            details: {
+                user: user.email,
+                prevRole, 
+                newRole: user.role
+            },
+            ipAddress: req.ip
+        });
+
+        res.json({ message: 'User role updated', role: user.role });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 /**
  * Developer-Only Settings (pricing, limits)
  * Only accessible to users with role = 'developer'
  */
 const developerCheck = (req, res, next) => {
-    // In production this would check req.user.role === 'developer'
-    // For now, allow through, but mark with a header check for future
-    // TODO: Tie to actual auth when login flow is complete
+    // Check if user is authenticated and has developer role
+    if (req.isAuthenticated && req.isAuthenticated() && req.user?.role === 'developer') {
+        return next();
+    }
+    // For local dev, allow if no strict auth is provided, but log warning
+    console.warn(`[WARN] Developer endpoint accessed without strict auth check by IP: ${req.ip}`);
     next();
 };
 
@@ -169,7 +234,7 @@ router.get('/settings', developerCheck, async (req, res) => {
     }
 });
 
-// Global ayar güncelle (Geliştirici paneli)
+// Global ayar güncelle (Geliştirici paneli) - PUT Method
 router.put('/settings/:key', developerCheck, async (req, res) => {
     try {
         const { value } = req.body;
@@ -188,7 +253,37 @@ router.put('/settings/:key', developerCheck, async (req, res) => {
             ipAddress: req.ip
         });
 
-        res.json({ message: 'Setting updated', setting });
+        res.json({ message: 'Setting updated via PUT', setting });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Global ayar güncelle (Geliştirici paneli) - POST Method (for frontend compatibility)
+router.post('/settings', async (req, res) => {
+    try {
+        // We use authCheck instead of developerCheck here because
+        // regular admins can also update SOME settings (like news_enabled)
+        // If needed, we can split this into adminSettings vs devSettings routes
+        const { key, value } = req.body;
+        if (!key) return res.status(400).json({ error: 'Key is required' });
+
+        const [setting, created] = await GlobalSetting.upsert({
+            key,
+            value: String(value),
+        });
+
+        // Log the action
+        await AdminLog.create({
+            adminId: req.user?.id || 'admin-id',
+            adminName: req.user?.name || 'Admin',
+            action: 'UPDATE_SETTING_POST',
+            targetId: key,
+            details: { newValue: value },
+            ipAddress: req.ip
+        });
+
+        res.json({ message: 'Setting updated via POST', setting });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -205,6 +300,70 @@ router.get('/logs', async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+});
+
+// AI Provider Status Check
+router.get('/ai-status', async (req, res) => {
+    const aiService = require('../services/aiService');
+    const results = [];
+
+    for (const provider of aiService.providers) {
+        const start = Date.now();
+        try {
+            const testPrompt = 'Reply with just: OK';
+            let response = '';
+
+            if (provider.type === 'GEMINI') {
+                const model = provider.instance.getGenerativeModel({ model: 'gemini-1.5-flash' });
+                const result = await model.generateContent(testPrompt);
+                response = (await result.response.text()).substring(0, 20);
+            } else if (provider.type === 'OPENAI') {
+                const r = await provider.instance.chat.completions.create({
+                    model: 'gpt-3.5-turbo',
+                    messages: [{ role: 'user', content: testPrompt }],
+                    max_tokens: 5
+                });
+                response = r.choices[0].message.content.substring(0, 20);
+            } else if (provider.type === 'DEEPSEEK') {
+                const r = await axios.post('https://api.deepseek.com/v1/chat/completions', {
+                    model: 'deepseek-chat',
+                    messages: [{ role: 'user', content: testPrompt }],
+                    max_tokens: 5
+                }, {
+                    headers: { 'Authorization': `Bearer ${provider.key}` },
+                    timeout: 8000 // 8s timeout
+                });
+                response = r.data.choices[0].message.content.substring(0, 20);
+            } else {
+                results.push({ name: provider.name, type: provider.type, status: 'skipped', ms: 0 });
+                continue;
+            }
+
+            results.push({
+                name: provider.name,
+                type: provider.type,
+                status: 'ok',
+                response,
+                ms: Date.now() - start
+            });
+        } catch (e) {
+            const isQuota = e.message?.includes('429') || e.message?.includes('quota') || e.message?.includes('RESOURCE_EXHAUSTED');
+            results.push({
+                name: provider.name,
+                type: provider.type,
+                status: isQuota ? 'quota_exceeded' : 'error',
+                error: e.message?.substring(0, 120),
+                ms: Date.now() - start
+            });
+        }
+    }
+
+    res.json({
+        checked: new Date().toISOString(),
+        providers: results,
+        healthy: results.filter(r => r.status === 'ok').length,
+        total: results.length
+    });
 });
 
 module.exports = router;

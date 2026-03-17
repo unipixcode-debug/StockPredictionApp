@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const flowService = require('../services/flowService');
 const marketDataService = require('../services/marketDataService');
+const cacheService = require('../services/cacheService');
 
 // Market Flow Visualization Data
 router.get('/flow', async (req, res) => {
@@ -18,6 +19,13 @@ router.get('/flow', async (req, res) => {
 // Dashboard Stat Cards — Real Market Indicators
 router.get('/stats', async (req, res) => {
     try {
+        const cachedStats = cacheService.getStats();
+        if (cachedStats) {
+            return res.json(cachedStats);
+        }
+
+        // Fallback if cache not ready
+        console.log('⚠️ Cache missed for /stats, falling back to service...');
         const indicators = await marketDataService.getGlobalIndicators();
         if (!indicators) throw new Error('No data');
 
@@ -68,10 +76,20 @@ const newsService = require('../services/newsService');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const aiService = require('../services/aiService');
+const NewsSummary = require('../models/NewsSummary');
 
 router.get('/news', async (req, res) => {
     try {
         const { symbol, lang } = req.query;
+        
+        // Use cache for general news if no symbol specified
+        if (!symbol) {
+            const cachedNews = cacheService.getNews(lang || 'TR');
+            if (cachedNews) {
+                return res.json(cachedNews);
+            }
+        }
+
         const news = await newsService.fetchLatestNews(symbol || '', lang || 'EN');
         res.json(news);
     } catch (error) {
@@ -83,32 +101,37 @@ router.get('/news', async (req, res) => {
 // Deep Article Reader & Translator
 router.get('/read-article', async (req, res) => {
     try {
-        const { url, title, snippet } = req.query;
+        const { url, title, snippet, lang } = req.query;
         if (!url) return res.status(400).json({ error: 'URL is required' });
+
+        // 1. Check DB Cache First
+        const existingSummary = await NewsSummary.findByPk(url);
+        if (existingSummary) {
+            console.log(`[DB CACHE] Found summary for ${url}`);
+            return res.json({
+                url,
+                content: lang === 'EN' ? existingSummary.summaryEN : existingSummary.summaryTR,
+                isCached: true
+            });
+        }
 
         let cleanText = '';
         let extractedLength = 0;
 
         try {
-            // 1. Fetch raw HTML from source
+            // Fetch raw HTML
             const response = await axios.get(url, {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
                 },
-                timeout: 8000 // 8s timeout
+                timeout: 8000
             });
 
-            // 2. Parse HTML and extract main text blocks using cheerio
             const $ = cheerio.load(response.data);
-            
-            // Remove scripts, styles, nav, footer to clean up text
-            $('script, style, nav, footer, header, iframe, aside, .ad, .advertisement').remove();
+            $('script, style, nav, footer, header, iframe, aside').remove();
             
             let articleText = '';
-            // Try to locate main article content, fallback to body paragraphs
-            const mainContent = $('article, main, .article-content, .post-content').first();
+            const mainContent = $('article, main, .article-content').first();
             if (mainContent.length > 0) {
                 articleText = mainContent.text();
             } else {
@@ -121,29 +144,34 @@ router.get('/read-article', async (req, res) => {
             extractedLength = cleanText.length;
             
         } catch (fetchError) {
-            console.warn(`Scraping failed for ${url}, falling back to snippet. Error: ${fetchError.message}`);
+            console.warn(`Scraping failed for ${url}, fallback to snippet`);
         }
 
-        // Fallback to title and snippet if scraping failed or returned too little content
         if (extractedLength < 150) {
-            console.log(`Using fallback text for ${url} (Extracted Length: ${extractedLength})`);
-            cleanText = `Başlık: ${title || 'Bilinmiyor'}\nÖzet: ${snippet || 'Kısa bilgi bulunamadı.'}\n\nBu makalenin tam metni güvenlik duvarı (bot erişimi) nedeniyle çekilemedi. Lütfen orijinal kaynağa giderek tamamını okuyunuz.`;
-            extractedLength = cleanText.length;
+            cleanText = `Başlık: ${title || ''}\nÖzet: ${snippet || ''}\n\nBu makalenin tam metni çekilemedi.`;
         }
 
-        // 3. Summarize and Translate using Gemini in BOTH languages
-        const markdownAnalysis = await aiService.summarizeAndTranslateArticle(cleanText);
+        // 2. AI Summarize (Both Languages)
+        const analysis = await aiService.summarizeAndTranslateArticle(cleanText);
+
+        // 3. Save to DB for future use
+        await NewsSummary.upsert({
+            url: url,
+            summaryTR: analysis.tr,
+            summaryEN: analysis.en,
+            importanceScore: 50 // Default
+        });
 
         res.json({
             url,
-            content: markdownAnalysis,
+            content: lang === 'EN' ? analysis.en : analysis.tr,
             extractedLength,
-            usedFallback: extractedLength < 150
+            isCached: false
         });
 
     } catch (error) {
         console.error('Article Reader API error:', error.message);
-        res.status(500).json({ error: 'Failed to read or translate article', details: error.message });
+        res.status(500).json({ error: 'Failed to read or translate article' });
     }
 });
 
