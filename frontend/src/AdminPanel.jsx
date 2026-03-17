@@ -260,7 +260,7 @@ const AdminPanel = () => {
           <p className="text-muted-foreground font-medium mt-1">Hizmet yönetimi ve sistem tercihleri</p>
         </div>
         <div className="flex items-center gap-3">
-            {user?.role === 'developer' && (
+            {(user?.role === 'developer' || user?.role === 'admin') && (
                 <Link to="/developer" className="px-5 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center space-x-3 hover:bg-amber-500/20 transition-all">
                     <Database className="text-amber-400" size={18} />
                     <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Geliştirici Paneli</span>
@@ -278,7 +278,7 @@ const AdminPanel = () => {
         <button className="px-8 py-3 rounded-[1.2rem] text-xs font-black uppercase tracking-widest bg-primary text-primary-foreground shadow-lg">
            Genel Ayarlar
         </button>
-        {user?.role === 'developer' && (
+        {(user?.role === 'developer' || user?.role === 'admin') && (
             <button 
                 onClick={() => navigate('/developer')}
                 className="px-8 py-3 rounded-[1.2rem] text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"

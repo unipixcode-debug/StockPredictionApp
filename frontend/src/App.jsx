@@ -78,8 +78,8 @@ function AppLayout() {
             <SidebarLink to="/profile" icon={<User size={22} />} label="Profil" />
             <SidebarLink to="/admin" icon={<Settings size={22} />} label="Ayarlar" />
             
-            {user.role === 'developer' && (
-              <SidebarLink to="/developer" icon={<Database size={22} />} label="Geliştirici" />
+            {(user.role === 'developer' || user.role === 'admin') && (
+              <SidebarLink to="/developer" icon={<Database size={20} />} label="Geliştirici" />
             )}
             {(user.role === 'admin' || user.role === 'developer') && (
               <SidebarLink to="/ai-management" icon={<Bot size={22} />} label="AI Yönetimi" />
