@@ -98,7 +98,7 @@ const Credits = () => {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {packages.map((pkg) => (
+                {packages.map((pkg, index) => (
                     <div 
                         key={pkg.id} 
                         className={`relative glass-card p-8 rounded-4xl border-2 transition-all hover:scale-105 ${
@@ -106,16 +106,21 @@ const Credits = () => {
                         }`}
                     >
                         {pkg.popular && (
-                            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
+                            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest z-10">
                                 {language === 'TR' ? 'En Popüler' : 'Most Popular'}
                             </div>
                         )}
+                        
+                        {/* Sıralama Numarası (Order Index) Rozeti */}
+                        <div className="absolute top-4 right-4 w-8 h-8 rounded-2xl bg-secondary/80 border border-border/80 flex items-center justify-center font-black text-sm text-muted-foreground shadow-inner opacity-70">
+                            #{index + 1}
+                        </div>
 
                         <div className="flex items-center justify-between mb-6">
                             <div className="p-3 bg-secondary rounded-2xl">
                                 {pkg.icon}
                             </div>
-                            <span className="text-3xl font-black">{pkg.tokens} <span className="text-xs text-muted-foreground uppercase">Tokens</span></span>
+                            <span className="text-3xl font-black mr-8">{pkg.tokens} <span className="text-xs text-muted-foreground uppercase">Tokens</span></span>
                         </div>
 
                         <h3 className="text-2xl font-black uppercase italic mb-2 tracking-tight">{pkg.name}</h3>
