@@ -110,13 +110,9 @@ const Credits = () => {
                                 {language === 'TR' ? 'En Popüler' : 'Most Popular'}
                             </div>
                         )}
-                        
-                        {/* Sıralama Numarası (Order Index) Rozeti */}
-                        <div className="absolute top-4 right-4 w-8 h-8 rounded-2xl bg-secondary/80 border border-border/80 flex items-center justify-center font-black text-sm text-muted-foreground shadow-inner opacity-70">
-                            #{index + 1}
-                        </div>
 
                         <div className="flex items-center justify-between mb-6">
+
                             <div className="p-3 bg-secondary rounded-2xl">
                                 {pkg.icon}
                             </div>
