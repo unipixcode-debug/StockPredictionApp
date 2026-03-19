@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 import api from './api';
 
-const { Check, Zap, Star, Crown, ShieldCheck, Loader2, Sparkles } = Icons;
+const { Check, Zap, Star, Crown, ShieldCheck, Loader2, Sparkles, Flame, Rocket, Gem } = Icons;
 
 const Credits = () => {
     const { user, updateCredits } = useAuth();
@@ -32,7 +32,7 @@ const Credits = () => {
         return <IconComponent className="text-primary" size={24} />;
     };
 
-    const packages = apiPackages
+    const packages = [...apiPackages]
         .sort((a, b) => Number(a.orderIndex || 0) - Number(b.orderIndex || 0))
         .map(pkg => ({
             ...pkg,
