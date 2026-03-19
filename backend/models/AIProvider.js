@@ -15,8 +15,8 @@ const AIProvider = sequelize.define('AIProvider', {
     type: {
         type: DataTypes.ENUM(
             'GEMINI', 'DEEPSEEK', 'OPENAI', 'OPENROUTER', 
-            'OLLAMA', 'ANTHROPIC', 'GROQ', 'MISTRAL', 
-            'PERPLEXITY', 'COHERE', 'XAI'
+            'OLLAMA', 'OLLAMA_CLOUD', 'ANTHROPIC', 'GROQ', 
+            'MISTRAL', 'PERPLEXITY', 'COHERE', 'XAI'
         ),
         allowNull: false
     },
@@ -47,6 +47,18 @@ const AIProvider = sequelize.define('AIProvider', {
     status: {
         type: DataTypes.STRING,
         defaultValue: 'Unknown'
+    },
+    lastError: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    lastChecked: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    latency: {
+        type: DataTypes.INTEGER,
+        allowNull: true
     }
 }, {
     timestamps: true

@@ -1,0 +1,1 @@
+ALTER TABLE "GlobalSettings" ALTER COLUMN "value" TYPE TEXT;

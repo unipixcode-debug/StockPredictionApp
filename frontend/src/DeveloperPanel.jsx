@@ -82,6 +82,20 @@ const DeveloperPanel = () => {
     }
   };
 
+  const triggerAiSync = async () => {
+    setLoadingAiStatus(true);
+    try {
+      await api.post('/admin/ai-sync');
+      // Wait a bit then refresh status to see progress
+      setTimeout(fetchAiStatus, 2000);
+      setTimeout(fetchAiStatus, 5000);
+    } catch (e) {
+      console.error('Error triggering AI sync:', e);
+    } finally {
+      // Don't set loading false immediately to show sync is starting
+    }
+  };
+
   const fetchPackages = async () => {
     setLoadingPackages(true);
     try {
@@ -94,15 +108,43 @@ const DeveloperPanel = () => {
     }
   };
 
-  const savePackageSetting = async (key, value) => {
+  const saveAllPackages = async () => {
+    setSavingCost(true);
     try {
-      await api.post('/admin/packages', { key, value });
+      await api.post('/admin/packages', packageSettings);
       setCostSaved(true);
       setTimeout(() => setCostSaved(false), 3000);
       fetchPackages();
     } catch (e) {
-      console.error('Error saving package setting:', e);
+      console.error('Error saving packages:', e);
+    } finally {
+      setSavingCost(false);
     }
+  };
+
+  const addPackage = () => {
+    const newId = `pkg_${Date.now()}`;
+    const nextOrder = packageSettings.length > 0 ? Math.max(...packageSettings.map(p => p.orderIndex || 0)) + 1 : 1;
+    setPackageSettings([...packageSettings, { 
+      id: newId, 
+      name: 'Yeni Paket', 
+      tokens: 100, 
+      price: '₺99.99', 
+      popular: false,
+      icon: 'Sparkles',
+      features: ['Yeni Özellik 1', 'Yeni Özellik 2'],
+      orderIndex: nextOrder
+    }]);
+  };
+
+  const removePackage = (id) => {
+    setPackageSettings(packageSettings.filter(p => p.id !== id));
+  };
+
+  const updatePackage = (id, field, value) => {
+    setPackageSettings(prev => prev.map(p => 
+      p.id === id ? { ...p, [field]: value } : p
+    ));
   };
 
   const saveSystemCost = async (key, value) => {
@@ -163,7 +205,7 @@ const DeveloperPanel = () => {
             <Link to="/ai-management" className="flex items-center space-x-6 group/link cursor-pointer">
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full scale-0 group-hover/link:scale-150 transition-transform duration-500" />
-                <div className="p-5 rounded-[2rem] bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 relative">
+                <div className="p-6 lg:p-8 rounded-4xl bg-gradient-to-br from-card to-secondary/30 border border-border/50 shadow-2xl backdrop-blur-xl group hover:border-primary/30 transition-all duration-500">
                   <Bot className="text-primary animate-pulse" size={28} />
                 </div>
               </div>
@@ -175,7 +217,7 @@ const DeveloperPanel = () => {
 
             <div className="flex flex-wrap items-center gap-4">
               {/* Credits Mirror - Bespoke Hero Section */}
-              <div className="px-8 py-4 bg-secondary/20 border border-border shadow-2xl rounded-[1.5rem] flex flex-col items-center justify-center min-w-[140px] hover:border-cyan-500/50 transition-all">
+              <div className="bg-secondary/20 p-4 lg:p-6 rounded-3xl border border-border shadow-sm flex flex-col h-full hover:border-border/80 transition-all duration-300 justify-center min-w-[140px]">
                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[.2em] mb-1">Hesap Bakiyesi</span>
                 <span className="text-3xl font-black text-cyan-400 tracking-tighter italic">
                   {aiStatus?.userCredits || 0}
@@ -184,7 +226,7 @@ const DeveloperPanel = () => {
 
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={fetchAiStatus}
+                  onClick={triggerAiSync}
                   disabled={loadingAiStatus}
                   className="flex items-center justify-center gap-2 px-6 py-3 text-xs font-black uppercase tracking-widest bg-primary/10 text-primary border border-primary/20 rounded-2xl hover:bg-primary/20 transition-all shadow-lg hover:shadow-primary/10"
                 >
@@ -193,7 +235,7 @@ const DeveloperPanel = () => {
                 </button>
                 <div className="px-3 py-1 flex items-center justify-center space-x-2 text-[9px] font-black uppercase tracking-widest text-muted-foreground bg-white/5 rounded-full">
                    <div className={`w-1.5 h-1.5 rounded-full ${aiStatus?.healthy > 0 ? 'bg-emerald-500 animate-ping' : 'bg-rose-500'}`} />
-                   <span>Last Pulse: {aiStatus ? new Date(aiStatus.checked).toLocaleTimeString('tr-TR') : 'Never'}</span>
+                   <span>Son Nabız: {aiStatus ? new Date(aiStatus.checked).toLocaleTimeString('tr-TR') : 'Hiçbir zaman'}</span>
                 </div>
               </div>
             </div>
@@ -232,7 +274,7 @@ const DeveloperPanel = () => {
                     <span className={`text-[10px] font-black uppercase tracking-widest ${
                       p.status === 'ok' ? 'text-emerald-400' : 'text-rose-400'
                     }`}>
-                      {p.status === 'ok' ? 'ACTIVE' : 'OFFLINE'}
+                      {p.status === 'ok' ? 'AKTİF' : 'OFFLINE'}
                     </span>
                     {p.status === 'ok' && (
                       <span className="text-[9px] opacity-40 font-mono">({p.ms}ms)</span>
@@ -305,51 +347,142 @@ const DeveloperPanel = () => {
         </div>
 
         {/* Token Paket Yönetimi (Fiyatlandırma) */}
-        <div className="glass-card p-6 border-border/50">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="p-3 rounded-2xl bg-cyan-500/10">
-              <Star className="text-cyan-400" size={20} />
+        <div className="glass-card p-6 border-border/50 xl:col-span-2">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-4">
+              <div className="p-4 rounded-3xl bg-cyan-500/10 border border-cyan-500/20 shadow-lg shadow-cyan-500/5">
+                <Star className="text-cyan-400" size={24} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black uppercase tracking-tighter italic">Paket & Fiyatlandırma</h3>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest opacity-60">Token Store paketlerini yönetin</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-black uppercase tracking-tight">Paket & Fiyatlandırma</h3>
-              <p className="text-xs text-muted-foreground">Token Store paketlerini yönetin</p>
+            <div className="flex items-center space-x-3">
+               <div className="flex items-center space-x-4 p-4 rounded-3xl bg-secondary/10 border border-white/5">
+                 <Plus size={14} />
+                 <span>Yeni Ekle</span>
+               </div>
+               <button 
+                onClick={saveAllPackages}
+                disabled={savingCost}
+                className="flex items-center space-x-2 px-6 py-2.5 bg-cyan-500 text-black rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-cyan-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+               >
+                 {savingCost ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                 <span>Tümünü Kaydet</span>
+               </button>
             </div>
           </div>
           
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {loadingPackages ? (
-              <div className="text-center py-4 text-xs opacity-50">Yükleniyor...</div>
+              <div className="col-span-full text-center py-20">
+                <RefreshCw size={32} className="animate-spin text-primary/30 mx-auto mb-4" />
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">Paketler Yükleniyor...</p>
+              </div>
+            ) : packageSettings.length === 0 ? (
+              <div className="col-span-full text-center py-20 border-2 border-dashed border-border rounded-4xl">
+                <p className="text-sm font-bold opacity-30 uppercase italic">Henüz paket ayarı bulunamadı.</p>
+              </div>
             ) : (
-              packageSettings.map(setting => (
-                <div key={setting.key} className="flex justify-between items-center p-3 rounded-xl bg-secondary/10 border border-border/50">
-                  <div className="flex-1">
-                    <span className="text-[10px] font-black uppercase tracking-wider opacity-50 block mb-1">
-                      {setting.description || setting.key}
-                    </span>
-                    <input
-                      type="text"
-                      value={setting.value}
-                      onChange={(e) => setPackageSettings(prev => prev.map(s => s.key === setting.key ? {...s, value: e.target.value} : s))}
-                      className="bg-transparent border-none text-sm font-bold focus:outline-none w-full"
-                    />
-                  </div>
+              [...packageSettings].sort((a, b) => Number(a.orderIndex || 0) - Number(b.orderIndex || 0)).map((pkg, idx) => (
+                <div key={pkg.id || idx} className="p-6 rounded-4xl bg-secondary/10 border border-border/50 relative group transition-all hover:border-cyan-500/30">
                   <button 
-                    onClick={() => savePackageSetting(setting.key, setting.value)}
-                    className="text-[10px] font-black uppercase bg-cyan-500/20 text-cyan-400 px-3 py-1.5 rounded-lg hover:bg-cyan-500/30 transition-all"
+                    onClick={() => removePackage(pkg.id)}
+                    className="absolute top-4 right-4 p-2 rounded-xl bg-rose-500/10 text-rose-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white"
                   >
-                    Güncelle
+                    <Trash2 size={14} />
                   </button>
+
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest block mb-2 opacity-50">Paket Adı</label>
+                        <input
+                          type="text"
+                          value={pkg.name}
+                          onChange={(e) => updatePackage(pkg.id, 'name', e.target.value)}
+                          className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:border-cyan-500/50"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest block mb-2 opacity-50">Simge (Lucide)</label>
+                        <select
+                          value={pkg.icon || 'Sparkles'}
+                          onChange={(e) => updatePackage(pkg.id, 'icon', e.target.value)}
+                          className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:border-cyan-500/50 appearance-none"
+                        >
+                          <option value="Zap">Zap (Enerji)</option>
+                          <option value="Star">Star (Yıldız)</option>
+                          <option value="Crown">Crown (Taç)</option>
+                          <option value="Sparkles">Sparkles (Parıltı)</option>
+                          <option value="Flame">Flame (Alev)</option>
+                          <option value="Rocket">Rocket (Roket)</option>
+                          <option value="Gem">Gem (Mücevher)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest block mb-2 opacity-50">Token Miktarı</label>
+                        <input
+                          type="number"
+                          value={pkg.tokens}
+                          onChange={(e) => updatePackage(pkg.id, 'tokens', parseInt(e.target.value) || 0)}
+                          className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2 text-xs font-bold focus:outline-none focus:border-cyan-500/50"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest block mb-2 opacity-50">Fiyat</label>
+                        <input
+                          type="text"
+                          value={pkg.price}
+                          onChange={(e) => updatePackage(pkg.id, 'price', e.target.value)}
+                          className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2 text-xs font-bold focus:outline-none focus:border-cyan-500/50"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest block mb-2 opacity-50">Sıra No</label>
+                        <input
+                          type="number"
+                          value={pkg.orderIndex || 0}
+                          onChange={(e) => updatePackage(pkg.id, 'orderIndex', parseInt(e.target.value) || 0)}
+                          className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2 text-xs font-bold focus:outline-none focus:border-cyan-500/50"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest block mb-2 opacity-50">Özellikler (Virgülle ayırın)</label>
+                      <textarea
+                        value={Array.isArray(pkg.features) ? pkg.features.join(',') : (pkg.features || '')}
+                        onChange={(e) => updatePackage(pkg.id, 'features', e.target.value.split(','))}
+                        className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2 text-[10px] font-bold focus:outline-none focus:border-cyan-500/50 min-h-[80px]"
+                        placeholder="Örn: 100 Analiz, Hızlı Destek..."
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-3 pt-2">
+                       <button 
+                        onClick={() => updatePackage(pkg.id, 'popular', !pkg.popular)}
+                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${
+                          pkg.popular ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' : 'bg-secondary text-muted-foreground border border-border'
+                        }`}
+                       >
+                         <Star size={10} fill={pkg.popular ? 'currentColor' : 'none'} />
+                         <span>{pkg.popular ? 'En Popüler' : 'Normal'}</span>
+                       </button>
+                    </div>
+                  </div>
                 </div>
               ))
-            )}
-            {packageSettings.length === 0 && !loadingPackages && (
-              <div className="text-center py-4 text-xs opacity-50">Henüz paket ayarı bulunamadı.</div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Admin Activity Logs */}
+      {/* Admin Activity Logs (Sistem Günlüğü) */}
       <div className="premium-card p-6 mt-8 border border-border">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
@@ -365,7 +498,7 @@ const DeveloperPanel = () => {
         {loadingAdminLogs ? (
           <div className="text-center py-8">Yükleniyor...</div>
         ) : adminLogs.length === 0 ? (
-           <div className="text-center py-8 text-sm opacity-50 font-bold">Herhangi bir kayıt bulunamadı.</div>
+          <div className="text-center py-8 text-sm opacity-50 font-bold">Herhangi bir kayıt bulunamadı.</div>
         ) : (
           <div className="space-y-3">
             {adminLogs.map(log => (

@@ -8,7 +8,7 @@ const AdminLog = sequelize.define('AdminLog', {
     primaryKey: true
   },
   adminId: {
-    type: DataTypes.UUID,
+    type: DataTypes.STRING,
     allowNull: false
   },
   adminName: {

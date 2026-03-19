@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { Check, Zap, Star, Crown, ShieldCheck, Loader2, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import * as Icons from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 import api from './api';
+
+const { Check, Zap, Star, Crown, ShieldCheck, Loader2, Sparkles } = Icons;
 
 const Credits = () => {
     const { user, updateCredits } = useAuth();
@@ -11,84 +13,49 @@ const Credits = () => {
     const [success, setSuccess] = useState(false);
     const [apiPackages, setApiPackages] = useState([]);
 
-    React.useEffect(() => {
+    useEffect(() => {
         fetchPackages();
     }, []);
 
     const fetchPackages = async () => {
         try {
-            const data = await api.get('/admin/packages');
+            const data = await api.get('/market/packages');
             setApiPackages(data);
         } catch (error) {
             console.error('Error fetching packages:', error);
         }
     };
 
-    const getSetting = (key, defaultValue) => {
-        const setting = apiPackages.find(s => s.key === key);
-        return setting ? setting.value : defaultValue;
+    const getIcon = (iconName) => {
+        const icons = { Zap, Star, Crown, Sparkles, Flame, Rocket, Gem };
+        const IconComponent = icons[iconName] || Sparkles;
+        return <IconComponent className="text-primary" size={24} />;
     };
 
-    const packages = [
-        {
-            id: 'starter',
-            name: 'Starter',
-            credits: parseInt(getSetting('pkg_starter_tokens', '100')),
-            price: getSetting('pkg_starter_price', '₺49.99'),
-            icon: <Zap className="text-blue-400" size={24} />,
-            features: [
-                `${getSetting('pkg_starter_tokens', '100')} AI Analysis`,
-                'Basic Predictions',
-                'Daily Market News'
-            ],
-            popular: false
-        },
-        {
-            id: 'pro',
-            name: 'Pro',
-            credits: parseInt(getSetting('pkg_pro_tokens', '500')),
-            price: getSetting('pkg_pro_price', '₺199.99'),
-            icon: <Star className="text-amber-400" size={24} />,
-            features: [
-                `${getSetting('pkg_pro_tokens', '500')} AI Analysis`,
-                'Priority Processing',
-                'Advance Technical Analysis',
-                'Early Data Access'
-            ],
-            popular: true
-        },
-        {
-            id: 'whale',
-            name: 'Whale',
-            credits: parseInt(getSetting('pkg_whale_tokens', '2000')),
-            price: getSetting('pkg_whale_price', '₺699.99'),
-            icon: <Crown className="text-purple-400" size={24} />,
-            features: [
-                `${getSetting('pkg_whale_tokens', '2000')} AI Analysis`,
-                'Dedicated Support',
-                'Deep Learning Insights',
-                'Custom Strategy Bot'
-            ],
-            popular: false
-        }
-    ];
+    const packages = apiPackages
+        .sort((a, b) => Number(a.orderIndex || 0) - Number(b.orderIndex || 0))
+        .map(pkg => ({
+            ...pkg,
+            credits: parseInt(pkg.tokens || 0),
+            icon: getIcon(pkg.icon || pkg.id),
+            displayFeatures: Array.isArray(pkg.features) ? pkg.features : (pkg.features ? (typeof pkg.features === 'string' ? pkg.features.split(',') : pkg.features) : [
+                `${pkg.tokens} AI Analizi`,
+                'Piyasa Tahminleri',
+                'Finansal Öngörüler'
+            ])
+        }));
 
     const handlePurchase = async (pkg) => {
         setLoading(true);
         try {
-            // Simulated transaction delay
             await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // If Mock user, skip backend and update locally
             if (user?.id === 'mock-user-123') {
-                updateCredits((user.credits || 0) + pkg.credits);
+                updateCredits((user.credits || 0) + (parseInt(pkg.tokens) || 0));
                 setSuccess(true);
                 setTimeout(() => setSuccess(false), 3000);
                 return;
             }
-
-            const response = await api.post('/auth/add-credits', { amount: pkg.credits });
-            
+            const response = await api.post('/auth/add-credits', { amount: parseInt(pkg.tokens) || 0 });
             if (response && response.newCredits !== undefined) {
                 updateCredits(response.newCredits);
                 setSuccess(true);
@@ -96,15 +63,14 @@ const Credits = () => {
             }
         } catch (error) {
             console.error('Purchase error:', error);
-            alert('Satın alma sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+            alert(language === 'TR' ? 'Satın alma sırasında bir hata oluştu. Lütfen tekrar deneyin.' : 'An error occurred during purchase. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="max-w-6xl mx-auto py-12 px-4 animate-in fade-in duration-700">
-            {/* Header */}
+        <div className="max-w-7xl mx-auto py-12 px-4 animate-in fade-in duration-700">
             <div className="text-center mb-16">
                 <h1 className="text-4xl md:text-5xl font-black mb-4 tracking-tight uppercase italic bg-linear-to-r from-primary to-accent bg-clip-text text-transparent">
                     PredictPro Token Store
@@ -116,20 +82,22 @@ const Credits = () => {
                 </p>
                 <div className="mt-6 inline-flex items-center space-x-2 bg-secondary/50 px-4 py-2 rounded-full border border-border">
                     <Sparkles className="text-accent" size={16} />
-                    <span className="text-sm font-bold uppercase tracking-wider">Aktif Bakiye: {user?.credits || 0} Token</span>
+                    <span className="text-sm font-bold uppercase tracking-wider">
+                        {language === 'TR' ? `Aktif Bakiye: ${user?.credits || 0} Token` : `Active Balance: ${user?.credits || 0} Tokens`}
+                    </span>
                 </div>
             </div>
 
-            {/* Success Animation */}
             {success && (
                 <div className="bg-green-500/20 border border-green-500/50 text-green-400 p-4 rounded-2xl mb-8 flex items-center justify-center space-x-3 animate-bounce">
                     <ShieldCheck size={24} />
-                    <span className="font-bold">Satın alma başarılı! Kredileriniz hesabınıza tanımlandı.</span>
+                    <span className="font-bold">
+                        {language === 'TR' ? 'Satın alma başarılı! Kredileriniz hesabınıza tanımlandı.' : 'Purchase successful! Credits added to your account.'}
+                    </span>
                 </div>
             )}
 
-            {/* Packages Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {packages.map((pkg) => (
                     <div 
                         key={pkg.id} 
@@ -139,7 +107,7 @@ const Credits = () => {
                     >
                         {pkg.popular && (
                             <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
-                                Most Popular
+                                {language === 'TR' ? 'En Popüler' : 'Most Popular'}
                             </div>
                         )}
 
@@ -147,14 +115,14 @@ const Credits = () => {
                             <div className="p-3 bg-secondary rounded-2xl">
                                 {pkg.icon}
                             </div>
-                            <span className="text-3xl font-black">{pkg.credits} <span className="text-xs text-muted-foreground uppercase">Tokens</span></span>
+                            <span className="text-3xl font-black">{pkg.tokens} <span className="text-xs text-muted-foreground uppercase">Tokens</span></span>
                         </div>
 
                         <h3 className="text-2xl font-black uppercase italic mb-2 tracking-tight">{pkg.name}</h3>
                         <div className="text-4xl font-black text-foreground mb-8">{pkg.price}</div>
 
                         <div className="space-y-4 mb-10">
-                            {pkg.features.map((feature, i) => (
+                            {pkg.displayFeatures.map((feature, i) => (
                                 <div key={i} className="flex items-center space-x-3">
                                     <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center">
                                         <Check size={12} className="text-primary" />
@@ -176,7 +144,7 @@ const Credits = () => {
                             {loading ? (
                                 <Loader2 size={24} className="animate-spin" />
                             ) : (
-                                <span>Get Package</span>
+                                <span>{language === 'TR' ? 'Paketi Al' : 'Get Package'}</span>
                             )}
                         </button>
                     </div>
@@ -190,7 +158,9 @@ const Credits = () => {
                     </div>
                     <div>
                         <h4 className="text-xl font-bold uppercase tracking-tight italic">Secure Google Checkout</h4>
-                        <p className="text-muted-foreground font-medium">Satın alma işlemi Google hesabınız ile eşleştirilecektir.</p>
+                        <p className="text-muted-foreground font-medium">
+                            {language === 'TR' ? 'Satın alma işlemi Google hesabınız ile eşleştirilecektir.' : 'Your purchase will be synchronized with your Google account.'}
+                        </p>
                     </div>
                 </div>
                 <div className="flex space-x-4">

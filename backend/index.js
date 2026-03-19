@@ -27,6 +27,7 @@ const authRoutes = require('./routes/auth');
 const marketRoutes = require('./routes/market');
 const aiRoutes = require('./routes/ai');
 const aiAdminRoutes = require('./routes/aiAdmin');
+const paymentRoutes = require('./routes/payment');
 const cacheService = require('./services/cacheService');
 const creditService = require('./services/creditService');
 
@@ -75,6 +76,7 @@ app.use('/api/market', marketRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin/ai', aiAdminRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Basic Route for testing
 app.get('/', (req, res) => {

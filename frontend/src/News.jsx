@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Newspaper, ExternalLink, RefreshCw, Calendar, ArrowRight } from 'lucide-react';
+import { Newspaper, ExternalLink, RefreshCw, Calendar, ArrowRight, Clock, Zap, Coins } from 'lucide-react';
 import api from './api';
 import { useLanguage } from './LanguageContext';
-
 import { useAuth } from './AuthContext';
 
 const News = () => {
@@ -17,7 +16,16 @@ const News = () => {
   
   const [sources, setSources] = useState([t('AllSources')]);
   const [activeSource, setActiveSource] = useState(sourceQuery || t('AllSources'));
+  const [timeframe, setTimeframe] = useState(7); // Default 7 days
   
+  const timeframes = [
+    { label: language === 'TR' ? 'Bugün' : 'Today', value: 1 },
+    { label: language === 'TR' ? '3 Gün' : '3 Days', value: 3 },
+    { label: language === 'TR' ? '7 Gün' : '7 Days', value: 7 },
+    { label: language === 'TR' ? '1 Ay' : '1 Month', value: 30 },
+    { label: language === 'TR' ? '1 Yıl' : '1 Year', value: 365 }
+  ];
+
   // Article Reader State
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [articleContent, setArticleContent] = useState("");
@@ -30,7 +38,7 @@ const News = () => {
     } else {
         setLoading(false);
     }
-  }, [language, user?.newsletterSubscribed]); 
+  }, [language, user?.newsletterSubscribed, timeframe]); 
 
   const handleSubscribe = async () => {
     const cost = 5; 
@@ -65,26 +73,21 @@ const News = () => {
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const data = await api.get(`/market/news?lang=${language}`);
+      const data = await api.get(`/market/news?lang=${language}&days=${timeframe}`);
       setNews(data);
       // Extract unique sources
       const uniqueSources = [t('AllSources'), ...new Set(data.map(item => item.sourceName || t('OtherSource')))];
       setSources(uniqueSources);
     } catch (e) {
       console.error('Error fetching news:', e);
-      // Fallback
+      // Fallback data for demonstration
       const fallbackData = [
         {
           title: "Küresel Piyasalar Enflasyon Verisine Odaklandı",
           contentSnippet: "Yatırımcılar, merkez bankasının faiz kararlarını şekillendirecek olan kritik enflasyon verisi öncesinde temkinli bekleyişini sürdürüyor.",
           pubDate: new Date().toISOString(),
-          link: "#"
-        },
-        {
-          title: "Teknoloji Hisselerinde Yapay Zeka Rallisi Devam Ediyor",
-          contentSnippet: "Nvidia ve Microsoft öncülüğünde teknoloji endeksi tarihi zirvelerini zorlarken, yapay zeka yatırımları hız kesmiyor.",
-          pubDate: new Date(Date.now() - 3600000).toISOString(),
           link: "#",
+          importanceScore: 85,
           sourceName: 'System Fallback'
         }
       ];
@@ -202,31 +205,55 @@ const News = () => {
               </p>
           </motion.div>
         </div>
-      ) : loading ? (
-        <div className="flex items-center justify-center py-32">
-            <RefreshCw className="animate-spin text-primary/30" size={48} />
-        </div>
       ) : (
         <>
-          {sources.length > 1 && (
-            <div className="flex overflow-x-auto pb-6 space-x-3 scrollbar-hide -mx-6 px-6 md:mx-0 md:px-0">
-                {sources.map(source => (
+          {/* Timeframe Filter */}
+          <div className="flex flex-col space-y-6">
+            <div className="flex items-center space-x-4 mb-2">
+               <Clock size={16} className="text-primary" />
+               <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{language === 'TR' ? 'Tarih Filtresi' : 'Date Filter'}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+                {timeframes.map(tf => (
                     <button
-                        key={source}
-                        onClick={() => setActiveSource(source)}
-                        className={`whitespace-nowrap px-6 py-2 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
-                            activeSource === source 
-                                ? 'bg-primary text-primary-foreground shadow-[0_0_20px_rgba(0,242,254,0.3)]'
-                                : 'bg-secondary/30 text-muted-foreground hover:bg-white/10 hover:text-foreground border border-border/50'
+                        key={tf.value}
+                        onClick={() => setTimeframe(tf.value)}
+                        className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                            timeframe === tf.value 
+                                ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                                : 'bg-secondary/20 text-muted-foreground border border-border/50 hover:bg-secondary/40'
                         }`}
                     >
-                        {source}
+                        {tf.label}
                     </button>
                 ))}
             </div>
-          )}
 
-          {filteredNews.length === 0 ? (
+            {/* Source Filter */}
+            {sources.length > 1 && (
+              <div className="flex overflow-x-auto pb-6 space-x-3 scrollbar-hide">
+                  {sources.map(source => (
+                      <button
+                          key={source}
+                          onClick={() => setActiveSource(source)}
+                          className={`whitespace-nowrap px-6 py-2 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+                              activeSource === source 
+                                  ? 'bg-amber-500 text-black shadow-[0_0_20px_rgba(245,158,11,0.3)]'
+                                  : 'bg-secondary/30 text-muted-foreground hover:bg-white/10 hover:text-foreground border border-border/50'
+                          }`}
+                      >
+                          {source}
+                      </button>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-32">
+                <RefreshCw className="animate-spin text-primary/30" size={48} />
+            </div>
+          ) : filteredNews.length === 0 ? (
             <div className="glass-card p-20 text-center flex flex-col items-center space-y-4 border-dashed border-border/50">
                 <Newspaper className="text-muted-foreground/20 w-16 h-16" />
                 <p className="text-muted-foreground font-black uppercase tracking-widest italic opacity-30 text-xs">{t('NoNews')}</p>
@@ -244,7 +271,6 @@ const News = () => {
                     key={idx} 
                     className="glass-card p-8 flex flex-col group hover:-translate-y-2 transition-all duration-500 hover:shadow-2xl hover:border-primary/30 relative overflow-hidden"
                 >
-                  {/* Decorative gradient blob */}
                   <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors" />
 
                   <div className="flex items-center space-x-3 mb-6">
@@ -261,7 +287,6 @@ const News = () => {
                         </div>
                     </div>
                     
-                    {/* Importance Score Badge */}
                     <div className="ml-auto self-start">
                         <div className={`
                             flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-dashed
@@ -307,7 +332,7 @@ const News = () => {
 
       {/* Article Reader Modal */}
       {selectedArticle && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center p-4 sm:p-6 bg-background/80 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-100 flex items-center justify-center p-4">
            <motion.div 
                initial={{ opacity: 0, scale: 0.95 }}
                animate={{ opacity: 1, scale: 1 }}
@@ -368,9 +393,9 @@ const News = () => {
                        </div>
                   )}
               </div>
-                            <div className="p-4 border-t border-border/50 bg-secondary/10 flex justify-between items-center">
+              <div className="p-4 border-t border-border/50 bg-secondary/10 flex justify-between items-center">
                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('AIPoweredTranslation')}</span>
-                   <a href={selectedArticle.link} target="_blank" rel="noopener noreferrer" className="text-xs uppercase font-black tracking-widest text-primary hover:underline flex items-center space-x-2">
+                   <a href={selectedArticle?.link} target="_blank" rel="noopener noreferrer" className="text-xs uppercase font-black tracking-widest text-primary hover:underline flex items-center space-x-2">
                        <span>{t('OpenOriginalArticle')}</span>
                        <ExternalLink size={14} />
                    </a>

@@ -7,7 +7,9 @@ class AIService {
     constructor() {
         this.providers = [];
         this.isInitialized = false;
-        this.initProviders();
+        this.initProviders().then(() => {
+            this.startHealthCheckLoop();
+        });
     }
 
     async initProviders() {
@@ -55,8 +57,11 @@ class AIService {
 
                 if (p.type === 'GEMINI') {
                     provider.instance = new GoogleGenerativeAI(p.apiKey);
-                } else if (p.type === 'OPENAI') {
-                    provider.instance = new OpenAI({ apiKey: p.apiKey });
+                } else if (p.type === 'OPENAI' || p.type === 'OLLAMA_CLOUD') {
+                    provider.instance = new OpenAI({ 
+                        apiKey: p.apiKey,
+                        baseURL: p.type === 'OLLAMA_CLOUD' ? 'https://api.ollama.com/v1' : undefined
+                    });
                 }
                 
                 return provider;
@@ -67,6 +72,55 @@ class AIService {
         } catch (error) {
             console.error("Critical error in AIService initialization:", error.message);
         }
+    }
+
+    startHealthCheckLoop() {
+        // Run every 15 minutes to "not kill the apis"
+        setInterval(() => {
+            this.checkAllProviders();
+        }, 15 * 60 * 1000);
+        
+        // Initial run after a short delay
+        setTimeout(() => this.checkAllProviders(), 5000);
+    }
+
+    async checkAllProviders() {
+        console.log("🌐 Starting background AI health check...");
+        const AIProvider = require('../models/AIProvider');
+        
+        for (const provider of this.providers) {
+            console.log(`Checking ${provider.name}...`);
+            const start = Date.now();
+            let status = 'active';
+            let lastError = null;
+            let latency = 0;
+
+            try {
+                // Sequential test to avoid overwhelming
+                await this.generateContent('Reply with: OK', null, provider.id);
+                latency = Date.now() - start;
+            } catch (e) {
+                lastError = e.message;
+                status = this.isQuotaError(e) ? 'quota_exceeded' : 'error';
+                latency = Date.now() - start;
+                console.warn(`Health check failed for ${provider.name}: ${lastError}`);
+            }
+
+            try {
+                await AIProvider.update({
+                    status,
+                    lastError: lastError ? lastError.substring(0, 500) : null,
+                    lastChecked: new Date(),
+                    latency
+                }, { where: { id: provider.id } });
+            } catch (dbErr) {
+                console.error(`Failed to update DB for provider ${provider.name}:`, dbErr.message);
+            }
+
+            // Small delay between tests
+            await new Promise(r => setTimeout(r, 2000));
+        }
+        console.log("✅ Background AI health check completed.");
     }
 
     async generateContent(prompt, modelOverride = null, providerId = null) {
@@ -151,13 +205,13 @@ class AIService {
                     return response.text();
                 }
 
-                if (provider.type === 'OPENAI') {
+                if (provider.type === 'OPENAI' || provider.type === 'OLLAMA_CLOUD') {
                     const messages = Array.isArray(prompt) 
-                        ? (typeof prompt[0] === 'object' ? prompt : prompt.map(p => ({role:'user', content: p})))
-                        : [{ role: "user", content: prompt }];
+                        ? (typeof prompt[0] === 'object' ? prompt : prompt.map(p => ({role:'user', content: String(p)})))
+                        : [{ role: "user", content: String(prompt) }];
 
                     const response = await provider.instance.chat.completions.create({
-                        model: modelOverride || "gpt-3.5-turbo",
+                        model: modelOverride || (provider.type === 'OLLAMA_CLOUD' ? "llama3" : "gpt-3.5-turbo"),
                         messages: messages,
                     });
                     return response.choices[0].message.content;
@@ -209,7 +263,8 @@ class AIService {
                     'MISTRAL': 'https://api.mistral.ai/v1',
                     'PERPLEXITY': 'https://api.perplexity.ai',
                     'COHERE': 'https://api.cohere.ai/v1',
-                    'XAI': 'https://api.x.ai/v1'
+                    'XAI': 'https://api.x.ai/v1',
+                    'OLLAMA_CLOUD': 'https://api.ollama.com/v1'
                 };
 
                 if (openAiCompatible[provider.type]) {
@@ -253,7 +308,7 @@ class AIService {
             emailService.sendQuotaExhaustedAlert('Tüm Mevcut AI Sağlayıcıları');
         }
 
-        throw new Error(`All AI providers failed. Last error: ${lastError?.message || 'Unknown'}`);
+        throw new Error("All AI providers failed. Last error: " + (lastError && lastError.message ? lastError.message : 'Unknown'));
     }
 
     // Updated to use Gemini Pool for cost optimization
@@ -274,14 +329,14 @@ class AIService {
 
     isQuotaError(error) {
         if (!error) return false;
-        const msg = error.message?.toLowerCase() || "";
-        const status = error.response?.status;
+        const msg = (error.message ? error.message.toLowerCase() : "");
+        const status = (error.response ? error.response.status : null);
         return (
             status === 429 || 
-            msg.includes("quota") || 
-            msg.includes("limit") || 
-            msg.includes("exhausted") || 
-            msg.includes("credit")
+            msg.indexOf("quota") !== -1 || 
+            msg.indexOf("limit") !== -1 || 
+            msg.indexOf("exhausted") !== -1 || 
+            msg.indexOf("credit") !== -1
         );
     }
 

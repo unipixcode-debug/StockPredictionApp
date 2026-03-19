@@ -3,6 +3,11 @@ const router = express.Router();
 const flowService = require('../services/flowService');
 const marketDataService = require('../services/marketDataService');
 const cacheService = require('../services/cacheService');
+const newsService = require('../services/newsService');
+const axios = require('axios');
+const cheerio = require('cheerio');
+const aiService = require('../services/aiService');
+const NewsSummary = require('../models/NewsSummary');
 
 // Market Flow Visualization Data
 router.get('/flow', async (req, res) => {
@@ -70,27 +75,13 @@ router.get('/stats', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
 });
-// News Endpoints
-const newsService = require('../services/newsService');
-
-const axios = require('axios');
-const cheerio = require('cheerio');
-const aiService = require('../services/aiService');
-const NewsSummary = require('../models/NewsSummary');
 
 router.get('/news', async (req, res) => {
     try {
-        const { symbol, lang } = req.query;
+        const { lang, days } = req.query;
+        const daysInt = parseInt(days) || 7; // Default 7 days
         
-        // Use cache for general news if no symbol specified
-        if (!symbol) {
-            const cachedNews = cacheService.getNews(lang || 'TR');
-            if (cachedNews) {
-                return res.json(cachedNews);
-            }
-        }
-
-        const news = await newsService.fetchLatestNews(symbol || '', lang || 'EN');
+        const news = await newsService.fetchLatestNews(daysInt);
         res.json(news);
     } catch (error) {
         console.error('News API error:', error);
@@ -107,7 +98,6 @@ router.get('/read-article', async (req, res) => {
         // 1. Check DB Cache First
         const existingSummary = await NewsSummary.findByPk(url);
         if (existingSummary) {
-            console.log(`[DB CACHE] Found summary for ${url}`);
             return res.json({
                 url,
                 content: lang === 'EN' ? existingSummary.summaryEN : existingSummary.summaryTR,
@@ -172,6 +162,20 @@ router.get('/read-article', async (req, res) => {
     } catch (error) {
         console.error('Article Reader API error:', error.message);
         res.status(500).json({ error: 'Failed to read or translate article' });
+    }
+});
+
+// Public Package & Pricing List
+router.get('/packages', async (req, res) => {
+    try {
+        const GlobalSetting = require('../models/GlobalSetting');
+        const packageSetting = await GlobalSetting.findOne({ where: { key: 'token_packages' } });
+        if (packageSetting) {
+            return res.json(JSON.parse(packageSetting.value));
+        }
+        res.json([]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 

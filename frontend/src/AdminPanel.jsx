@@ -377,7 +377,7 @@ const AdminPanel = () => {
                 {showUsers && (
                     <div className="space-y-4 pt-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                         {usersList.map(u => (
-                            <div key={u.id} className="p-4 rounded-2xl bg-secondary/10 border border-border/40 flex justify-between items-center group">
+                            <div key={u.id} className="p-1.5 rounded-3xl bg-secondary/30 border border-border/50 group-hover:border-cyan-500/50 transition-colors shadow-sm flex justify-between items-center group">
                                 <div className="min-w-0">
                                     <p className="text-sm font-black truncate">{u.name || (u.email.split('@')[0])}</p>
                                     <p className="text-[10px] opacity-40 uppercase font-bold">{u.email}</p>

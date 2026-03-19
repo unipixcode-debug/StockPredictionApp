@@ -1,7 +1,9 @@
 const RSSParser = require('rss-parser');
 const parser = new RSSParser();
 const DataSource = require('../models/DataSource');
+const NewsSummary = require('../models/NewsSummary');
 const aiService = require('./aiService');
+const { Op } = require('sequelize');
 
 class NewsService {
     constructor() {
@@ -71,145 +73,106 @@ class NewsService {
 
         let dynamicSources = [];
         try {
-            // Try database first
             dynamicSources = await DataSource.findAll({ where: { type: 'NEWS_RSS', isActive: true } });
         } catch (dbError) {
             console.warn('DB Error fetching dynamic feeds, falling back to JSON:', dbError.message);
         }
 
+        const dynamicFeeds = dynamicSources.map(s => ({ name: s.name, url: s.url }));
+        const allFeeds = [...defaultFeeds, ...dynamicFeeds];
+        const uniqueFeeds = Array.from(new Map(allFeeds.map(item => [item.url, item])).values());
+        
+        return uniqueFeeds;
+    }
+
+    async fetchLatestNews(days = 7) {
         try {
-            // If DB is empty or failed, try JSON fallback
-            if (!dynamicSources || dynamicSources.length === 0) {
-                const fs = require('fs');
-                const path = require('path');
-                const fallbackFilePath = path.join(__dirname, '..', 'fallback_sources.json');
-                if (fs.existsSync(fallbackFilePath)) {
-                    const fallbackData = JSON.parse(fs.readFileSync(fallbackFilePath, 'utf8'));
-                    dynamicSources = fallbackData.filter(s => s.type === 'NEWS_RSS' && s.active !== false);
+            // First, cleanup news older than 1 year
+            await this.cleanupOldNews();
+
+            const feeds = await this.getFeedsWithNames();
+            let allItems = [];
+
+            const fetchPromises = feeds.map(async (feed) => {
+                try {
+                    const parsed = await parser.parseURL(feed.url);
+                    return parsed.items.map(item => ({
+                        ...item,
+                        sourceName: feed.name,
+                        importanceScore: this.calculateImportanceScore(item)
+                    }));
+                } catch (e) {
+                    console.error(`Error parsing feed ${feed.name}:`, e.message);
+                    return [];
                 }
+            });
+
+            const results = await Promise.all(fetchPromises);
+            allItems = results.flat();
+
+            // Filter by date (if days is provided)
+            if (days && days > 0) {
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - days);
+                allItems = allItems.filter(item => new Date(item.pubDate) >= cutoffDate);
             }
 
-            const dynamicFeeds = dynamicSources.map(s => ({ name: s.name, url: s.url }));
-            
-            // Deduplicate by URL
-            const allFeeds = [...defaultFeeds, ...dynamicFeeds];
-            const uniqueFeeds = Array.from(new Map(allFeeds.map(item => [item.url, item])).values());
-            
-            return uniqueFeeds;
+            // Sort by importance then by date
+            allItems.sort((a, b) => {
+                const scoreDiff = (b.importanceScore || 0) - (a.importanceScore || 0);
+                if (Math.abs(scoreDiff) > 10) return scoreDiff;
+                return new Date(b.pubDate) - new Date(a.pubDate);
+            });
+
+            return allItems.slice(0, 50); // Return top 50
         } catch (error) {
-            console.error('Critical error in getFeedsWithNames:', error.message);
-            return defaultFeeds;
+            console.error('FetchNews Error:', error.message);
+            throw error;
         }
     }
 
-    async getFeeds() {
-        const feeds = await this.getFeedsWithNames();
-        return feeds.map(f => f.url);
-    }
-
-    async fetchLatestNews(symbol = '', lang = 'EN') {
+    async cleanupOldNews() {
         try {
-            const query = this.searchMappings[symbol] || symbol;
-            const getFeedsResponse = await this.getFeedsWithNames();
-            const allNews = [];
+            const oneYearAgo = new Date();
+            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
             
-            console.log(`Fetching news for: ${query} across ${getFeedsResponse.length} feeds...`);
-
-            for (const { name, url } of getFeedsResponse) {
-                try {
-                    const feed = await parser.parseURL(url);
-                    allNews.push(...feed.items.map(item => ({
-                        title: item.title,
-                        link: item.link,
-                        pubDate: item.pubDate,
-                        contentSnippet: item.contentSnippet,
-                        sourceName: name || feed.title || 'Other' // Extract source name
-                    })));
-                } catch (e) {
-                    console.error(`RSS fetch error (${url}):`, e.message);
+            const deleted = await NewsSummary.destroy({
+                where: {
+                    createdAt: {
+                        [Op.lt]: oneYearAgo
+                    }
                 }
-            }
-
-            console.log(`Total raw news items found: ${allNews.length}`);
-
-            // Calculate Importance Score and Sort
-            allNews.forEach(item => {
-                item.importanceScore = this.calculateImportanceScore(item);
             });
             
-            // Sort by score
-            allNews.sort((a, b) => b.importanceScore - a.importanceScore);
-
-            // Variety booster: take top news but ensure we don't just take one source
-            const sourceCounts = {};
-            const diverseNews = [];
-            for (const item of allNews) {
-                const sName = item.sourceName || 'Other';
-                sourceCounts[sName] = (sourceCounts[sName] || 0) + 1;
-                
-                // Allow up to 10 items per source in the top list to ensure variety
-                if (sourceCounts[sName] <= 10) {
-                    diverseNews.push(item);
-                }
-                if (diverseNews.length >= 60) break;
+            if (deleted > 0) {
+                console.log(`🧹 Cleaned up ${deleted} old news summaries older than 1 year.`);
             }
-
-            let finalNews = diverseNews;
-
-            // Filter news based on query keywords
-            if (query) {
-                const keywords = query.toLowerCase().split(' ');
-                const filtered = allNews.filter(n => {
-                    const text = (n.title + ' ' + (n.contentSnippet || '')).toLowerCase();
-                    return keywords.some(kw => text.includes(kw));
-                });
-                console.log(`Filtered news items for "${query}": ${filtered.length}`);
-                finalNews = filtered.slice(0, 15);
-            }
-
-            if (lang === 'TR') {
-                finalNews = await aiService.translateNewsItems(finalNews, lang);
-            }
-
-            return finalNews;
         } catch (error) {
-            console.error('News fetch error:', error);
-            return [];
+            console.error('CleanupOldNews Error:', error.message);
         }
     }
 
-    /**
-     * AI Sentiment Analysis using Multi-Provider AIService
-     */
-    async analyzeSentiment(newsList) {
-        if (!newsList || newsList.length === 0) {
-            console.log("No news to analyze. Returning 50.");
-            return 50;
-        }
-
+    async analyzeSentiment(text) {
         try {
-            console.log(`Analyzing sentiment for ${newsList.length} items...`);
-            // Prepare a text prompt summarizing the news
-            const newsSummaries = newsList.map(n => `- ${n.title}: ${n.contentSnippet || ''}`).join('\n');
-            const prompt = `Analyze the sentiment of the following financial news and return a single integer score between 0 and 100. 
-0 means extremely negative/bearish, 50 means neutral, and 100 means extremely positive/bullish. 
-Respond ONLY with the integer number.
+            const prompt = `Analyze the market sentiment of the following news text. Provide a score from 0 (very bearish) to 100 (very bullish) and a short one-sentence explanation in Turkish.
+            
+            Text: ${text.substring(0, 1000)}
+            
+            JSON format: {"score": number, "explanation": "string"}`;
 
-News:
-${newsSummaries}`;
-
-            const responseText = await aiService.generateContent(prompt, null);
-            const score = parseInt(responseText.trim(), 10);
-
-            if (!isNaN(score) && score >= 0 && score <= 100) {
-                return score;
-            } else {
-                console.error("Failed to parse AI response to a valid score:", responseText);
-                return 50;
+            const responseText = await aiService.generateContent(prompt, "gemini-flash-latest");
+            try {
+                let cleanJson = responseText.trim();
+                if (cleanJson.startsWith('```')) {
+                    cleanJson = cleanJson.replace(/^```json/, '').replace(/```$/, '').trim();
+                }
+                return JSON.parse(cleanJson);
+            } catch (e) {
+                return { score: 50, explanation: "Sentiment analizi yapılamadı." };
             }
         } catch (error) {
-            console.error("AI Sentiment Analysis Error:", error.message);
-            return 50; // default neutral
+            console.error('Sentiment Analysis Error:', error.message);
+            return { score: 50, explanation: "Hata oluştu." };
         }
     }
 }

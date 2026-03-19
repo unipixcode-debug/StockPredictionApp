@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Star, Crown, ChevronRight, Sparkles, ShieldCheck, Coins } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
@@ -7,68 +7,89 @@ import { useAuth } from '../_layout';
 
 const { width } = Dimensions.get('window');
 
+interface Package {
+    id: string;
+    name: string;
+    tokens: number;
+    price: string;
+    popular?: boolean;
+    features?: string[];
+}
+
 const CreditsScreen = () => {
     const { user, updateCredits } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [apiPackages, setApiPackages] = useState<Package[]>([]);
 
-    const packages = [
-        {
-            id: 'starter',
-            name: 'Başlangıç',
-            credits: 100,
-            price: '₺49.99',
-            icon: <Zap color="#60a5fa" size={24} />,
-            color: '#60a5fa',
-            popular: false
-        },
-        {
-            id: 'pro',
-            name: 'Profesyonel',
-            credits: 500,
-            price: '₺199.99',
-            icon: <Star color="#fbbf24" size={24} />,
-            color: '#fbbf24',
-            popular: true
-        },
-        {
-            id: 'whale',
-            name: 'Balina',
-            credits: 2000,
-            price: '₺699.99',
-            icon: <Crown color="#a78bfa" size={24} />,
-            color: '#a78bfa',
-            popular: false
+    const fetchPackages = async () => {
+        try {
+            const response = await fetch(`${Config.API_BASE}/admin/packages`);
+            const data = await response.json();
+            setApiPackages(data);
+        } catch (error) {
+            console.error('Error fetching packages:', error);
+            // Fallback list
+            setApiPackages([
+                { id: 'starter', name: 'Başlangıç', tokens: 100, price: '₺49.99' },
+                { id: 'pro', name: 'Profesyonel', tokens: 500, price: '₺199.99', popular: true },
+                { id: 'whale', name: 'Balina', tokens: 2000, price: '₺699.99' }
+            ]);
+        } finally {
+            setRefreshing(false);
         }
-    ];
+    };
 
-    const handlePurchase = async (pkg: any) => {
+    useEffect(() => {
+        fetchPackages();
+    }, []);
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchPackages();
+    };
+
+    const getIcon = (id: string, color: string) => {
+        const idLower = id.toLowerCase();
+        if (idLower.includes('starter')) return <Zap color={color} size={24} />;
+        if (idLower.includes('pro')) return <Star color={color} size={24} />;
+        if (idLower.includes('whale')) return <Crown color={color} size={24} />;
+        return <Sparkles color={color} size={24} />;
+    };
+
+    const getColor = (id: string) => {
+        const idLower = id.toLowerCase();
+        if (idLower.includes('starter')) return '#60a5fa';
+        if (idLower.includes('pro')) return '#fbbf24';
+        if (idLower.includes('whale')) return '#a78bfa';
+        return '#22d3ee';
+    };
+
+    const handlePurchase = async (pkg: Package) => {
         setLoading(true);
         try {
-            // Simulated payment delay
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // If Mock user, skip backend and update locally
-            if (user?.email === 'admin@predictpro.com') { // Using the email as a marker for the mock development account
-                updateCredits((user.credits || 0) + pkg.credits);
-                Alert.alert('Başarılı', `${pkg.credits} kredi (Mock) hesabınıza eklendi! ✨`);
-                return;
+            // Simulated delay for UI feedback
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // For now, simple credit addition (Simulation or Backend verify)
+            // If admin/dev, auto-approve
+            if (user?.role === 'admin' || user?.role === 'developer' || user?.email?.includes('admin')) {
+                const response = await fetch(`${Config.API_BASE}/auth/add-credits`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: pkg.tokens })
+                });
+                const data = await response.json();
+                if (data.newCredits !== undefined) {
+                    updateCredits(data.newCredits);
+                    Alert.alert('Başarılı', `${pkg.tokens} Token hesabınıza tanımlandı! ✨`);
+                }
+            } else {
+                Alert.alert('Ödeme Sistemi', 'Google Play ödeme penceresi açılıyor... (Simülasyon)');
             }
-
-            const response = await fetch(`${Config.API_BASE}/auth/add-credits`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: pkg.credits })
-            });
-
-            const data = await response.json();
-
-            if (data.newCredits !== undefined) {
-                updateCredits(data.newCredits);
-                Alert.alert('Başarılı', `${pkg.credits} kredi hesabınıza eklendi! ✨`);
-            }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Mobile Purchase Error:', error);
-            Alert.alert('Hata', 'İşlem sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+            Alert.alert('Hata', 'İşlem tamamlanamadı.');
         } finally {
             setLoading(false);
         }
@@ -77,58 +98,65 @@ const CreditsScreen = () => {
     return (
         <View style={styles.container}>
             <SafeAreaView style={styles.safeArea}>
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <ScrollView 
+                    contentContainerStyle={styles.scrollContent} 
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22d3ee" />}
+                >
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.headerIcon}>
                             <Sparkles color="#22d3ee" size={32} />
                         </View>
                         <Text style={styles.headerTitle}>Token Mağazası</Text>
-                        <Text style={styles.headerSubtitle}>AI tahminleri ve analizler için hesabınıza kredi yükleyin.</Text>
+                        <Text style={styles.headerSubtitle}>AI tahminleri ve analizler için hesabınıza kredi yükleyin. Paketler web sitesi ile senkronizedir.</Text>
                         
                         <View style={styles.balanceBadge}>
                             <Coins color="#f59e0b" size={16} />
-                            <Text style={styles.balanceText}>Güncel Bakiye: {user?.credits || 0}</Text>
+                            <Text style={styles.balanceText}>Güncel Bakiye: {user?.credits || 0} Token</Text>
                         </View>
                     </View>
 
                     {/* Packages */}
                     <View style={styles.packagesGrid}>
-                        {packages.map((pkg) => (
-                            <TouchableOpacity 
-                                key={pkg.id} 
-                                style={[styles.packageCard, pkg.popular && styles.popularCard]}
-                                onPress={() => handlePurchase(pkg)}
-                                disabled={loading}
-                            >
-                                {pkg.popular && (
-                                    <View style={styles.popularBadge}>
-                                        <Text style={styles.popularBadgeText}>EN POPÜLER</Text>
+                        {apiPackages.map((pkg) => {
+                            const pkgColor = getColor(pkg.id || pkg.name);
+                            return (
+                                <TouchableOpacity 
+                                    key={pkg.id || pkg.name} 
+                                    style={[styles.packageCard, pkg.popular && styles.popularCard]}
+                                    onPress={() => handlePurchase(pkg)}
+                                    disabled={loading}
+                                >
+                                    {pkg.popular && (
+                                        <View style={styles.popularBadge}>
+                                            <Text style={styles.popularBadgeText}>EN POPÜLER</Text>
+                                        </View>
+                                    )}
+                                    
+                                    <View style={styles.cardInfo}>
+                                        <View style={[styles.iconBox, { backgroundColor: pkgColor + '20' }]}>
+                                            {getIcon(pkg.id || pkg.name, pkgColor)}
+                                        </View>
+                                        <View style={styles.textContainer}>
+                                            <Text style={styles.packageName}>{pkg.name}</Text>
+                                            <Text style={styles.packageCredits}>{pkg.tokens} Token</Text>
+                                        </View>
                                     </View>
-                                )}
-                                
-                                <View style={styles.cardInfo}>
-                                    <View style={[styles.iconBox, { backgroundColor: pkg.color + '20' }]}>
-                                        {pkg.icon}
-                                    </View>
-                                    <View style={styles.textContainer}>
-                                        <Text style={styles.packageName}>{pkg.name}</Text>
-                                        <Text style={styles.packageCredits}>{pkg.credits} Token</Text>
-                                    </View>
-                                </View>
 
-                                <View style={styles.priceContainer}>
-                                    <Text style={styles.packagePrice}>{pkg.price}</Text>
-                                    <View style={styles.buyButtonCircle}>
-                                        {loading ? (
-                                            <ActivityIndicator size="small" color="#0f172a" />
-                                        ) : (
-                                            <ChevronRight color="#0f172a" size={20} />
-                                        )}
+                                    <View style={styles.priceContainer}>
+                                        <Text style={styles.packagePrice}>{pkg.price}</Text>
+                                        <View style={styles.buyButtonCircle}>
+                                            {loading ? (
+                                                <ActivityIndicator size="small" color="#0f172a" />
+                                            ) : (
+                                                <ChevronRight color="#0f172a" size={20} />
+                                            )}
+                                        </View>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
 
                     {/* Security Info */}
@@ -143,7 +171,7 @@ const CreditsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#0f172a' },
+    container: { flex: 1, backgroundColor: '#060d1a' },
     safeArea: { flex: 1 },
     scrollContent: { padding: 24, paddingBottom: 40 },
     header: { alignItems: 'center', marginBottom: 32 },
@@ -154,7 +182,9 @@ const styles = StyleSheet.create({
         borderRadius: 25, 
         alignItems: 'center', 
         justifyContent: 'center',
-        marginBottom: 16
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(34, 211, 238, 0.2)'
     },
     headerTitle: { fontSize: 28, fontWeight: '900', color: 'white', letterSpacing: -0.5 },
     headerSubtitle: { 
@@ -163,7 +193,7 @@ const styles = StyleSheet.create({
         textAlign: 'center', 
         marginTop: 8, 
         lineHeight: 20,
-        paddingHorizontal: 20 
+        paddingHorizontal: 10 
     },
     balanceBadge: { 
         flexDirection: 'row', 
@@ -203,7 +233,7 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         borderRadius: 8
     },
-    popularBadgeText: { fontSize: 10, fontWeight: '900', color: '#0f172a' },
+    popularBadgeText: { fontSize: 10, fontWeight: '900', color: '#060d1a' },
     cardInfo: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     iconBox: { 
         width: 50, 

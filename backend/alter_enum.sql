@@ -1,0 +1,1 @@
+ALTER TYPE "enum_AIProviders_type" ADD VALUE 'OLLAMA_CLOUD';

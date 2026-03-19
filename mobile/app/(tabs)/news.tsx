@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, StyleSheet, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Newspaper, ExternalLink, Calendar, Zap } from 'lucide-react-native';
+import { Newspaper, ExternalLink, Calendar, Zap, Clock } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 
 interface NewsItem {
@@ -17,10 +17,19 @@ const NewsScreen = () => {
     const [news, setNews] = useState<NewsItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [timeframe, setTimeframe] = useState(7);
+
+    const timeframes = [
+        { label: 'Bugün', value: 1 },
+        { label: '3 Gün', value: 3 },
+        { label: '7 Gün', value: 7 },
+        { label: '1 Ay', value: 30 },
+        { label: '1 Yıl', value: 365 }
+    ];
 
     const fetchNews = async () => {
         try {
-            const response = await fetch(`${Config.API_BASE}${Config.ENDPOINTS.MARKET_NEWS}?lang=TR`);
+            const response = await fetch(`${Config.API_BASE}${Config.ENDPOINTS.MARKET_NEWS}?lang=TR&days=${timeframe}`);
             const data = await response.json();
             setNews(data);
         } catch (error) {
@@ -44,7 +53,7 @@ const NewsScreen = () => {
 
     useEffect(() => {
         fetchNews();
-    }, []);
+    }, [timeframe]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -60,75 +69,105 @@ const NewsScreen = () => {
         }
     };
 
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#22d3ee" />
-            </View>
-        );
-    }
-
     return (
         <View style={styles.container}>
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Haberler</Text>
+                    <View>
+                        <Text style={styles.headerTitle}>Haberler</Text>
+                        <Text style={styles.subTitle}>Yapay Zeka Destekli Bülten</Text>
+                    </View>
                     <TouchableOpacity onPress={onRefresh} style={styles.refreshBtn}>
                         <Zap size={20} color="#22d3ee" />
                     </TouchableOpacity>
+                </View>
+
+                {/* Timeframe Selector */}
+                <View style={styles.filterContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+                        {timeframes.map((tf) => (
+                            <TouchableOpacity
+                                key={tf.value}
+                                onPress={() => {
+                                    setTimeframe(tf.value);
+                                    setLoading(true);
+                                }}
+                                style={[
+                                    styles.filterBtn,
+                                    timeframe === tf.value && styles.activeFilterBtn
+                                ]}
+                            >
+                                <Text style={[
+                                    styles.filterText,
+                                    timeframe === tf.value && styles.activeFilterText
+                                ]}>{tf.label}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
                 </View>
 
                 <ScrollView 
                     style={styles.scrollView}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22d3ee" />}
                 >
-                    {news.map((item, index) => (
-                        <TouchableOpacity 
-                            key={index} 
-                            style={styles.newsCard}
-                            onPress={() => Linking.openURL(item.link)}
-                        >
-                            <View style={styles.cardHeader}>
-                                <View style={styles.sourceContainer}>
-                                    <View style={styles.sourceBadge}>
-                                        <Text style={styles.sourceText}>{item.sourceName || 'Piyasa'}</Text>
+                    {loading ? (
+                        <View style={styles.innerLoading}>
+                            <ActivityIndicator size="large" color="#22d3ee" />
+                        </View>
+                    ) : news.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                            <Newspaper size={48} color="rgba(255,255,255,0.1)" />
+                            <Text style={styles.emptyText}>Haber bulunamadı.</Text>
+                        </View>
+                    ) : (
+                        news.map((item, index) => (
+                            <TouchableOpacity 
+                                key={index} 
+                                style={styles.newsCard}
+                                onPress={() => Linking.openURL(item.link)}
+                            >
+                                <View style={styles.cardHeader}>
+                                    <View style={styles.sourceContainer}>
+                                        <View style={styles.sourceBadge}>
+                                            <Text style={styles.sourceText}>{item.sourceName || 'Piyasa'}</Text>
+                                        </View>
+                                        <View style={styles.dateRow}>
+                                            <Calendar size={10} color="rgba(255,255,255,0.4)" />
+                                            <Text style={styles.dateText}>{formatDate(item.pubDate)}</Text>
+                                        </View>
                                     </View>
-                                    <View style={styles.dateRow}>
-                                        <Calendar size={10} color="rgba(255,255,255,0.4)" />
-                                        <Text style={styles.dateText}>{formatDate(item.pubDate)}</Text>
-                                    </View>
-                                </View>
-                                
-                                {item.importanceScore && (
-                                    <View style={[
-                                        styles.scoreBadge,
-                                        { backgroundColor: item.importanceScore >= 80 ? 'rgba(244, 63, 94, 0.1)' : 'rgba(34, 211, 238, 0.1)' },
-                                        { borderColor: item.importanceScore >= 80 ? 'rgba(244, 63, 94, 0.3)' : 'rgba(34, 211, 238, 0.3)' }
-                                    ]}>
+                                    
+                                    {item.importanceScore && (
                                         <View style={[
-                                            styles.scoreDot,
-                                            { backgroundColor: item.importanceScore >= 80 ? '#f43f5e' : '#22d3ee' }
-                                        ]} />
-                                        <Text style={[
-                                            styles.scoreText,
-                                            { color: item.importanceScore >= 80 ? '#f43f5e' : '#22d3ee' }
-                                        ]}>ÖNEM: {item.importanceScore}</Text>
-                                    </View>
+                                            styles.scoreBadge,
+                                            { backgroundColor: item.importanceScore >= 80 ? 'rgba(244, 63, 94, 0.1)' : 'rgba(34, 211, 238, 0.1)' },
+                                            { borderColor: item.importanceScore >= 80 ? 'rgba(244, 63, 94, 0.3)' : 'rgba(34, 211, 238, 0.3)' }
+                                        ]}>
+                                            <View style={[
+                                                styles.scoreDot,
+                                                { backgroundColor: item.importanceScore >= 80 ? '#f43f5e' : '#22d3ee' }
+                                            ]} />
+                                            <Text style={[
+                                                styles.scoreText,
+                                                { color: item.importanceScore >= 80 ? '#f43f5e' : '#22d3ee' }
+                                            ]}>ÖNEM: {item.importanceScore}</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                <Text style={styles.newsTitle}>{item.title}</Text>
+                                {item.contentSnippet && (
+                                    <Text style={styles.newsSnippet} numberOfLines={2}>{item.contentSnippet}</Text>
                                 )}
-                            </View>
 
-                            <Text style={styles.newsTitle}>{item.title}</Text>
-                            {item.contentSnippet && (
-                                <Text style={styles.newsSnippet} numberOfLines={2}>{item.contentSnippet}</Text>
-                            )}
-
-                            <View style={styles.cardFooter}>
-                                <Text style={styles.readMore}>Haberin Devamı</Text>
-                                <ExternalLink size={14} color="#22d3ee" />
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                    <View style={{ height: 40 }} />
+                                <View style={styles.cardFooter}>
+                                    <Text style={styles.readMore}>Haberin Devamı</Text>
+                                    <ExternalLink size={14} color="#22d3ee" />
+                                </View>
+                            </TouchableOpacity>
+                        ))
+                    )}
+                    <View style={{ height: 100 }} />
                 </ScrollView>
             </SafeAreaView>
         </View>
@@ -139,10 +178,20 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#060d1a' },
     safeArea: { flex: 1 },
     loadingContainer: { flex: 1, backgroundColor: '#060d1a', justifyContent: 'center', alignItems: 'center' },
+    innerLoading: { paddingVertical: 50 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15 },
     headerTitle: { fontSize: 28, fontWeight: '900', color: 'white', letterSpacing: -0.5 },
+    subTitle: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '600', marginTop: -2 },
     refreshBtn: { width: 44, height: 44, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+    filterContainer: { marginBottom: 15, paddingLeft: 16 },
+    filterScroll: { paddingRight: 16, gap: 10 },
+    filterBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+    activeFilterBtn: { backgroundColor: '#22d3ee', borderColor: '#22d3ee' },
+    filterText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
+    activeFilterText: { color: '#060d1a' },
     scrollView: { flex: 1, paddingHorizontal: 16 },
+    emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 100, gap: 10 },
+    emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: '700' },
     newsCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
     sourceContainer: { gap: 6 },

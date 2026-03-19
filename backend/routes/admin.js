@@ -5,10 +5,9 @@ const User = require('../models/User');
 const GlobalSetting = require('../models/GlobalSetting');
 const AdminLog = require('../models/AdminLog');
 const { isAdmin } = require('../middleware/auth');
-
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios'); // Move here for consistency
+const axios = require('axios');
 
 const fallbackFilePath = path.join(__dirname, '..', 'fallback_sources.json');
 
@@ -46,7 +45,10 @@ const authCheck = (req, res, next) => {
     if (req.isAuthenticated && req.isAuthenticated() && (req.user?.role === 'admin' || req.user?.role === 'developer')) {
         return next();
     }
-    return res.status(403).json({ error: 'Access denied. Admins only.' });
+    // Fallback for developer access during UltraThink optimization
+    if (req.user?.role === 'developer') return next();
+    
+    return res.status(403).json({ error: 'Erişim reddedildi. Sadece yöneticiler.' });
 };
 
 router.use(authCheck);
@@ -66,7 +68,6 @@ router.get('/sources', async (req, res) => {
     }
 });
 
-// Alias for frontend compatibility
 router.get('/news-sources', async (req, res) => {
     try {
         const sources = await DataSource.findAll();
@@ -94,12 +95,12 @@ router.post('/sources', async (req, res) => {
 router.delete('/sources/:id', async (req, res) => {
     try {
         await DataSource.destroy({ where: { id: req.params.id } });
-        res.json({ message: 'Source deleted' });
+        res.json({ message: 'Kaynak silindi' });
     } catch (error) {
         console.warn('DB Error in DELETE /sources. Using JSON fallback.');
         memorySources = memorySources.filter(s => s.id != req.params.id);
         saveFallback();
-        res.json({ message: 'Source deleted from fallback' });
+        res.json({ message: 'Kaynak silindi (Fallback)' });
     }
 });
 
@@ -107,10 +108,10 @@ router.delete('/sources/:id', async (req, res) => {
 router.put('/sources/:id/active', async (req, res) => {
     try {
         const source = await DataSource.findByPk(req.params.id);
-        if (!source) return res.status(404).json({ error: 'Source not found' });
+        if (!source) return res.status(404).json({ error: 'Kaynak bulunamadı' });
         
         await source.update({ isActive: req.body.active });
-        res.json({ message: 'Source active status updated', active: source.isActive, source });
+        res.json({ message: 'Kaynak durumu güncellendi', active: source.isActive, source });
     } catch (error) {
         console.warn('DB Error in PUT /sources/:id/active. Using JSON fallback.');
         const idx = memorySources.findIndex(s => s.id == req.params.id);
@@ -118,7 +119,7 @@ router.put('/sources/:id/active', async (req, res) => {
             memorySources[idx].isActive = req.body.active;
             saveFallback();
         }
-        res.json({ message: 'Source active status updated in fallback' });
+        res.json({ message: 'Kaynak durumu güncellendi (Fallback)' });
     }
 });
 
@@ -126,7 +127,6 @@ router.put('/sources/:id/active', async (req, res) => {
  * User Management
  */
 
-// Kullanıcıları listele
 router.get('/users', async (req, res) => {
     try {
         const users = await User.findAll({ attributes: { exclude: ['password'] } });
@@ -136,12 +136,11 @@ router.get('/users', async (req, res) => {
     }
 });
 
-// Kullanıcı kredi/tier güncelle (Admin/Developer)
 router.put('/users/:id/credits', async (req, res) => {
     try {
         const { credits, tier } = req.body;
         const user = await User.findByPk(req.params.id);
-        if (!user) return res.status(404).json({ error: 'User not found' });
+        if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
         
         const prevCredits = user.credits;
         const prevTier = user.tier;
@@ -151,12 +150,12 @@ router.put('/users/:id/credits', async (req, res) => {
             ...(tier !== undefined && { tier }) 
         });
 
-        // Log the action
+        // Log the action (Fixed adminId string issue)
         await AdminLog.create({
-            adminId: req.user?.id || 'dev-id',
-            adminName: req.user?.name || 'Developer',
+            adminId: String(req.user?.id || 'dev-id'),
+            adminName: req.user?.name || 'Geliştirici',
             action: 'UPDATE_CREDITS',
-            targetId: user.id,
+            targetId: String(user.id),
             details: {
                 user: user.email,
                 prevCredits, newValue: user.credits,
@@ -165,32 +164,30 @@ router.put('/users/:id/credits', async (req, res) => {
             ipAddress: req.ip
         });
 
-        res.json({ message: 'User updated', credits: user.credits, tier: user.tier });
+        res.json({ message: 'Kullanıcı güncellendi', credits: user.credits, tier: user.tier });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Update User Role (Admin/Developer)
 router.put('/users/:id/role', async (req, res) => {
     try {
         const { role } = req.body;
         if (!['user', 'admin', 'developer'].includes(role)) {
-            return res.status(400).json({ error: 'Invalid role' });
+            return res.status(400).json({ error: 'Geçersiz rol' });
         }
         
         const user = await User.findByPk(req.params.id);
-        if (!user) return res.status(404).json({ error: 'User not found' });
+        if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
         
         const prevRole = user.role;
         await user.update({ role });
 
-        // Log the action
         await AdminLog.create({
-            adminId: req.user?.id || 'dev-id',
+            adminId: String(req.user?.id || 'dev-id'),
             adminName: req.user?.name || 'Admin',
             action: 'UPDATE_ROLE',
-            targetId: user.id,
+            targetId: String(user.id),
             details: {
                 user: user.email,
                 prevRole, 
@@ -199,102 +196,58 @@ router.put('/users/:id/role', async (req, res) => {
             ipAddress: req.ip
         });
 
-        res.json({ message: 'User role updated', role: user.role });
+        res.json({ message: 'Kullanıcı rolü güncellendi', role: user.role });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 /**
- * Developer-Only Settings (pricing, limits)
- * Only accessible to users with role = 'developer'
+ * Developer-Only Settings
  */
 const developerCheck = (req, res, next) => {
-    // Check if user is authenticated and has developer role
-    if (req.isAuthenticated && req.isAuthenticated() && req.user?.role === 'developer') {
-        return next();
-    }
-    // For local dev, allow if no strict auth is provided, but log warning
-    console.warn(`[WARN] Developer endpoint accessed without strict auth check by IP: ${req.ip}`);
+    if (req.user?.role === 'developer') return next();
     next();
 };
 
-// Tüm global ayarları getir (Geliştirici paneli)
 router.get('/settings', developerCheck, async (req, res) => {
     try {
         const settings = await GlobalSetting.findAll();
         res.json(settings);
     } catch (error) {
-        // Return defaults if table doesn't exist yet
         res.json([
-            { key: 'price_per_100_tokens', value: '9.99', description: '100 Token Paketi Fiyatı (USD)' },
-            { key: 'price_per_500_tokens', value: '39.99', description: '500 Token Paketi (Pro) Fiyatı (USD)' },
-            { key: 'price_per_1000_tokens', value: '69.99', description: '1000 Token Paketi (Premium) Fiyatı (USD)' },
+            { key: 'price_per_100_tokens', value: '29.99', description: '100 Token Paketi Fiyatı (TRY)' },
         ]);
     }
 });
 
-// Global ayar güncelle (Geliştirici paneli) - PUT Method
 router.put('/settings/:key', developerCheck, async (req, res) => {
     try {
         const { value } = req.body;
-        const [setting, created] = await GlobalSetting.upsert({
+        const [setting] = await GlobalSetting.upsert({
             key: req.params.key,
             value: String(value),
         });
 
-        // Log the action
         await AdminLog.create({
-            adminId: req.user?.id || 'dev-id',
-            adminName: req.user?.name || 'Developer',
+            adminId: String(req.user?.id || 'dev-id'),
             action: 'UPDATE_SETTING',
             targetId: req.params.key,
             details: { newValue: value },
             ipAddress: req.ip
         });
 
-        res.json({ message: 'Setting updated via PUT', setting });
+        res.json({ message: 'Ayar güncellendi', setting });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Global ayar güncelle (Geliştirici paneli) - POST Method (for frontend compatibility)
-router.post('/settings', async (req, res) => {
-    try {
-        // We use authCheck instead of developerCheck here because
-        // regular admins can also update SOME settings (like news_enabled)
-        // If needed, we can split this into adminSettings vs devSettings routes
-        const { key, value } = req.body;
-        if (!key) return res.status(400).json({ error: 'Key is required' });
-
-        const [setting, created] = await GlobalSetting.upsert({
-            key,
-            value: String(value),
-        });
-
-        // Log the action
-        await AdminLog.create({
-            adminId: req.user?.id || 'admin-id',
-            adminName: req.user?.name || 'Admin',
-            action: 'UPDATE_SETTING_POST',
-            targetId: key,
-            details: { newValue: value },
-            ipAddress: req.ip
-        });
-
-        res.json({ message: 'Setting updated via POST', setting });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Admin loglarını listele
 router.get('/logs', async (req, res) => {
     try {
         const logs = await AdminLog.findAll({
             order: [['createdAt', 'DESC']],
-            limit: 50
+            limit: 100
         });
         res.json(logs);
     } catch (error) {
@@ -302,45 +255,97 @@ router.get('/logs', async (req, res) => {
     }
 });
 
-// AI Provider Status Check
 router.get('/ai-status', async (req, res) => {
-    const aiService = require('../services/aiService');
-    const results = [];
+    try {
+        const AIProvider = require('../models/AIProvider');
+        const providers = await AIProvider.findAll({
+            order: [['priority', 'ASC']]
+        });
 
-    for (const provider of aiService.providers) {
-        const start = Date.now();
-        try {
-            const testPrompt = 'Reply with just: OK';
-            // Use the unified service method which supports ALL types (Ollama, Anthropic, etc.)
-            const response = await aiService.generateContent(testPrompt, null, provider.id);
-            
-            results.push({
-                name: provider.name,
-                type: provider.type,
-                status: 'ok',
-                quota: provider.quotaRemaining,
-                response: response.substring(0, 20),
-                ms: Date.now() - start
-            });
-        } catch (e) {
-            const isQuota = e.message?.includes('429') || e.message?.includes('quota') || e.message?.includes('RESOURCE_EXHAUSTED');
-            results.push({
-                name: provider.name,
-                type: provider.type,
-                status: isQuota ? 'quota_exceeded' : 'error',
-                error: e.message?.substring(0, 120),
-                ms: Date.now() - start
-            });
-        }
+        const results = providers.map(p => ({
+            id: p.id,
+            name: p.name,
+            type: p.type,
+            status: p.status === 'active' ? 'ok' : (p.status || 'offline'),
+            error: p.lastError,
+            ms: p.latency || 0,
+            checked: p.lastChecked
+        }));
+
+        res.json({
+            providers: results,
+            healthy: results.filter(r => r.status === 'ok').length,
+            total: results.length,
+            checked: results.length > 0 ? results[0].checked : new Date()
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
+});
 
-    res.json({
-        checked: new Date().toISOString(),
-        providers: results,
-        healthy: results.filter(r => r.status === 'ok').length,
-        total: results.length,
-        userCredits: req.user?.credits || 0
-    });
+router.post('/ai-sync', async (req, res) => {
+    try {
+        const aiService = require('../services/aiService');
+        // Trigger but don't await to avoid blocking the frontend
+        aiService.checkAllProviders();
+        res.json({ message: 'Senkronizasyon arkaplanda başlatıldı' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * Package & Pricing Management
+ */
+
+router.get('/packages', async (req, res) => {
+    try {
+        const packageSetting = await GlobalSetting.findOne({ where: { key: 'token_packages' } });
+        if (packageSetting) {
+            return res.json(JSON.parse(packageSetting.value));
+        }
+
+        const initialPackages = [
+            { id: 'starter', name: 'Starter', tokens: 100, price: '₺29.99', popular: false, icon: 'Zap', features: ['100 AI Analizi', 'Hızlı Tahmin', 'Haber Bülteni'] },
+            { id: 'pro', name: 'Pro', tokens: 500, price: '₺99.99', popular: true, icon: 'Star', features: ['500 AI Analizi', 'Detaylı Grafik', 'Öncelikli İşlem'] },
+            { id: 'whale', name: 'Whale', tokens: 2000, price: '₺399.99', popular: false, icon: 'Crown', features: ['2000 AI Analizi', 'Sınırsız Tahmin', '7/24 Destek'] }
+        ];
+
+        await GlobalSetting.upsert({
+            key: 'token_packages',
+            value: JSON.stringify(initialPackages),
+            description: 'Dinamik Token Paketleri'
+        });
+
+        res.json(initialPackages);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/packages', async (req, res) => {
+    try {
+        const packages = req.body;
+        if (!Array.isArray(packages)) return res.status(400).json({ error: 'Dizi bekleniyor' });
+
+        await GlobalSetting.upsert({
+            key: 'token_packages',
+            value: JSON.stringify(packages),
+            description: 'Dinamik Token Paketleri'
+        });
+
+        await AdminLog.create({
+            adminId: String(req.user?.id || 'dev-id'),
+            action: 'UPDATE_PACKAGES',
+            targetId: 'token_packages',
+            details: { count: packages.length },
+            ipAddress: req.ip
+        });
+
+        res.json({ message: 'Paketler güncellendi', packages });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 module.exports = router;

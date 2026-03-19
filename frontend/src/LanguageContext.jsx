@@ -101,7 +101,13 @@ const translations = {
     OtherSource: "Diğer Kaynak",
     NoSnippet: "Haber detayı için kaynağa gidiniz.",
     AIRead: "Yapay Zeka Okuması",
-    GoToSource: "Kaynağa Git"
+    GoToSource: "Kaynağa Git",
+    DateFilter: "Tarih Filtresi",
+    Today: "Bugün",
+    Days3: "3 Gün",
+    Days7: "7 Gün",
+    Month1: "1 Ay",
+    Year1: "1 Yıl"
   },
   EN: {
     // Sidebar
@@ -201,7 +207,13 @@ const translations = {
     OtherSource: "Other Source",
     NoSnippet: "Visit the source for news details.",
     AIRead: "AI Interpretation",
-    GoToSource: "Go to Source"
+    GoToSource: "Go to Source",
+    DateFilter: "Date Filter",
+    Today: "Today",
+    Days3: "3 Days",
+    Days7: "7 Days",
+    Month1: "1 Month",
+    Year1: "1 Year"
   }
 };
 
@@ -219,6 +231,7 @@ export function LanguageProvider({ children }) {
   };
 
   const t = (key) => {
+    if (!translations[language]) return key;
     return translations[language][key] || key;
   };
 
