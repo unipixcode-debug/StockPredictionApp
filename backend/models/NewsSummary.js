@@ -15,6 +15,22 @@ const NewsSummary = sequelize.define('NewsSummary', {
         type: DataTypes.TEXT,
         allowNull: true
     },
+    titleTR: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    titleEN: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    snippetTR: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    snippetEN: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     importanceScore: {
         type: DataTypes.INTEGER,
         allowNull: true

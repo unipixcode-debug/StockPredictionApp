@@ -274,7 +274,7 @@ const AdminPanel = () => {
       </header>
 
       {/* Tab Navigation */}
-      <div className="flex items-center space-x-1 p-1 bg-secondary/20 rounded-[1.5rem] w-fit border border-border/40">
+      <div className="flex items-center space-x-1 p-1 bg-secondary/20 rounded-3xl w-fit border border-border/40">
         <button className="px-8 py-3 rounded-[1.2rem] text-xs font-black uppercase tracking-widest bg-primary text-primary-foreground shadow-lg">
            Genel Ayarlar
         </button>

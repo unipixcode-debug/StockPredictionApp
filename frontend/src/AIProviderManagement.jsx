@@ -221,7 +221,8 @@ const AIProviderManagement = () => {
                                         <option value="GEMINI">GOOGLE GEMINI</option>
                                         <option value="DEEPSEEK">DEEPSEEK</option>
                                         <option value="OPENAI">OPENAI (GPT)</option>
-                                        <option value="OLLAMA">OLLAMA</option>
+                                        <option value="OLLAMA">OLLAMA (LOCAL)</option>
+                                        <option value="OLLAMA_CLOUD">OLLAMA CLOUD</option>
                                         <option value="ANTHROPIC">ANTHROPIC (CLAUDE)</option>
                                         <option value="GROQ">GROQ</option>
                                         <option value="MISTRAL">MISTRAL AI</option>
@@ -237,7 +238,11 @@ const AIProviderManagement = () => {
                                         type="password" 
                                         required
                                         className="premium-input w-full"
-                                        placeholder={(editingProvider ? editingProvider.type : newProvider.type) === 'OLLAMA' ? 'http://localhost:11434' : 'sk-...'}
+                                        placeholder={(editingProvider ? editingProvider.type : newProvider.type) === 'OLLAMA' 
+                                            ? 'http://localhost:11434' 
+                                            : (editingProvider ? editingProvider.type : newProvider.type) === 'OLLAMA_CLOUD'
+                                            ? 'Ollama Cloud API Key'
+                                            : 'sk-...'}
                                         value={editingProvider ? editingProvider.apiKey : newProvider.apiKey}
                                         onChange={(e) => editingProvider ? setEditingProvider({...editingProvider, apiKey: e.target.value}) : setNewProvider({...newProvider, apiKey: e.target.value})}
                                     />

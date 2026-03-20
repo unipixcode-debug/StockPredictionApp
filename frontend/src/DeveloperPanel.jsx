@@ -100,7 +100,12 @@ const DeveloperPanel = () => {
     setLoadingPackages(true);
     try {
       const data = await api.get('/admin/packages');
-      setPackageSettings(data);
+      // Ensure every package has an ID to prevent deletion bugs
+      const normalizedData = (data || []).map((pkg, idx) => ({
+        ...pkg,
+        id: pkg.id || `pkg_init_${idx}_${Date.now()}`
+      }));
+      setPackageSettings(normalizedData);
     } catch (e) {
       console.error('Error fetching packages:', e);
     } finally {
@@ -137,8 +142,23 @@ const DeveloperPanel = () => {
     }]);
   };
 
-  const removePackage = (id) => {
-    setPackageSettings(packageSettings.filter(p => p.id !== id));
+  const removePackage = async (id) => {
+    if (window.confirm('Bu paketi kalıcı olarak silmek istediğinize emin misiniz?')) {
+      const newPackages = packageSettings.filter(p => p.id !== id);
+      setPackageSettings(newPackages);
+      
+      setSavingCost(true);
+      try {
+        await api.post('/admin/packages', newPackages);
+        setCostSaved(true);
+        setTimeout(() => setCostSaved(false), 3000);
+      } catch (e) {
+        console.error('Error deleting package:', e);
+        alert('Paket silinirken bir hata oluştu');
+      } finally {
+        setSavingCost(false);
+      }
+    }
   };
 
   const updatePackage = (id, field, value) => {
@@ -182,7 +202,7 @@ const DeveloperPanel = () => {
       </header>
 
       {/* Tab Navigation */}
-      <div className="flex items-center space-x-1 p-1 bg-secondary/20 rounded-[1.5rem] w-fit border border-border/40">
+      <div className="flex items-center space-x-1 p-1 bg-secondary/20 rounded-3xl w-fit border border-border/40">
         <button 
             onClick={() => navigate('/admin')}
             className="px-8 py-3 rounded-[1.2rem] text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all"
@@ -205,7 +225,7 @@ const DeveloperPanel = () => {
             <Link to="/ai-management" className="flex items-center space-x-6 group/link cursor-pointer">
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full scale-0 group-hover/link:scale-150 transition-transform duration-500" />
-                <div className="p-6 lg:p-8 rounded-4xl bg-gradient-to-br from-card to-secondary/30 border border-border/50 shadow-2xl backdrop-blur-xl group hover:border-primary/30 transition-all duration-500">
+                <div className="p-6 lg:p-8 rounded-4xl bg-linear-to-br from-card to-secondary/30 border border-border/50 shadow-2xl backdrop-blur-xl group hover:border-primary/30 transition-all duration-500">
                   <Bot className="text-primary animate-pulse" size={28} />
                 </div>
               </div>
@@ -250,9 +270,9 @@ const DeveloperPanel = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
                   className={`p-5 rounded-3xl border transition-all duration-500 overflow-hidden relative ${
-                    p.status === 'ok' ? 'bg-emerald-500/[0.03] border-emerald-500/20 hover:border-emerald-500/50' :
-                    p.status === 'quota_exceeded' ? 'bg-amber-500/[0.03] border-amber-500/20 hover:border-amber-500/50' :
-                    'bg-rose-500/[0.03] border-rose-500/20 hover:border-rose-500/50'
+                    p.status === 'ok' ? 'bg-emerald-500/3 border-emerald-500/20 hover:border-emerald-500/50' :
+                    p.status === 'quota_exceeded' ? 'bg-amber-500/3 border-amber-500/20 hover:border-amber-500/50' :
+                    'bg-rose-500/3 border-rose-500/20 hover:border-rose-500/50'
                   }`}
                 >
                   {/* Quota Badge if exists */}
@@ -359,10 +379,10 @@ const DeveloperPanel = () => {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-               <div className="flex items-center space-x-4 p-4 rounded-3xl bg-secondary/10 border border-white/5">
+               <button onClick={addPackage} className="flex items-center space-x-4 p-4 rounded-3xl bg-secondary/10 border border-white/5 hover:bg-secondary/30 transition-all cursor-pointer">
                  <Plus size={14} />
                  <span>Yeni Ekle</span>
-               </div>
+               </button>
                <button 
                 onClick={saveAllPackages}
                 disabled={savingCost}
@@ -389,7 +409,7 @@ const DeveloperPanel = () => {
                 <div key={pkg.id || idx} className="p-6 rounded-4xl bg-secondary/10 border border-border/50 relative group transition-all hover:border-cyan-500/30">
                   <button 
                     onClick={() => removePackage(pkg.id)}
-                    className="absolute top-4 right-4 p-2 rounded-xl bg-rose-500/10 text-rose-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white"
+                    className="absolute top-4 right-4 p-2 rounded-xl bg-rose-500/10 text-rose-500 opacity-50 hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white z-50 cursor-pointer"
                   >
                     <Trash2 size={14} />
                   </button>

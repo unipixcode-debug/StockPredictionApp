@@ -1,13 +1,14 @@
-const marketDataService = require('./marketDataService');
+﻿const marketDataService = require('./marketDataService');
 const newsService = require('./newsService');
 const Prediction = require('../models/Prediction');
 const aiService = require('./aiService');
 const yahooFinance = require('yahoo-finance2').default;
+yahooFinance.setGlobalConfig({ validation: { logErrors: false, throwOnError: false } });
 
 class PredictionEngine {
     /**
-     * Bütüncül Tahmin Analizi
-     * @param {string} symbol - Örn: 'AAPL', 'BTC-USD', 'THYAO.IS'
+     * BÃ¼tÃ¼ncÃ¼l Tahmin Analizi
+     * @param {string} symbol - Ã–rn: 'AAPL', 'BTC-USD', 'THYAO.IS'
      * @param {string} market - 'US', 'CRYPTO', 'BIST'
      * @param {string} userId - Owner user ID
      */
@@ -83,7 +84,7 @@ class PredictionEngine {
                 const prompt = `Provide 2 sentences in Turkish analyzing ${symbol} (${market}). Current trend is ${direction}. Score: ${Math.round(finalScore)}/100. Be professional.`;
                 reasoning = await aiService.generateContent(prompt, null);
             } catch (aiErr) {
-                reasoning = `${symbol} için ${direction} sinyali. Güven: %${Math.round(finalScore)}. Pazar baskısı: ${pressureScore}`;
+                reasoning = `${symbol} iÃ§in ${direction} sinyali. GÃ¼ven: %${Math.round(finalScore)}. Pazar baskÄ±sÄ±: ${pressureScore}`;
             }
 
             // 6. DB Persistence (CRITICAL FIX)
@@ -115,3 +116,4 @@ class PredictionEngine {
 }
 
 module.exports = new PredictionEngine();
+

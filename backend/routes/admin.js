@@ -336,6 +336,7 @@ router.post('/packages', async (req, res) => {
 
         await AdminLog.create({
             adminId: String(req.user?.id || 'dev-id'),
+            adminName: req.user?.name || req.user?.email || 'Geliştirici',
             action: 'UPDATE_PACKAGES',
             targetId: 'token_packages',
             details: { count: packages.length },

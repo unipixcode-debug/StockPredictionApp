@@ -81,7 +81,8 @@ router.get('/news', async (req, res) => {
         const { lang, days } = req.query;
         const daysInt = parseInt(days) || 7; // Default 7 days
         
-        const news = await newsService.fetchLatestNews(daysInt);
+        const requestedLang = (lang || '').toUpperCase() === 'TR' ? 'TR' : 'EN';
+        const news = await newsService.fetchLatestNews(daysInt, requestedLang);
         res.json(news);
     } catch (error) {
         console.error('News API error:', error);
@@ -145,11 +146,20 @@ router.get('/read-article', async (req, res) => {
         const analysis = await aiService.summarizeAndTranslateArticle(cleanText);
 
         // 3. Save to DB for future use
+        console.log(`💾 Saving generated TR summary for: ${url}`);
+        
+        // Find existing to preserve importanceScore
+        const existingRecord = await NewsSummary.findOne({ where: { url } });
+        
         await NewsSummary.upsert({
             url: url,
-            summaryTR: analysis.tr,
-            summaryEN: analysis.en,
-            importanceScore: 50 // Default
+            summaryTR: analysis.tr || analysis.summaryTR || analysis.TurkishSummary || analysis.turkish_summary || '',
+            summaryEN: analysis.en || analysis.summaryEN || analysis.EnglishSummary || analysis.english_summary || '',
+            importanceScore: existingRecord ? existingRecord.importanceScore : 50,
+            titleTR: existingRecord?.titleTR,
+            titleEN: existingRecord?.titleEN,
+            snippetTR: existingRecord?.snippetTR,
+            snippetEN: existingRecord?.snippetEN
         });
 
         res.json({

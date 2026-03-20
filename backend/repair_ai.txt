@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+﻿const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { OpenAI } = require('openai');
 const axios = require('axios');
 const emailService = require('./emailService');
@@ -24,7 +24,7 @@ class AIService {
 
             // 2. Seed from ENV if DB is empty (First run)
             if (dbProviders.length === 0) {
-                console.log('🌱 No AI providers in DB, seeding from ENV...');
+                console.log('ğŸŒ± No AI providers in DB, seeding from ENV...');
                 const seedData = [];
                 
                 // Deepseek (Primary)
@@ -85,7 +85,7 @@ class AIService {
     }
 
     async checkAllProviders() {
-        console.log("🌐 Starting background AI health check...");
+        console.log("ğŸŒ Starting background AI health check...");
         const AIProvider = require('../models/AIProvider');
         
         for (const provider of this.providers) {
@@ -120,7 +120,7 @@ class AIService {
             // Small delay between tests
             await new Promise(r => setTimeout(r, 2000));
         }
-        console.log("✅ Background AI health check completed.");
+        console.log("âœ… Background AI health check completed.");
     }
 
     async generateContent(prompt, modelOverride = null, providerId = null) {
@@ -335,7 +335,7 @@ class AIService {
 
         // If we get here, all providers failed
         if (this.isQuotaError(lastError)) {
-            emailService.sendQuotaExhaustedAlert('Tüm Mevcut AI Sağlayıcıları').catch(err => console.error('Silent alert failure:', err.message));
+            emailService.sendQuotaExhaustedAlert('TÃ¼m Mevcut AI SaÄŸlayÄ±cÄ±larÄ±').catch(err => console.error('Silent alert failure:', err.message));
         }
 
         throw new Error("All AI providers failed. Last error: " + (lastError && lastError.message ? lastError.message : 'Unknown'));
@@ -432,8 +432,8 @@ class AIService {
             
             Return ONLY a valid JSON object with the following structure:
             {
-              "tr": "# 🇹🇷 Türkçe Özet\\n\\n**Özet:**\\n[summary text here...]",
-              "en": " # 🇬🇧 English Summary\\n\\n**Summary:**\\n[summary text here...]"
+              "tr": "# ğŸ‡¹ğŸ‡· TÃ¼rkÃ§e Ã–zet\\n\\n**Ã–zet:**\\n[summary text here...]",
+              "en": " # ğŸ‡¬ğŸ‡§ English Summary\\n\\n**Summary:**\\n[summary text here...]"
             }
 
             Article Text:
@@ -452,7 +452,7 @@ class AIService {
                     const parsed = JSON.parse(cleanJson);
                     // Standardize field names just in case Gemini gets creative
                     return {
-                        tr: parsed.tr || parsed.summaryTR || parsed.TurkishSummary || parsed.turkish_summary || "Özet hazırlanamadı.",
+                        tr: parsed.tr || parsed.summaryTR || parsed.TurkishSummary || parsed.turkish_summary || "Ã–zet hazÄ±rlanamadÄ±.",
                         en: parsed.en || parsed.summaryEN || parsed.EnglishSummary || parsed.english_summary || "Summary not available."
                     };
                 }
@@ -460,8 +460,8 @@ class AIService {
             } catch (pErr) {
                 console.warn("[AI Summary] JSON Parsing failed, raw response:", responseText.substring(0, 200));
                 return { 
-                    tr: "# 🇹🇷 Türkçe Özet\n\n" + responseText, 
-                    en: "# 🇬🇧 English Summary\n\n" + responseText 
+                    tr: "# ğŸ‡¹ğŸ‡· TÃ¼rkÃ§e Ã–zet\n\n" + responseText, 
+                    en: "# ğŸ‡¬ğŸ‡§ English Summary\n\n" + responseText 
                 };
             }
         } catch (error) {
@@ -472,3 +472,4 @@ class AIService {
 }
 
 module.exports = new AIService();
+

@@ -35,7 +35,7 @@ export default function RootLayout() {
     } else if (user && isAuthPath) {
       console.log('Redirecting to dashboard because user is authenticated');
       // Navigate to the root of the tabs group
-      router.replace('/(tabs)');
+      router.replace('/' as any);
     }
   }, [user, segments]);
 
@@ -84,7 +84,7 @@ function GlobalCreditBadge({ credits }: { credits: number }) {
   return (
     <TouchableOpacity 
       activeOpacity={0.8}
-      onPress={() => router.push('/(tabs)/credits')}
+      onPress={() => router.push('/credits' as any)}
       style={[
         styles.badgeContainer, 
         { top: Math.max(insets.top, 10), right: 20 }

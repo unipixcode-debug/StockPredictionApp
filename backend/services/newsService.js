@@ -1,130 +1,94 @@
-const RSSParser = require('rss-parser');
-const parser = new RSSParser();
-const DataSource = require('../models/DataSource');
+const yahooFinance = require('yahoo-finance2').default;
 const NewsSummary = require('../models/NewsSummary');
 const aiService = require('./aiService');
 const { Op } = require('sequelize');
 
 class NewsService {
-    constructor() {
-        this.staticFeeds = [
-            'https://www.cnbc.com/id/10000664/device/rss/rss.html',
-            'https://www.cnbc.com/id/15839069/device/rss/rss.html',
-            'https://www.investing.com/rss/news_25.rss',
-            'https://cointelegraph.com/rss/tag/bitcoin',
-            'https://www.coindesk.com/arc/outboundfeeds/rss/',
-            'https://www.bloomberg.com/politics/feeds/site.xml',
-            'https://www.reutersagency.com/feed/?best-sectors=business-finance',
-            'https://www.marketwatch.com/rss/topstories'
-        ];
-        
-        // Mapping for better search results
-        this.searchMappings = {
-            'BTC-USD': 'Bitcoin Crypto',
-            'ETH-USD': 'Ethereum Crypto',
-            'AAPL': 'Apple Stock Finance',
-            'TSLA': 'Tesla Stock Finance',
-            'GC=F': 'Gold Price Market',
-            '^VIX': 'VIX Volatility Market'
-        };
-    }
-
-    calculateImportanceScore(item) {
-        let score = 50; // Base score
-        const text = (item.title + " " + (item.contentSnippet || "")).toLowerCase();
-        
-        // High impact keywords
-        const highImpactWords = ['fed', 'faiz', 'enflasyon', 'kriz', 'çöküş', 'ralli', 'merkez bankası', 'savaş', 'rates', 'inflation', 'crisis', 'crash', 'rally', 'central bank', 'war', 'ai', 'yapay zeka', 'bitcoin', 'bankruptcy', 'iflas'];
-        // Medium impact keywords
-        const mediumImpactWords = ['bilanço', 'kar', 'zarar', 'earnings', 'profit', 'loss', 'büyüme', 'growth', 'hisse', 'stock', 'piyasa', 'market', 'yatırım', 'investment'];
-
-        for (const word of highImpactWords) {
-            if (text.includes(word)) score += 15;
-        }
-        for (const word of mediumImpactWords) {
-            if (text.includes(word)) score += 8;
-        }
-
-        // Time decay (newer is more important)
-        const ageHours = (Date.now() - new Date(item.pubDate).getTime()) / (1000 * 60 * 60);
-        if (ageHours < 1) score += 20;
-        else if (ageHours < 4) score += 10;
-        else if (ageHours < 12) score += 5;
-        else if (ageHours > 24) score -= 10;
-        else if (ageHours > 72) score -= 30;
-
-        // Add a small pseudo-random variation based on title length to break ties and make it look natural
-        score += (item.title?.length || 0) % 5;
-
-        return Math.min(Math.max(score, 10), 99); // Cap between 10 and 99
-    }
-
-    async getFeedsWithNames() {
-        const defaultFeeds = [
-            { name: 'CNBC', url: 'https://www.cnbc.com/id/10000664/device/rss/rss.html' },
-            { name: 'CNBC Main', url: 'https://www.cnbc.com/id/15839069/device/rss/rss.html' },
-            { name: 'Investing.com', url: 'https://www.investing.com/rss/news_25.rss' },
-            { name: 'Cointelegraph', url: 'https://cointelegraph.com/rss/tag/bitcoin' },
-            { name: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
-            { name: 'Bloomberg', url: 'https://www.bloomberg.com/politics/feeds/site.xml' },
-            { name: 'Reuters', url: 'https://www.reutersagency.com/feed/?best-sectors=business-finance' },
-            { name: 'MarketWatch', url: 'https://www.marketwatch.com/rss/topstories' }
-        ];
-
-        let dynamicSources = [];
+    async fetchLatestNews(days = 7, targetLang = 'TR') {
         try {
-            dynamicSources = await DataSource.findAll({ where: { type: 'NEWS_RSS', isActive: true } });
-        } catch (dbError) {
-            console.warn('DB Error fetching dynamic feeds, falling back to JSON:', dbError.message);
-        }
+            console.log(`🔄 Fetching News (${targetLang})...`);
+            
+            // Yahoo Finance News Query
+            const result = await yahooFinance.search('Economy', { newsCount: 50 });
+            const rawNews = result.news || [];
+            
+            // Limit to top 50
+            const top50 = rawNews.slice(0, 50);
 
-        const dynamicFeeds = dynamicSources.map(s => ({ name: s.name, url: s.url }));
-        const allFeeds = [...defaultFeeds, ...dynamicFeeds];
-        const uniqueFeeds = Array.from(new Map(allFeeds.map(item => [item.url, item])).values());
-        
-        return uniqueFeeds;
-    }
+            // Intelligent Cache Check
+            if (targetLang === 'TR') {
+                const urls = top50.map(n => n.link).filter(Boolean);
+                const existingCache = await NewsSummary.findAll({
+                    where: { url: { [Op.in]: urls } }
+                });
+                const cacheMap = new Map(existingCache.map(c => [c.url, c]));
 
-    async fetchLatestNews(days = 7) {
-        try {
-            // First, cleanup news older than 1 year
-            await this.cleanupOldNews();
-
-            const feeds = await this.getFeedsWithNames();
-            let allItems = [];
-
-            const fetchPromises = feeds.map(async (feed) => {
-                try {
-                    const parsed = await parser.parseURL(feed.url);
-                    return parsed.items.map(item => ({
-                        ...item,
-                        sourceName: feed.name,
-                        importanceScore: this.calculateImportanceScore(item)
-                    }));
-                } catch (e) {
-                    console.error(`Error parsing feed ${feed.name}:`, e.message);
-                    return [];
+                const itemsToTranslate = [];
+                for (const item of top50) {
+                    if (!item.link) continue;
+                    const cached = cacheMap.get(item.link);
+                    if (!cached || !cached.titleTR) {
+                        itemsToTranslate.push(item);
+                    } else {
+                        item.titleTR = cached.titleTR;
+                        item.snippetTR = cached.snippetTR;
+                        item.importanceScore = cached.importanceScore;
+                    }
                 }
-            });
 
-            const results = await Promise.all(fetchPromises);
-            allItems = results.flat();
+                if (itemsToTranslate.length > 0) {
+                    console.log(`📝 Intelligent Cache: Requires TR translation for ${itemsToTranslate.length} new news items...`);
+                    try {
+                        const translatedChunk = await aiService.batchTranslateNews(itemsToTranslate, 'TR');
+                        for (let j = 0; j < itemsToTranslate.length; j++) {
+                            const original = itemsToTranslate[j];
+                            const translated = (translatedChunk && translatedChunk[j]) ? translatedChunk[j] : original; 
+                            
+                            const titleTR = translated.titleTR || original.title;
+                            const snippetTR = translated.snippetTR || original.contentSnippet || original.content || '';
 
-            // Filter by date (if days is provided)
-            if (days && days > 0) {
-                const cutoffDate = new Date();
-                cutoffDate.setDate(cutoffDate.getDate() - days);
-                allItems = allItems.filter(item => new Date(item.pubDate) >= cutoffDate);
+                            const [record, created] = await NewsSummary.findOrCreate({
+                                where: { url: original.link },
+                                defaults: {
+                                    url: original.link,
+                                    titleEN: original.title,
+                                    snippetEN: original.contentSnippet || original.content || '',
+                                    titleTR: titleTR,
+                                    snippetTR: snippetTR,
+                                    importanceScore: original.importanceScore || 50,
+                                    lastProcessed: new Date()
+                                }
+                            });
+
+                            if (!created) {
+                                await record.update({
+                                    titleEN: original.title,
+                                    snippetEN: original.contentSnippet || original.content || '',
+                                    titleTR: titleTR,
+                                    snippetTR: snippetTR,
+                                    importanceScore: original.importanceScore || 50,
+                                    lastProcessed: new Date()
+                                });
+                            }
+                            
+                            // Add to memory for immediate return
+                            original.titleTR = titleTR;
+                            original.snippetTR = snippetTR;
+                        }
+                    } catch (err) {
+                        console.error('Translation batch error:', err.message);
+                    }
+                }
             }
 
-            // Sort by importance then by date
-            allItems.sort((a, b) => {
-                const scoreDiff = (b.importanceScore || 0) - (a.importanceScore || 0);
-                if (Math.abs(scoreDiff) > 10) return scoreDiff;
-                return new Date(b.pubDate) - new Date(a.pubDate);
-            });
+            // UNIFIED RETURN: Always use the same structure so frontend doesn't break
+            return top50.map(item => ({
+                ...item,
+                title: (targetLang === 'TR' ? item.titleTR : item.title) || item.title,
+                contentSnippet: (targetLang === 'TR' ? item.snippetTR : (item.contentSnippet || item.content)) || item.contentSnippet || item.content,
+                isTranslated: !!item.titleTR && item.titleTR !== item.title
+            }));
 
-            return allItems.slice(0, 50); // Return top 50
         } catch (error) {
             console.error('FetchNews Error:', error.message);
             throw error;

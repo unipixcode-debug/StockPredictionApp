@@ -35,7 +35,7 @@ class EmailService {
 
             console.log('Alert email sent: %s', info.messageId);
         } catch (error) {
-            console.error('Error sending alert email:', error);
+            console.error('❌ CRITICAL: Email service failure (suppressed to prevent crash):', error.message);
         }
     }
 

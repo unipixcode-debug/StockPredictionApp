@@ -63,12 +63,13 @@ const News = () => {
   };
 
   useEffect(() => {
-    if (sourceQuery) {
-      setActiveSource(sourceQuery);
-    } else if (activeSource === t('AllSources') || activeSource === (language === 'TR' ? 'Tüm Kaynaklar' : 'All Sources')) {
+    // Reset source filter to "All" when language changes to prevent mismatch
+    if (!sourceQuery) {
         setActiveSource(t('AllSources'));
+    } else {
+        setActiveSource(sourceQuery);
     }
-  }, [sourceQuery, t, language]);
+  }, [language, t, sourceQuery]);
 
   const fetchNews = async () => {
     setLoading(true);
@@ -287,7 +288,7 @@ const News = () => {
                         </div>
                     </div>
                     
-                    <div className="ml-auto self-start">
+                    <div className="ml-auto self-start flex items-center space-x-2">
                         <div className={`
                             flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-dashed
                             ${item.importanceScore >= 80 ? 'bg-rose-500/10 border-rose-500/30 text-rose-500' : 
@@ -301,6 +302,15 @@ const News = () => {
                             <span className="text-[10px] font-black uppercase tracking-widest">
                                 {language === 'TR' ? 'ÖNEM:' : 'SCORE:'} {item.importanceScore || 50}
                             </span>
+                        </div>
+                        {/* Visual Flags for Database Verification - Made much more obvious */}
+                        <div className={`
+                            w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-lg border-2 transition-all duration-300
+                            ${item.isTranslated 
+                                ? 'bg-rose-600/20 border-rose-500 shadow-rose-500/20 animate-pulse' 
+                                : 'bg-blue-600/20 border-blue-500 shadow-blue-500/20'}
+                        `} title={item.isTranslated ? "Database: Translated (TR)" : "Database: Original (EN)"}>
+                            {item.isTranslated ? '🇹🇷' : '🇬🇧'}
                         </div>
                     </div>
                   </div>

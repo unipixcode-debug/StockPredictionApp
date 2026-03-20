@@ -66,3 +66,9 @@ Bu döküman, **StockPredictionApp** projesinin sunucu (OracleServer3-24) üzeri
 
 > [!CAUTION]
 > **DİKKAT:** Her zaman `/var/www/html/StockPredictionApp/dist/` dizinine yazma iznini (`chown -R ubuntu:ubuntu`) kontrol edin. İzin hatası alırsanız `sudo` ile müdahale edin.
+
+---
+## CRITICAL VITE BUILD RULE (GHOST FILE PREVENTION)
+1. **Index.html Entry Point:** Vite's index.html inside rontend folder MUST ALWAYS contain <script type="module" src="/src/main.jsx"></script>.
+2. **Never Cache-Poison index.html:** NEVER overwrite rontend/index.html with rontend/dist/index.html. If you do, Vite will completely ignore src/ and silently bundle old .js chunks forever. If changes aren't reflecting after 
+pm run build, CHECK index.html FIRST!
