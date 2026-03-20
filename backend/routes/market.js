@@ -8,6 +8,9 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const aiService = require('../services/aiService');
 const NewsSummary = require('../models/NewsSummary');
+const scraperService = require('../services/scraperService');
+const DailyMarketInsight = require('../models/DailyMarketInsight');
+const { Op } = require('sequelize');
 
 // Market Flow Visualization Data
 router.get('/flow', async (req, res) => {
@@ -172,6 +175,49 @@ router.get('/read-article', async (req, res) => {
     } catch (error) {
         console.error('Article Reader API error:', error.message);
         res.status(500).json({ error: 'Failed to read or translate article' });
+    }
+});
+
+// AI Trade Ideas (from Danelfin)
+router.get('/ideas', async (req, res) => {
+    try {
+        const ideas = await scraperService.getDanelfinTradeIdeas();
+        res.json(ideas);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch trade ideas' });
+    }
+});
+
+// Market Analysis (from Investing.com)
+router.get('/analysis', async (req, res) => {
+    try {
+        const analysis = await scraperService.getInvestingAnalysis();
+        res.json(analysis);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch analysis' });
+    }
+});
+
+// Daily Global Insights (Archived)
+router.get('/insights', async (req, res) => {
+    try {
+        const insights = await DailyMarketInsight.findAll({
+            limit: 20,
+            order: [['date', 'DESC'], ['createdAt', 'DESC']]
+        });
+        res.json(insights);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch insights' });
+    }
+});
+
+// S&P 500 Heatmap Data
+router.get('/heatmap', async (req, res) => {
+    try {
+        const data = await marketDataService.getHeatmapData();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch heatmap data' });
     }
 });
 

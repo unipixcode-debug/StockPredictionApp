@@ -14,6 +14,8 @@ import Analysis from './Analysis';
 import News from './News';
 import DeveloperPanel from './DeveloperPanel';
 import Chatbot from './Chatbot';
+import Market360 from './Market360';
+import PortfolioOverview from './PortfolioOverview';
 import Credits from './Credits';
 import Profile from './Profile';
 import AIProviderManagement from './AIProviderManagement';
@@ -72,6 +74,8 @@ function AppLayout() {
             <SidebarLink to="/" icon={<LayoutDashboard size={22} />} label={t('Dashboard')} />
             <SidebarLink to="/news" icon={<Newspaper size={22} />} label={t('News')} />
             <SidebarLink to="/flow" icon={<Receipt size={22} />} label={t('MoneyFlow')} />
+            <SidebarLink to="/market-360" icon={<Globe size={22} />} label="Market 360" />
+            <SidebarLink to="/portfolio" icon={<Wallet size={22} />} label="Portföy" />
             <SidebarLink to="/analysis" icon={<LineChart size={22} />} label={t('Analysis')} />
             <SidebarLink to="/chat" icon={<Bot size={22} />} label={t('AIChat')} />
             <SidebarLink to="/credits" icon={<Coins size={22} />} label={language === 'TR' ? 'Kredi Al' : 'Buy Credits'} />
@@ -117,6 +121,8 @@ function AppLayout() {
               <Route path="/developer" element={<DeveloperPanel />} />
               <Route path="/flow" element={<MoneyFlow />} />
               <Route path="/flow/:assetId" element={<AssetDetails />} />
+              <Route path="/market-360" element={<Market360 />} />
+              <Route path="/portfolio" element={<PortfolioOverview />} />
               <Route path="/chart/:symbol" element={<MarketChart />} />
               <Route path="/analysis" element={<Analysis />} />
               <Route path="/news" element={<News />} />

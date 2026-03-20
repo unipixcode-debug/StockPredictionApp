@@ -3,6 +3,7 @@ const newsService = require('./newsService');
 const Prediction = require('../models/Prediction');
 const aiService = require('./aiService');
 const yahooFinance = require('yahoo-finance2').default;
+yahooFinance.setGlobalConfig({ validation: { logErrors: false } });
 
 class PredictionEngine {
     /**

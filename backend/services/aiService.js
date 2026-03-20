@@ -391,7 +391,12 @@ class AIService {
                     snippet: item.contentSnippet || ''
                 }));
 
-                const prompt = `Translate the following JSON array of news articles to Turkish. Ensure the output is valid, complete JSON. Return ONLY the JSON array containing exactly the same 'id' fields and the translated 'title' and 'snippet' fields.\n\n${JSON.stringify(payload)}`;
+                const prompt = `Translate the following JSON array of news articles to Turkish. 
+                Also, for each article:
+                1. Assign a 'sentimentScore' from 0 (very bearish/negative) to 100 (very bullish/positive).
+                2. Identify related asset 'tags' (e.g., BTC, XRP, ETH, XAU, DXY, SP500, TSLA, etc.). Use abbreviations.
+                
+                Ensure the output is valid, complete JSON. Return ONLY the JSON array containing exactly the same 'id' fields and the translated 'title', 'snippet', 'sentimentScore', and 'tags' fields.\n\n${JSON.stringify(payload)}`;
                 
                 const responseText = await this.generateContent(prompt, "gemini-flash-latest");
                 
@@ -407,7 +412,13 @@ class AIService {
                 const translatedChunk = chunk.map((item, index) => {
                     const trans = translatedArray.find(t => t.id === index);
                     if (trans) {
-                        return { ...item, titleTR: trans.title, snippetTR: trans.snippet };
+                        return { 
+                            ...item, 
+                            titleTR: trans.title || trans.titleTR, 
+                            snippetTR: trans.snippet || trans.snippetTR,
+                            sentimentScore: trans.sentimentScore || 50,
+                            tags: Array.isArray(trans.tags) ? trans.tags.join(', ') : (trans.tags || '')
+                        };
                     }
                     return item;
                 });
@@ -433,7 +444,9 @@ class AIService {
             Return ONLY a valid JSON object with the following structure:
             {
               "tr": "# 🇹🇷 Türkçe Özet\\n\\n**Özet:**\\n[summary text here...]",
-              "en": " # 🇬🇧 English Summary\\n\\n**Summary:**\\n[summary text here...]"
+              "en": " # 🇬🇧 English Summary\\n\\n**Summary:**\\n[summary text here...]",
+              "sentimentScore": number (0-100),
+              "tags": "string (comma separated assets like BTC, XRP, GLD)"
             }
 
             Article Text:
@@ -453,7 +466,9 @@ class AIService {
                     // Standardize field names just in case Gemini gets creative
                     return {
                         tr: parsed.tr || parsed.summaryTR || parsed.TurkishSummary || parsed.turkish_summary || "Özet hazırlanamadı.",
-                        en: parsed.en || parsed.summaryEN || parsed.EnglishSummary || parsed.english_summary || "Summary not available."
+                        en: parsed.en || parsed.summaryEN || parsed.EnglishSummary || parsed.english_summary || "Summary not available.",
+                        sentimentScore: parsed.sentimentScore || 50,
+                        tags: parsed.tags || ""
                     };
                 }
                 throw new Error("No JSON boundaries found in AI response");

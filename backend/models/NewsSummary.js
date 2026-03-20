@@ -35,6 +35,15 @@ const NewsSummary = sequelize.define('NewsSummary', {
         type: DataTypes.INTEGER,
         allowNull: true
     },
+    sentimentScore: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: 50
+    },
+    tags: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     lastProcessed: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW

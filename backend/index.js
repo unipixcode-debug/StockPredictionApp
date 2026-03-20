@@ -20,6 +20,7 @@ const NewsSummary = require('./models/NewsSummary');
 const ChatMessage = require('./models/ChatMessage');
 const AIProvider = require('./models/AIProvider');
 const AdminLog = require('./models/AdminLog');
+const DailyMarketInsight = require('./models/DailyMarketInsight');
 
 const predictionRoutes = require('./routes/predictions');
 const adminRoutes = require('./routes/admin');
@@ -30,12 +31,14 @@ const aiAdminRoutes = require('./routes/aiAdmin');
 const paymentRoutes = require('./routes/payment');
 const cacheService = require('./services/cacheService');
 const creditService = require('./services/creditService');
+const scraperService = require('./services/scraperService');
 
 const app = express();
 
 // Start Background Tasks
 cacheService.startBackgroundUpdates();
 creditService.startBackgroundTasks();
+scraperService.startBackgroundTasks();
 
 // Middleware
 app.use(express.json());

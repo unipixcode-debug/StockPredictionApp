@@ -1,4 +1,5 @@
 const yahooFinance = require('yahoo-finance2').default;
+yahooFinance.setGlobalConfig({ validation: { logErrors: false } });
 const NewsSummary = require('../models/NewsSummary');
 const aiService = require('./aiService');
 const { Op } = require('sequelize');
@@ -56,6 +57,8 @@ class NewsService {
                                     titleTR: titleTR,
                                     snippetTR: snippetTR,
                                     importanceScore: original.importanceScore || 50,
+                                    sentimentScore: translated.sentimentScore || 50,
+                                    tags: translated.tags || '',
                                     lastProcessed: new Date()
                                 }
                             });
@@ -67,6 +70,8 @@ class NewsService {
                                     titleTR: titleTR,
                                     snippetTR: snippetTR,
                                     importanceScore: original.importanceScore || 50,
+                                    sentimentScore: translated.sentimentScore || 50,
+                                    tags: translated.tags || '',
                                     lastProcessed: new Date()
                                 });
                             }
@@ -82,12 +87,17 @@ class NewsService {
             }
 
             // UNIFIED RETURN: Always use the same structure so frontend doesn't break
-            return top50.map(item => ({
-                ...item,
-                title: (targetLang === 'TR' ? item.titleTR : item.title) || item.title,
-                contentSnippet: (targetLang === 'TR' ? item.snippetTR : (item.contentSnippet || item.content)) || item.contentSnippet || item.content,
-                isTranslated: !!item.titleTR && item.titleTR !== item.title
-            }));
+            return top50.map(item => {
+                const cached = NewsSummary.cacheMap?.get(item.link); // Mock logic for mapping tags
+                return {
+                    ...item,
+                    title: (targetLang === 'TR' ? item.titleTR : item.title) || item.title,
+                    contentSnippet: (targetLang === 'TR' ? item.snippetTR : (item.contentSnippet || item.content)) || item.contentSnippet || item.content,
+                    isTranslated: !!item.titleTR && item.titleTR !== item.title,
+                    sentimentScore: item.sentimentScore || 50,
+                    tags: item.tags || ''
+                };
+            });
 
         } catch (error) {
             console.error('FetchNews Error:', error.message);
@@ -113,6 +123,27 @@ class NewsService {
             }
         } catch (error) {
             console.error('CleanupOldNews Error:', error.message);
+        }
+    }
+
+    async cleanupPoorNews() {
+        try {
+            console.log("🧹 Starting cleanup of poor quality news...");
+            const deleted = await NewsSummary.destroy({
+                where: {
+                    [Op.or]: [
+                        { titleTR: { [Op.like]: '%makalenin tam metni çekilemedi%' } },
+                        { snippetTR: { [Op.like]: '%çekilemedi%' } },
+                        { titleTR: null },
+                        { snippetTR: { [Op.length]: { [Op.lt]: 20 } } }
+                    ]
+                }
+            });
+            if (deleted > 0) {
+                console.log(`✅ Deleted ${deleted} poor quality news items.`);
+            }
+        } catch (error) {
+            console.error('CleanupPoorNews Error:', error.message);
         }
     }
 
