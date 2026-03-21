@@ -4,6 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Newspaper, ExternalLink, Calendar, Zap, Clock } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 
+interface ImpactItem {
+    asset: string;
+    score: number;
+    direction: 'POSITIVE' | 'NEGATIVE';
+}
+
 interface NewsItem {
     title: string;
     link: string;
@@ -11,6 +17,7 @@ interface NewsItem {
     contentSnippet?: string;
     sourceName?: string;
     importanceScore?: number;
+    impacts?: ImpactItem[];
 }
 
 const NewsScreen = () => {
@@ -160,6 +167,29 @@ const NewsScreen = () => {
                                     <Text style={styles.newsSnippet} numberOfLines={2}>{item.contentSnippet}</Text>
                                 )}
 
+                                {/* Impact Indicators */}
+                                {item.impacts && item.impacts.length > 0 && (
+                                    <View style={styles.impactContainer}>
+                                        {item.impacts.map((impact, i) => (
+                                            <View key={i} style={[
+                                                styles.impactBadge,
+                                                { backgroundColor: impact.direction === 'POSITIVE' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)' },
+                                                { borderColor: impact.direction === 'POSITIVE' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)' }
+                                            ]}>
+                                                <Text style={[
+                                                    styles.impactAsset,
+                                                    { color: impact.direction === 'POSITIVE' ? '#22c55e' : '#ef4444' }
+                                                ]}>{impact.asset}</Text>
+                                                <View style={[styles.impactLine, { backgroundColor: impact.direction === 'POSITIVE' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)' }]} />
+                                                <Text style={[
+                                                    styles.impactScore,
+                                                    { color: impact.direction === 'POSITIVE' ? '#22c55e' : '#ef4444' }
+                                                ]}>{impact.direction === 'POSITIVE' ? '+' : '-'}{impact.score}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
+
                                 <View style={styles.cardFooter}>
                                     <Text style={styles.readMore}>Haberin Devamı</Text>
                                     <ExternalLink size={14} color="#22d3ee" />
@@ -206,6 +236,11 @@ const styles = StyleSheet.create({
     newsSnippet: { fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 20, marginBottom: 14 },
     cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     readMore: { fontSize: 11, fontWeight: '800', color: '#22d3ee', textTransform: 'uppercase', letterSpacing: 0.5 },
+    impactContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+    impactBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+    impactAsset: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+    impactLine: { width: 1, height: 10, marginHorizontal: 6 },
+    impactScore: { fontSize: 11, fontWeight: '700' },
 });
 
 export default NewsScreen;

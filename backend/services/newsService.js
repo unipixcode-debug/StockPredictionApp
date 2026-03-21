@@ -4,7 +4,10 @@ if (yahooFinance.default) yahooFinance = yahooFinance.default;
 if (typeof yahooFinance.setGlobalConfig === 'function') {
     yahooFinance.setGlobalConfig({ validation: { logErrors: false } });
 }
+const axios = require('axios');
+const cheerio = require('cheerio');
 const NewsSummary = require('../models/NewsSummary');
+const DataSource = require('../models/DataSource');
 const aiService = require('./aiService');
 const { Op } = require('sequelize');
 
@@ -13,16 +16,23 @@ class NewsService {
         try {
             console.log(`🔄 Fetching News (${targetLang})...`);
             
-            // RSS Feed Fallback (Stable)
+            // Dynamic RSS Feeds from Active Infrastructure
             let rssNews = [];
             try {
-                const rssUrls = [
-                    'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069',
-                    'https://www.coindesk.com/arc/outboundfeeds/rss/'
-                ];
-                for(const url of rssUrls) {
+                const activeSources = await DataSource.findAll({
+                    where: { isActive: true, type: 'NEWS_RSS' }
+                });
+                
+                const rssUrls = activeSources.length > 0 
+                    ? activeSources.map(s => ({ url: s.url, name: s.name }))
+                    : [
+                        { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069', name: 'CNBC' },
+                        { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk' }
+                    ];
+
+                for(const source of rssUrls) {
                     try {
-                        const { data } = await axios.get(url, { timeout: 5000 });
+                        const { data } = await axios.get(source.url, { timeout: 5000 });
                         const $ = cheerio.load(data, { xmlMode: true });
                         $('item').each((i, el) => {
                             if (rssNews.length >= 20) return;
@@ -31,10 +41,10 @@ class NewsService {
                                 link: $(el).find('link').text(),
                                 content: $(el).find('description').text(),
                                 pubDate: $(el).find('pubDate').text(),
-                                source: url.includes('cnbc') ? 'CNBC' : 'CoinDesk'
+                                source: source.name
                             });
                         });
-                    } catch(e) { console.error(`RSS fetch failed for ${url}`); }
+                    } catch(e) { console.error(`RSS fetch failed for ${source.url}`); }
                 }
             } catch(e) { console.error("General RSS error"); }
 
@@ -95,6 +105,7 @@ class NewsService {
                                     importanceScore: original.importanceScore || 50,
                                     sentimentScore: translated.sentimentScore || 50,
                                     tags: translated.tags || '',
+                                    impacts: translated.impacts || [],
                                     lastProcessed: new Date()
                                 }
                             });
@@ -108,6 +119,7 @@ class NewsService {
                                     importanceScore: original.importanceScore || 50,
                                     sentimentScore: translated.sentimentScore || 50,
                                     tags: translated.tags || '',
+                                    impacts: translated.impacts || [],
                                     lastProcessed: new Date()
                                 });
                             }
@@ -132,7 +144,8 @@ class NewsService {
                     contentSnippet: (targetLang === 'TR' ? item.snippetTR : (item.contentSnippet || item.content)) || item.contentSnippet || item.content,
                     isTranslated: !!item.titleTR && item.titleTR !== item.title,
                     sentimentScore: item.sentimentScore || (cached ? cached.sentimentScore : 50),
-                    tags: item.tags || (cached ? cached.tags : '')
+                    tags: item.tags || (cached ? cached.tags : ''),
+                    impacts: item.impacts || (cached ? cached.impacts : [])
                 };
             });
 
