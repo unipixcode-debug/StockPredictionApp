@@ -1,8 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate, Navigate } from 'react-router-dom';
 import { 
   Activity, BarChart3, User, Settings, Database, Moon, Sun, 
-  LayoutDashboard, Receipt, LineChart, LogOut, Newspaper, Bot, Coins, Sparkles
+  LayoutDashboard, Receipt, LineChart, LogOut, Newspaper, Bot, Coins, Sparkles, Wallet, Globe
 } from 'lucide-react';
 
 import Dashboard from './Dashboard';
@@ -117,6 +117,7 @@ function AppLayout() {
           <div className="p-4 md:p-10 max-w-[1600px] mx-auto min-h-screen">
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/developer" element={<DeveloperPanel />} />
               <Route path="/flow" element={<MoneyFlow />} />
@@ -130,6 +131,7 @@ function AppLayout() {
               <Route path="/credits" element={<Credits />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/ai-management" element={<AIProviderManagement />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
         </main>

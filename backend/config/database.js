@@ -1,14 +1,15 @@
 const { Sequelize } = require('sequelize');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const sequelize = new Sequelize(
     process.env.DB_NAME || 'prediction_db',
-    process.env.DB_USER || 'postgres',
+    process.env.DB_USER || 'erdem',
     process.env.DB_PASS || 'password',
     {
-        host: process.env.DB_HOST || 'localhost',
+        host: process.env.DB_HOST || '127.0.0.1',
         dialect: 'postgres',
-        logging: false, // Set to console.log to see SQL queries
+        logging: false, 
     }
 );
 

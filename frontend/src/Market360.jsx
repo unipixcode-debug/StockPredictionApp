@@ -177,8 +177,9 @@ const Market360 = () => {
 };
 
 const HeatmapCell = ({ stock }) => {
-    const isUp = stock.change >= 0;
-    const absChange = Math.abs(stock.change).toFixed(2);
+    const change = stock.change || 0;
+    const isUp = change >= 0;
+    const absChange = Math.abs(change).toFixed(2);
     
     // Calculate intensity based on percentage (max 5% for full color)
     const intensity = Math.min(Math.abs(stock.change) / 3, 1); 

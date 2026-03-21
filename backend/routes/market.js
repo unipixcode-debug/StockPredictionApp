@@ -178,9 +178,26 @@ router.get('/read-article', async (req, res) => {
     }
 });
 
-// AI Trade Ideas (from Danelfin)
+// AI Trade Ideas (Priority: Archive, Fallback: Scrape)
 router.get('/ideas', async (req, res) => {
     try {
+        // 1. Check Archive First (Today's Ideas)
+        const today = new Date().toISOString().split('T')[0];
+        const archivedIdeas = await DailyMarketInsight.findAll({
+            where: { date: today, type: 'TRADE_IDEA' },
+            order: [['score', 'DESC']]
+        });
+
+        if (archivedIdeas.length > 0) {
+            return res.json(archivedIdeas.map(i => ({
+                symbol: i.symbol,
+                score: i.score,
+                probability: i.metadata?.probability || 'N/A',
+                source: 'Danelfin (Archived)'
+            })));
+        }
+
+        // 2. Fallback to Scraper
         const ideas = await scraperService.getDanelfinTradeIdeas();
         res.json(ideas);
     } catch (error) {
@@ -188,9 +205,26 @@ router.get('/ideas', async (req, res) => {
     }
 });
 
-// Market Analysis (from Investing.com)
+// Market Analysis (Priority: Archive, Fallback: Scrape)
 router.get('/analysis', async (req, res) => {
     try {
+        // 1. Check Archive First
+        const archivedAnalysis = await DailyMarketInsight.findAll({
+            where: { type: 'MARKET_ANALYSIS' },
+            limit: 10,
+            order: [['date', 'DESC'], ['createdAt', 'DESC']]
+        });
+
+        if (archivedAnalysis.length > 0) {
+            return res.json(archivedAnalysis.map(a => ({
+                title: a.title,
+                link: a.content,
+                author: a.metadata?.author || 'Investing.com',
+                source: 'Investing (Archived)'
+            })));
+        }
+
+        // 2. Fallback to Scraper
         const analysis = await scraperService.getInvestingAnalysis();
         res.json(analysis);
     } catch (error) {

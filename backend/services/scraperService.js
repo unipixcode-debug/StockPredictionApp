@@ -9,7 +9,6 @@ class ScraperService {
 
     /**
      * Scrapes Trade Ideas from Danelfin
-     * Focuses on AI-powered stock picking
      */
     async getDanelfinTradeIdeas() {
         try {
@@ -17,10 +16,11 @@ class ScraperService {
             const { data } = await axios.get('https://danelfin.com/trade-ideas', {
                 headers: { 'User-Agent': this.userAgent }
             });
+
             const $ = cheerio.load(data);
             const ideas = [];
 
-            // Updated selectors based on browser research
+            // Updated selectors based on verified browser research
             $('tr').each((i, element) => {
                 const ticker = $(element).find('a[href^="/stock/"] span span').first().text().trim();
                 const scoreAttr = $(element).find('div[role="img"][aria-label*="out of 10"]').attr('aria-label');
@@ -37,6 +37,7 @@ class ScraperService {
                 }
             });
 
+            console.log(`✅ Scraped ${ideas.length} ideas from Danelfin.`);
             return ideas.slice(0, 10);
         } catch (error) {
             console.error('Danelfin scrape failed:', error.message);
@@ -53,13 +54,14 @@ class ScraperService {
             const { data } = await axios.get('https://www.investing.com/analysis', {
                 headers: { 'User-Agent': this.userAgent }
             });
+
             const $ = cheerio.load(data);
             const articles = [];
 
-            // Updated selector: targets the bolded analysis links
             $('a[href*="/analysis/"].font-bold').each((i, el) => {
                 const title = $(el).text().trim();
-                const link = 'https://www.investing.com' + $(el).attr('href');
+                let href = $(el).attr('href');
+                const link = href.startsWith('http') ? href : ('https://www.investing.com' + href);
                 const author = $(el).closest('article, .articleItem').find('.articleDetails .byLine').text().replace('By ', '').trim() || 'Investing.com';
 
                 if (title && title.length > 5) {
@@ -72,6 +74,7 @@ class ScraperService {
                 }
             });
 
+            console.log(`✅ Scraped ${articles.length} articles from Investing.com.`);
             return articles.slice(0, 10);
         } catch (error) {
             console.error('Investing Analysis scrape failed:', error.message);
@@ -84,9 +87,10 @@ class ScraperService {
      */
     startBackgroundTasks() {
         console.log('📅 Scraper background tasks started...');
-        
-        // Run immediately on start
-        this.performDailyArchive();
+        // Run immediately on start (using a small delay to let DB connect)
+        setTimeout(() => {
+            this.performDailyArchive();
+        }, 5000);
 
         // Run every 24 hours
         setInterval(() => {
@@ -97,32 +101,36 @@ class ScraperService {
     async performDailyArchive() {
         try {
             console.log('📦 Performing daily market archive...');
-            
+
             // 1. Archive Danelfin Ideas
             const ideas = await this.getDanelfinTradeIdeas();
-            for (const idea of ideas) {
-                await DailyMarketInsight.upsert({
-                    date: new Date().toISOString().split('T')[0],
-                    type: 'TRADE_IDEA',
-                    source: 'Danelfin',
-                    symbol: idea.symbol,
-                    score: idea.score,
-                    metadata: { probability: idea.probability },
-                    title: `AI Trade Idea: ${idea.symbol}`
-                });
+            if (ideas.length > 0) {
+                for (const idea of ideas) {
+                    await DailyMarketInsight.upsert({
+                        date: new Date().toISOString().split('T')[0],
+                        type: 'TRADE_IDEA',
+                        source: 'Danelfin',
+                        symbol: idea.symbol,
+                        score: idea.score,
+                        metadata: { probability: idea.probability },
+                        title: `AI Trade Idea: ${idea.symbol}`
+                    });
+                }
             }
 
             // 2. Archive Investing Analysis
             const analyses = await this.getInvestingAnalysis();
-            for (const analysis of analyses) {
-                await DailyMarketInsight.upsert({
-                    date: new Date().toISOString().split('T')[0],
-                    type: 'MARKET_ANALYSIS',
-                    source: 'Investing',
-                    title: analysis.title,
-                    content: analysis.link,
-                    metadata: { author: analysis.author }
-                });
+            if (analyses.length > 0) {
+                for (const analysis of analyses) {
+                    await DailyMarketInsight.upsert({
+                        date: new Date().toISOString().split('T')[0],
+                        type: 'MARKET_ANALYSIS',
+                        source: 'Investing',
+                        title: analysis.title,
+                        content: analysis.link,
+                        metadata: { author: analysis.author }
+                    });
+                }
             }
 
             console.log('✅ Daily market archive completed.');

@@ -2,8 +2,12 @@ const marketDataService = require('./marketDataService');
 const newsService = require('./newsService');
 const Prediction = require('../models/Prediction');
 const aiService = require('./aiService');
-const yahooFinance = require('yahoo-finance2').default;
-yahooFinance.setGlobalConfig({ validation: { logErrors: false } });
+let yahooFinance = require('yahoo-finance2');
+if (yahooFinance.default) yahooFinance = yahooFinance.default;
+
+if (typeof yahooFinance.setGlobalConfig === 'function') {
+    yahooFinance.setGlobalConfig({ validation: { logErrors: false } });
+}
 
 class PredictionEngine {
     /**
@@ -56,7 +60,14 @@ class PredictionEngine {
             else if (finalScore < 35) direction = 'SELL';
 
             // 4. Price & Chart Data
-            const currentPrice = Number(quote?.regularMarketPrice) || 100; // Mock if no quote
+            let currentPrice = Number(quote?.regularMarketPrice);
+            if (!currentPrice || isNaN(currentPrice) || currentPrice === 100) {
+                // Secondary fallback using our custom fetcher (likely Binance)
+                console.log(`Using custom price fetcher for ${symbol}...`);
+                const fallbackPrice = await marketDataService.fetchPrice(symbol);
+                if (fallbackPrice) currentPrice = fallbackPrice;
+                else if (!currentPrice) currentPrice = 100; // Last resort mock
+            }
             const volatility = Math.abs(Number(quote?.regularMarketChangePercent) || 2) / 100;
             
             const entryPrice = currentPrice;

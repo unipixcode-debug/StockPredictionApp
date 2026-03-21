@@ -182,7 +182,7 @@ const Analysis = () => {
         <IndicatorCard
           label="Bitcoin"
           symbol="BTC-USD"
-          value={`$${stats?.raw?.btc?.price != null ? stats.raw.btc.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : '–'}`}
+          value={`$${stats?.raw?.btc?.price != null ? stats.raw?.btc?.price.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : '–'}`}
           change={fmtChange(stats?.raw?.btc?.change)}
           up={stats?.raw?.btc?.change >= 0}
           icon={<Bitcoin size={22} className="text-amber-400" />}

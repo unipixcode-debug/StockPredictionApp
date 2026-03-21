@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import api from './api';
 import { useLanguage } from './LanguageContext';
+import { useNavigate } from 'react-router-dom';
 
 const DISCLAIMER_KEY = 'predictpro_disclaimer_accepted';
 
@@ -19,6 +20,7 @@ const Dashboard = () => {
   const [news, setNews] = useState([]);
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const { t, language } = useLanguage();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [searchSymbol, setSearchSymbol] = useState('');
@@ -280,7 +282,7 @@ const Dashboard = () => {
         />
         <StatCard
           label={t('VIX_Fear')}
-          value={stats?.vix?.price != null ? stats.vix.price.toFixed(1) : '–'}
+          value={stats?.vix?.price != null ? stats.vix?.price?.toFixed(1) : '–'}
           trend={fmtChange(stats?.raw?.vix?.change)}
           trendUp={(stats?.raw?.vix?.change ?? 0) < 0}
           icon={<Activity className="text-primary" />}
@@ -288,7 +290,7 @@ const Dashboard = () => {
         />
         <StatCard
           label={t('DXY_Value')}
-          value={stats?.dxy?.price != null ? stats.dxy.price.toFixed(1) : '–'}
+          value={stats?.dxy?.price != null ? stats.dxy?.price?.toFixed(1) : '–'}
           trend={fmtChange(stats?.raw?.dxy?.change)}
           trendUp={(stats?.raw?.dxy?.change ?? 0) >= 0}
           icon={<Globe className="text-blue-400" />}
@@ -298,7 +300,7 @@ const Dashboard = () => {
           label={t('MarketSentiment')}
           value={stats?.sentiment?.label ?? '–'}
           trend={stats?.sentiment?.trend ?? '…'}
-          trendUp={stats?.sentiment?.pressureScore != null && stats.sentiment.pressureScore < 50}
+          trendUp={stats?.sentiment?.pressureScore != null && stats?.sentiment?.pressureScore < 50}
           icon={<TrendingUp className="text-emerald-400" />}
           loading={loading}
         />
@@ -442,7 +444,7 @@ const Dashboard = () => {
               .slice(0, 20) // Limit to top 20 most recent to ensure visibility
               .map(pred => (
               <motion.div key={pred.id} variants={itemVariants}>
-                <PredictionCard data={pred} onDelete={() => handleDelete(pred.id)} />
+                <PredictionCard data={pred} onDelete={() => handleDelete(pred.id)} navigate={navigate} />
               </motion.div>
             ))
           )}
@@ -482,7 +484,7 @@ function StatCard({ label, value, trend, trendUp = true, icon, loading = false }
   );
 }
 
-function PredictionCard({ data, onDelete }) {
+function PredictionCard({ data, onDelete, navigate }) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const isBuy = data.direction === 'BUY';
