@@ -17,14 +17,18 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
+const callbackURL = process.env.GOOGLE_CALLBACK_URL || (process.env.FRONTEND_URL || 'https://unipixcode.xyz') + "/api/auth/google/callback";
+console.log(`[AUTH-CONFIG] Passport callbackURL: "${callbackURL}"`);
+
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: (process.env.FRONTEND_URL || 'https://unipixcode.xyz') + "/api/auth/google/callback",
+    callbackURL: callbackURL,
     proxy: true
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
+
       const email = profile.emails[0].value;
       console.log(`[AUTH] Google login attempt: ${email} (ID: ${profile.id})`);
       

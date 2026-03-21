@@ -165,7 +165,7 @@ const News = () => {
         </button>
       </header>
 
-      {!(user?.newsletterSubscribed || user?.role === 'admin' || user?.role === 'developer') ? (
+      {!(user?.newsletterSubscribed || user?.role === 'admin' || user?.role === 'developer' || import.meta.env.DEV) ? (
         <div className="flex flex-col items-center justify-center py-20 px-6">
           <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
@@ -327,8 +327,8 @@ const News = () => {
                                   flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-tight
                                   ${impact.direction === 'POSITIVE' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' : 'bg-rose-500/10 border-rose-500/30 text-rose-500'}
                               `}>
-                                  <span className="tracking-[0.1em]">{impact.asset}</span>
-                                  <div className={`w-[1px] h-2 ${impact.direction === 'POSITIVE' ? 'bg-emerald-500/20' : 'bg-rose-500/20'}`} />
+                                  <span className="tracking-widest">{impact.asset}</span>
+                                  <div className={`w-px h-2 ${impact.direction === 'POSITIVE' ? 'bg-emerald-500/20' : 'bg-rose-500/20'}`} />
                                   <span className="font-black">{impact.direction === 'POSITIVE' ? '+' : '-'}{impact.score}</span>
                               </div>
                           ))}

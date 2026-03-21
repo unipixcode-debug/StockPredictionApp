@@ -127,6 +127,9 @@ class NewsService {
                             // Add to memory for immediate return
                             original.titleTR = titleTR;
                             original.snippetTR = snippetTR;
+                            original.sentimentScore = translated.sentimentScore;
+                            original.tags = translated.tags;
+                            original.impacts = translated.impacts;
                         }
                     } catch (err) {
                         console.error('Translation batch error:', err.message);

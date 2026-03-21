@@ -3,15 +3,11 @@ const sequelize = require('../config/database');
 
 const NewsSummary = sequelize.define('NewsSummary', {
     url: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
         primaryKey: true,
         allowNull: false
     },
-    summaryTR: {
-        type: DataTypes.TEXT,
-        allowNull: true
-    },
-    summaryEN: {
+    titleEN: {
         type: DataTypes.TEXT,
         allowNull: true
     },
@@ -19,15 +15,11 @@ const NewsSummary = sequelize.define('NewsSummary', {
         type: DataTypes.TEXT,
         allowNull: true
     },
-    titleEN: {
+    snippetEN: {
         type: DataTypes.TEXT,
         allowNull: true
     },
     snippetTR: {
-        type: DataTypes.TEXT,
-        allowNull: true
-    },
-    snippetEN: {
         type: DataTypes.TEXT,
         allowNull: true
     },

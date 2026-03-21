@@ -15,7 +15,20 @@ export const AuthProvider = ({ children }) => {
     try {
       const userData = await api.get('/auth/current_user');
       console.log('--- AuthContext: current_user data:', userData);
-      setUser(userData || null);
+      
+      if (!userData && import.meta.env.DEV) {
+        setUser({
+          id: 'dev-123',
+          email: 'dev@local.test',
+          name: 'Lokal Geliştirici',
+          role: 'developer',
+          credits: 9999,
+          newsletterSubscribed: true,
+          moneyFlowSubscribed: true
+        });
+      } else {
+        setUser(userData || null);
+      }
     } catch (e) {
       console.error('--- AuthContext: current_user fetch failed:', e);
       setUser(null);

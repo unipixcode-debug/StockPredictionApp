@@ -1,4 +1,8 @@
 require('dotenv').config();
+console.log('--- ENV DEBUG ---');
+console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+console.log('GOOGLE_CALLBACK_URL:', process.env.GOOGLE_CALLBACK_URL);
+console.log('-----------------');
 const express = require('express');
 const dns = require('dns');
 if (dns.setDefaultResultOrder) {
