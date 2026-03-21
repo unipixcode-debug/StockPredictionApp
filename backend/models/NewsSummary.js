@@ -40,6 +40,10 @@ const NewsSummary = sequelize.define('NewsSummary', {
         type: DataTypes.JSONB,
         allowNull: true
     },
+    sourceName: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     lastProcessed: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW

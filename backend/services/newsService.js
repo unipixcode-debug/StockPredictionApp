@@ -14,148 +14,123 @@ const { Op } = require('sequelize');
 class NewsService {
     async fetchLatestNews(days = 7, targetLang = 'TR') {
         try {
-            console.log(`🔄 Fetching News (${targetLang})...`);
+            console.log(`🔄 Fetching News from DB (${targetLang})...`);
             
-            // Dynamic RSS Feeds from Active Infrastructure
-            let rssNews = [];
-            try {
-                const activeSources = await DataSource.findAll({
-                    where: { isActive: true, type: 'NEWS_RSS' }
-                });
-                
-                const rssUrls = activeSources.length > 0 
-                    ? activeSources.map(s => ({ url: s.url, name: s.name }))
-                    : [
-                        { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069', name: 'CNBC' },
-                        { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk' }
-                    ];
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - (days || 7));
 
-                for(const source of rssUrls) {
-                    try {
-                        const { data } = await axios.get(source.url, { timeout: 5000 });
-                        const $ = cheerio.load(data, { xmlMode: true });
-                        $('item').each((i, el) => {
-                            if (rssNews.length >= 20) return;
-                            rssNews.push({
-                                title: $(el).find('title').text(),
-                                link: $(el).find('link').text(),
-                                content: $(el).find('description').text(),
-                                pubDate: $(el).find('pubDate').text(),
-                                source: source.name
-                            });
-                        });
-                    } catch(e) { console.error(`RSS fetch failed for ${source.url}`); }
-                }
-            } catch(e) { console.error("General RSS error"); }
-
-            let rawNews = rssNews; 
-            
-            // EMERGENCY FALLBACK: If still empty, add 3 static news items to prevent empty UI
-            if (rawNews.length === 0) {
-                rawNews.push(
-                    { title: "Global Markets Review: Volatility remains moderate", link: "https://stockapp.com/static1", content: "Markets are showing stable trends today.", pubDate: new Date().toUTCString(), source: "SYSTEM" },
-                    { title: "Bitcoin Price Analysis: $70k support holding firm", link: "https://stockapp.com/static2", content: "BTC continues to consolidate above major support levels.", pubDate: new Date().toUTCString(), source: "SYSTEM" },
-                    { title: "Federal Reserve: Inflation data under close watch", link: "https://stockapp.com/static3", content: "Analysts expect the Fed to maintain current rates.", pubDate: new Date().toUTCString(), source: "SYSTEM" }
-                );
-            }
-
-            // Limit to top 50
-            const top50 = rawNews.slice(0, 50);
-
-            // Intelligent Cache Check
-            if (targetLang === 'TR') {
-                const urls = top50.map(n => n.link).filter(Boolean);
-                const existingCache = await NewsSummary.findAll({
-                    where: { url: { [Op.in]: urls } }
-                });
-                const cacheMap = new Map(existingCache.map(c => [c.url, c]));
-
-                const itemsToTranslate = [];
-                for (const item of top50) {
-                    if (!item.link) continue;
-                    const cached = cacheMap.get(item.link);
-                    if (!cached || !cached.titleTR) {
-                        itemsToTranslate.push(item);
-                    } else {
-                        item.titleTR = cached.titleTR;
-                        item.snippetTR = cached.snippetTR;
-                        item.importanceScore = cached.importanceScore;
-                    }
-                }
-
-                if (itemsToTranslate.length > 0) {
-                    console.log(`📝 Intelligent Cache: Requires TR translation for ${itemsToTranslate.length} new news items...`);
-                    try {
-                        const translatedChunk = await aiService.batchTranslateNews(itemsToTranslate, 'TR');
-                        for (let j = 0; j < itemsToTranslate.length; j++) {
-                            const original = itemsToTranslate[j];
-                            const translated = (translatedChunk && translatedChunk[j]) ? translatedChunk[j] : original; 
-                            
-                            const titleTR = translated.titleTR || original.title;
-                            const snippetTR = translated.snippetTR || original.contentSnippet || original.content || '';
-
-                            const [record, created] = await NewsSummary.findOrCreate({
-                                where: { url: original.link },
-                                defaults: {
-                                    url: original.link,
-                                    titleEN: original.title,
-                                    snippetEN: original.contentSnippet || original.content || '',
-                                    titleTR: titleTR,
-                                    snippetTR: snippetTR,
-                                    importanceScore: original.importanceScore || 50,
-                                    sentimentScore: translated.sentimentScore || 50,
-                                    tags: translated.tags || '',
-                                    impacts: translated.impacts || [],
-                                    lastProcessed: new Date()
-                                }
-                            });
-
-                            if (!created) {
-                                await record.update({
-                                    titleEN: original.title,
-                                    snippetEN: original.contentSnippet || original.content || '',
-                                    titleTR: titleTR,
-                                    snippetTR: snippetTR,
-                                    importanceScore: original.importanceScore || 50,
-                                    sentimentScore: translated.sentimentScore || 50,
-                                    tags: translated.tags || '',
-                                    impacts: translated.impacts || [],
-                                    lastProcessed: new Date()
-                                });
-                            }
-                            
-                            // Add to memory for immediate return
-                            original.titleTR = titleTR;
-                            original.snippetTR = snippetTR;
-                            original.sentimentScore = translated.sentimentScore;
-                            original.tags = translated.tags;
-                            original.impacts = translated.impacts;
-                        }
-                    } catch (err) {
-                        console.error('Translation batch error:', err.message);
-                    }
-                }
-            }
-
-            // UNIFIED RETURN: Always use the same structure so frontend doesn't break
-            const hasCacheMap = typeof cacheMap !== 'undefined' && cacheMap !== null;
-            return top50.map(item => {
-                const cached = hasCacheMap ? cacheMap.get(item.link) : null;
-                return {
-                    ...item,
-                    title: (targetLang === 'TR' ? item.titleTR : item.title) || item.title,
-                    contentSnippet: (targetLang === 'TR' ? item.snippetTR : (item.contentSnippet || item.content)) || item.contentSnippet || item.content,
-                    isTranslated: !!item.titleTR && item.titleTR !== item.title,
-                    sentimentScore: item.sentimentScore || (cached ? cached.sentimentScore : 50),
-                    tags: item.tags || (cached ? cached.tags : ''),
-                    impacts: item.impacts || (cached ? cached.impacts : [])
-                };
+            const dbNews = await NewsSummary.findAll({
+                where: {
+                    createdAt: { [Op.gte]: oneWeekAgo }
+                },
+                order: [['createdAt', 'DESC']],
+                limit: 50
             });
 
+            if (dbNews.length > 0) {
+                return dbNews.map(item => ({
+                    title: (targetLang === 'TR' ? item.titleTR : item.titleEN) || item.titleEN,
+                    contentSnippet: (targetLang === 'TR' ? item.snippetTR : item.snippetEN) || item.snippetEN,
+                    link: item.url,
+                    pubDate: item.createdAt,
+                    sourceName: item.sourceName || 'Piyasa', 
+                    importanceScore: item.importanceScore || 50,
+                    sentimentScore: item.sentimentScore || 50,
+                    tags: item.tags || '',
+                    impacts: item.impacts || [],
+                    isTranslated: !!item.titleTR
+                }));
+            }
+
+            // Fallback if DB is completely empty (usually first run)
+            return [{
+                title: "Haberler analiz ediliyor...",
+                contentSnippet: "Yapay zeka haberleri tarıyor ve etki analizi yapıyor. Lütfen kısa süre sonra sayfayı yenileyin.",
+                pubDate: new Date(),
+                link: "#",
+                sourceName: "Sistem",
+                importanceScore: 10,
+                impacts: []
+            }];
         } catch (error) {
             console.error('FetchNews Error:', error.message);
-            // Return empty array instead of throwing to prevent 500
             return [];
+        }
+    }
+
+    /**
+     * Periodically scrapes and analyzes news in the background
+     */
+    startBackgroundTasks() {
+        console.log('📅 News background synchronization started...');
+        // Initial run
+        setTimeout(() => this.syncNewsWithImpacts(), 10000);
+        // Every 30 minutes
+        setInterval(() => this.syncNewsWithImpacts(), 30 * 60 * 1000);
+    }
+
+    async syncNewsWithImpacts() {
+        try {
+            console.log('🔄 Syncing News with AI Impact Analysis...');
+            const activeSources = await DataSource.findAll({ where: { isActive: true, type: 'NEWS_RSS' } });
+            const rssUrls = activeSources.length > 0 
+                ? activeSources.map(s => ({ url: s.url, name: s.name }))
+                : [
+                    { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069', name: 'CNBC' },
+                    { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk' }
+                ];
+
+            let count = 0;
+            for(const source of rssUrls) {
+                try {
+                    const { data } = await axios.get(source.url, { timeout: 10000 });
+                    const $ = cheerio.load(data, { xmlMode: true });
+                    const items = [];
+                    $('item').each((i, el) => {
+                        if (i >= 5) return; // Only process top 5 per source to avoid over-limit
+                        items.push({
+                            title: $(el).find('title').text(),
+                            link: $(el).find('link').text(),
+                            content: $(el).find('description').text().substring(0, 500),
+                            sourceName: source.name
+                        });
+                    });
+
+                    // filter items already in DB
+                    const urls = items.map(i => i.link);
+                    const existing = await NewsSummary.findAll({ where: { url: { [Op.in]: urls } } });
+                    const existingUrls = new Set(existing.map(e => e.url));
+                    const newItems = items.filter(i => !existingUrls.has(i.link));
+
+                    if (newItems.length > 0) {
+                        console.log(`📝 Processing ${newItems.length} new items from ${source.name}...`);
+                        const translated = await aiService.batchTranslateNews(newItems, 'TR');
+                        
+                        for (let i = 0; i < newItems.length; i++) {
+                            const original = newItems[i];
+                            const trans = translated[i] || original;
+                            
+                            await NewsSummary.upsert({
+                                url: original.link,
+                                titleEN: original.title,
+                                snippetEN: original.content,
+                                titleTR: trans.titleTR || trans.title || original.title,
+                                snippetTR: trans.snippetTR || trans.snippet || original.content,
+                                importanceScore: trans.importanceScore || 50,
+                                sentimentScore: trans.sentimentScore || 50,
+                                tags: trans.tags || '',
+                                impacts: trans.impacts || [],
+                                sourceName: original.sourceName,
+                                lastProcessed: new Date()
+                            });
+                            count++;
+                        }
+                    }
+                } catch(e) { console.error(`Sync failed for ${source.url}: ${e.message}`); }
+            }
+            console.log(`✅ Background News Sync completed. Processed ${count} new items.`);
+        } catch (error) {
+            console.error('SyncNews Error:', error.message);
         }
     }
 

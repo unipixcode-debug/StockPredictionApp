@@ -123,13 +123,27 @@ class AIService {
         console.log("✅ Background AI health check completed.");
     }
 
+    async ensureInitialized() {
+        if (this.isInitialized) return;
+        let attempts = 0;
+        while (!this.isInitialized && attempts < 10) {
+            await new Promise(r => setTimeout(r, 500));
+            attempts++;
+        }
+    }
+
     async generateContent(prompt, modelOverride = null, providerId = null) {
+        await this.ensureInitialized();
         let lastError = null;
 
         // If specific provider requested (health check)
         const targetProviders = providerId 
             ? this.providers.filter(p => p.id === providerId)
             : this.providers;
+
+        if (targetProviders.length === 0) {
+             throw new Error("No active AI providers found. Please check Admin Panel -> AI Providers.");
+        }
 
         for (const provider of targetProviders) {
             try {

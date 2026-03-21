@@ -36,6 +36,7 @@ const paymentRoutes = require('./routes/payment');
 const cacheService = require('./services/cacheService');
 const creditService = require('./services/creditService');
 const scraperService = require('./services/scraperService');
+const newsService = require('./services/newsService');
 
 const app = express();
 
@@ -43,6 +44,7 @@ const app = express();
 cacheService.startBackgroundUpdates();
 creditService.startBackgroundTasks();
 scraperService.startBackgroundTasks();
+newsService.startBackgroundTasks();
 
 // Middleware
 app.use(express.json());
