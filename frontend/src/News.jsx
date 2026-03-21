@@ -319,6 +319,22 @@ const News = () => {
                     {item.title}
                   </h3>
                   
+                  {/* Impact Indicators */}
+                  {item.impacts && item.impacts.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-6 pointer-events-none">
+                          {item.impacts.map((impact, i) => (
+                              <div key={i} className={`
+                                  flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-tight
+                                  ${impact.direction === 'POSITIVE' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' : 'bg-rose-500/10 border-rose-500/30 text-rose-500'}
+                              `}>
+                                  <span className="tracking-[0.1em]">{impact.asset}</span>
+                                  <div className={`w-[1px] h-2 ${impact.direction === 'POSITIVE' ? 'bg-emerald-500/20' : 'bg-rose-500/20'}`} />
+                                  <span className="font-black">{impact.direction === 'POSITIVE' ? '+' : '-'}{impact.score}</span>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+
                   <p className="text-sm text-muted-foreground leading-relaxed flex-1 opacity-80 mb-8 line-clamp-3">
                     {item.contentSnippet || t('NoSnippet')}
                   </p>
