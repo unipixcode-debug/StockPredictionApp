@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+console.log("Hotfix for MoneyFlow crash v1");
 import { motion, AnimatePresence } from 'framer-motion';
 import api from './api';
 import { 
@@ -296,13 +297,13 @@ const MoneyFlow = () => {
                         <p className="text-xl font-medium italic leading-relaxed text-foreground/80">
                             "Mevcut dairesel akış incelendiğinde, likiditenin en güçlü olduğu sınıf 
                             <span className="text-emerald-500 font-black mx-2 italic uppercase">
-                                {data?.assets?.sort((a,b) => b.change - a.change)[0].name}
+                                {data?.assets?.length > 0 ? data.assets.slice().sort((a,b) => b.change - a.change)[0].name : '...'}
                             </span> 
                             olarak öne çıkıyor. Beşgen üzerindeki akış yönleri, sermayenin güvenli limanlardan getiri odaklı varlıklara kaydığını teyit ediyor."
                         </p>
                         <div className="inline-flex items-center space-x-3 px-6 py-3 bg-primary/10 border border-primary/20 rounded-2xl text-xs font-black uppercase tracking-widest text-primary italic">
                             <Activity size={16} />
-                            <span>Sinyal: {data?.assets?.sort((a,b) => b.change - a.change)[0].name === 'Crypto' ? 'Agresif Risk-On' : 'Temkinli Bekleyiş'}</span>
+                            <span>Sinyal: {data?.assets?.length > 0 ? (data.assets.slice().sort((a,b) => b.change - a.change)[0].name === 'Crypto' ? 'Agresif Risk-On' : 'Temkinli Bekleyiş') : 'Analiz Ediliyor...'}</span>
                         </div>
                     </div>
                 </div>

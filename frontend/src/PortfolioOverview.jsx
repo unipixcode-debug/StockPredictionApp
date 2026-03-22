@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+console.log("Bypassing CDN cache v4");
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
@@ -112,6 +113,14 @@ const PortfolioOverview = () => {
     const totalInvested = (holdings || []).reduce((sum, h) => sum + getValFromPC(Number(h.totalInvested), h.purchaseCurrency), 0);
     const totalPL = totalValue - totalInvested;
     const totalPLPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
+
+    // Helpers for safe, per-row native currency symbols
+    const getNcSym = (nc, dc) => {
+        const safe_nc = nc || 'USD';
+        const effective = (dc === safe_nc) ? safe_nc : dc;
+        return effective === 'TRY' ? '₺' : '$';
+    };
+    const getPcSym = (pc) => (pc || 'USD') === 'TRY' ? '₺' : '$';
 
     const PREMIUM_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
     const chartData = (holdings || []).map((h, i) => ({
@@ -288,23 +297,23 @@ const PortfolioOverview = () => {
                                         <td className="p-4">
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-sm">
-                                                    {displayCurrency === 'USD' ? '$' : '₺'}
-                                                    {getValFromPC(Number(row.avgPrice), row.purchaseCurrency).toLocaleString()}
+                                                    {getPcSym(row.purchaseCurrency)}
+                                                    {getValFromPC(Number(row.avgPrice), row.purchaseCurrency || 'USD').toLocaleString()}
                                                 </span>
-                                                <span className="text-[10px] opacity-40">{Number(row.avgPrice).toLocaleString()} {row.purchaseCurrency}</span>
+                                                <span className="text-[10px] opacity-40">{Number(row.avgPrice).toLocaleString()} {row.purchaseCurrency || 'USD'}</span>
                                             </div>
                                         </td>
                                         <td className="p-4 font-bold text-sm text-muted-foreground whitespace-nowrap">
-                                            {displayCurrency === 'USD' ? '$' : '₺'}
-                                            {getValFromPC(Number(row.totalInvested), row.purchaseCurrency).toLocaleString()}
+                                            {getPcSym(row.purchaseCurrency)}
+                                            {getValFromPC(Number(row.totalInvested), row.purchaseCurrency || 'USD').toLocaleString()}
                                         </td>
                                         <td className="p-4 font-bold text-sm whitespace-nowrap">
-                                            {displayCurrency === 'USD' ? '$' : '₺'}
-                                            {getVal(Number(row.currentPrice), row.naturalCurrency, row).toLocaleString()}
+                                            {getNcSym(row.naturalCurrency, displayCurrency)}
+                                            {getVal(Number(row.currentPrice), row.naturalCurrency || 'USD', row).toLocaleString()}
                                         </td>
                                         <td className="p-4 font-black text-sm text-right whitespace-nowrap">
-                                            {displayCurrency === 'USD' ? '$' : '₺'}
-                                            {getVal(row.valueInNC, row.naturalCurrency, row).toLocaleString()}
+                                            {getNcSym(row.naturalCurrency, displayCurrency)}
+                                            {getVal(row.valueInNC, row.naturalCurrency || 'USD', row).toLocaleString()}
                                         </td>
                                         <td className="p-4 text-right">
                                             <div className="flex flex-col items-end">
