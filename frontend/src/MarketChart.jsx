@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -17,6 +17,7 @@ const MarketChart = () => {
     const name = queryParams.get('name') || symbol;
 
     const [currency, setCurrency] = useState('USD');
+    const tvContainerRef = useRef(null);
     const [searchSymbol, setSearchSymbol] = useState('');
     const [liveSearchResults, setLiveSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -27,7 +28,10 @@ const MarketChart = () => {
 
     // Detect if this symbol belongs to a restricted market (BIST)
     useEffect(() => {
-        const isBist = symbol && (symbol.toUpperCase().includes('BIST') || symbol.toUpperCase().endsWith('.IS'));
+        const isBist = symbol && (
+            symbol.toUpperCase().includes('BIST') || 
+            symbol.toUpperCase().endsWith('.IS')
+        );
         setIsLocalChart(isBist);
         
         if (isBist) {
@@ -49,8 +53,9 @@ const MarketChart = () => {
 
     // TradingView Dynamic Widget Mount
     useEffect(() => {
-        const containerId = 'tv_chart_container';
-        const container = document.getElementById(containerId);
+        if (isLocalChart) return;
+        
+        const container = tvContainerRef.current;
         if(!container) return;
 
         // Clean previous widget
@@ -60,7 +65,7 @@ const MarketChart = () => {
         script.src = 'https://s3.tradingview.com/tv.js';
         script.async = true;
         script.onload = () => {
-            if (window.TradingView) {
+            if (window.TradingView && tvContainerRef.current) {
                 new window.TradingView.widget({
                     "autosize": true,
                     "symbol": getTVSymbol(symbol, currency),
@@ -74,16 +79,16 @@ const MarketChart = () => {
                     "hide_top_toolbar": false,
                     "hide_legend": false,
                     "save_image": false,
-                    "container_id": containerId
+                    "container_id": container.id
                 });
             }
         };
         container.appendChild(script);
 
         return () => {
-             container.innerHTML = '';
+             if (container) container.innerHTML = '';
         }
-    }, [symbol, currency]);
+    }, [symbol, currency, isLocalChart]);
 
     // Debounced Live Search Effect
     useEffect(() => {
@@ -311,7 +316,7 @@ const MarketChart = () => {
                         )}
                     </div>
                 ) : (
-                    <div id="tv_chart_container" className="w-full h-full" />
+                    <div id="tv_chart_container" ref={tvContainerRef} className="w-full h-full" />
                 )}
                 
                 {/* Decorative Borders */}
