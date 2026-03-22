@@ -18,6 +18,21 @@ export default function RootLayout() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
 
+  // Check initial login status
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
+        const userData = await AsyncStorage.getItem('user_data');
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+      } catch (e) {
+        console.error('Failed to load user data', e);
+      }
+    };
+    checkLoginStatus();
+  }, []);
+
   // Auth Redirect Logic
   useEffect(() => {
     // Wait for segments to be populated (router is ready)
@@ -25,7 +40,8 @@ export default function RootLayout() {
 
     const inAuthGroup = segments[0] === '(tabs)';
     const isAuthPath = segments[0] === 'login';
-    const isDetailPath = segments[0] === 'prediction-detail' || segments[0] === 'market-chart';
+    const pathName = segments[0] as string;
+    const isDetailPath = pathName === 'prediction-detail' || pathName === 'market-chart' || pathName === 'money-flow' || pathName === 'analysis' || pathName === 'market-360';
     
     console.log('Auth Check Logic:', { user: !!user, segments: segments[0], inAuthGroup, isAuthPath, isDetailPath });
 
@@ -41,20 +57,28 @@ export default function RootLayout() {
 
   const authContextValue = {
     user,
-    login: () => {
+    login: async () => {
         console.log('AuthContext: Logging in...');
-        setUser({ 
+        const newUserData = { 
           name: 'Geliştirici', 
           email: 'admin@predictpro.com',
           credits: 1000 
-        });
+        };
+        setUser(newUserData);
+        await AsyncStorage.setItem('user_data', JSON.stringify(newUserData));
     },
     logout: async () => {
       await AsyncStorage.removeItem('chat_history');
+      await AsyncStorage.removeItem('user_data');
       setUser(null);
     },
-    updateCredits: (newCredits: number) => {
-      setUser((prev: any) => prev ? { ...prev, credits: newCredits } : prev);
+    updateCredits: async (newCredits: number) => {
+      setUser((prev: any) => {
+        if (!prev) return prev;
+        const updated = { ...prev, credits: newCredits };
+        AsyncStorage.setItem('user_data', JSON.stringify(updated)).catch(console.error);
+        return updated;
+      });
     }
   };
 

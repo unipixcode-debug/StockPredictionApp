@@ -171,7 +171,10 @@ const MoneyFlowScreen = () => {
                                     entering={FadeInDown.delay(index * 80)}
                                     style={[s.assetCard, { borderColor: `${accent}30`, backgroundColor: `${accent}0A` }]}
                                 >
-                                    <View style={s.assetHead}>
+                                    <TouchableOpacity 
+                                        style={s.assetHead}
+                                        onPress={() => router.push({ pathname: '/money-flow/[id]' as any, params: { id: asset.id } })}
+                                    >
                                         <Text style={s.assetName}>{asset.name}</Text>
                                         <View style={s.assetHeadRight}>
                                             <TouchableOpacity
@@ -184,7 +187,7 @@ const MoneyFlowScreen = () => {
                                                 {asset.change > 0 ? <TrendingUp size={14} color="#4ade80" /> : <TrendingDown size={14} color="#f87171" />}
                                             </View>
                                         </View>
-                                    </View>
+                                    </TouchableOpacity>
 
                                     <View style={s.valueRow}>
                                         <Text style={s.valueText}>{asset.value.toFixed(1)}</Text>

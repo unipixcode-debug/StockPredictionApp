@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, StyleSheet, Modal, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Activity, TrendingUp, TrendingDown, Clock, Search, ChevronRight, BrainCircuit, Trash2, Play, RefreshCw, X, LogOut } from 'lucide-react-native';
+import { Activity, TrendingUp, TrendingDown, Clock, Search, ChevronRight, BrainCircuit, Trash2, Play, RefreshCw, X, LogOut, Globe, BarChart3 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Config } from '@/constants/Config';
 import { TextInput } from 'react-native';
@@ -159,6 +159,16 @@ const DashboardScreen = () => {
                     </View>
 
                     {/* AI Analysis Search Box */}
+                    <View style={styles.actionHeaderRow}>
+                        <TouchableOpacity style={styles.actionNavBtn} onPress={() => router.push('/market-360' as any)}>
+                            <Globe size={18} color="#22d3ee" />
+                            <Text style={styles.actionNavText}>Market 360</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionNavBtn} onPress={() => router.push('/analysis' as any)}>
+                            <BarChart3 size={18} color="#f59e0b" />
+                            <Text style={[styles.actionNavText, { color: '#f59e0b' }]}>Genel Analiz</Text>
+                        </TouchableOpacity>
+                    </View>
                     <View style={styles.searchSection}>
                         <View style={styles.searchInputWrapper}>
                             <TextInput
@@ -344,6 +354,9 @@ const styles = StyleSheet.create({
     tabButtonActive: { backgroundColor: '#22d3ee', borderColor: '#22d3ee' },
     tabText: { fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.5)' },
     tabTextActive: { color: '#0f172a' },
+    actionHeaderRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+    actionNavBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingVertical: 12, gap: 8 },
+    actionNavText: { fontSize: 13, fontWeight: '800', color: '#22d3ee' },
     searchSection: { flexDirection: 'row', gap: 12, marginBottom: 32 },
     searchInputWrapper: { flex: 1, height: 50, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
     searchInput: { flex: 1, color: 'white', fontWeight: '700', fontSize: 14 },

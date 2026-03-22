@@ -327,12 +327,12 @@ const MoneyFlow = () => {
                                     <p className="text-muted-foreground font-bold tracking-widest uppercase text-xs opacity-50">Sınıfın İçindeki En Büyük 100 Varlık ve Likidite Dağılımı</p>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-y-auto pr-6 custom-scrollbar flex-1 pb-10">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-y-auto pr-6 custom-scrollbar flex-1 pb-10" style={{ maxHeight: '60vh' }}>
                                     {data.assets.find(a => a.id === expandedAsset).subAssets.map((sub, idx) => (
-                                        <div key={idx} className={`p-6 rounded-3xl border border-white/5 bg-white/3 flex justify-between items-center group ${sub.isOther ? 'bg-primary/5 border-primary/20' : ''}`}>
+                                        <div key={idx} className={`p-6 rounded-3xl border border-white/5 bg-white/5 flex justify-between items-center group transition-colors hover:bg-white/10 ${sub.isOther ? 'bg-primary/5 border-primary/20' : ''}`}>
                                             <div className="flex flex-col">
                                                 <span className="text-sm font-black italic uppercase tracking-tight group-hover:text-primary transition-colors">{sub.name}</span>
-                                                <span className="text-[10px] opacity-30 font-bold uppercase tracking-widest">{formatValue(sub.value)}</span>
+                                                <span className="text-[10px] opacity-40 font-bold uppercase tracking-widest">{formatValue(sub.value)}</span>
                                             </div>
                                             <div className={`px-3 py-1 rounded-xl text-xs font-black italic ${sub.change >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
                                                 {sub.change > 0 ? '+' : ''}{sub.change?.toFixed(2)}%

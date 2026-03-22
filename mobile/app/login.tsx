@@ -11,9 +11,9 @@ const LoginScreen = () => {
     const auth = useAuth();
     const router = useRouter();
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         console.log('Login: Action triggered');
-        auth.login();
+        await auth.login();
         
         // Use the auth state to determine if we should redirect
         // Since login() updates state, the global useEffect in _layout.tsx 

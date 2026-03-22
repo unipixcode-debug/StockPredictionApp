@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-console.log("Bypassing CDN cache v4");
+console.log("Bypassing CDN cache v5");
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
@@ -29,6 +29,8 @@ const PortfolioOverview = () => {
     const [isSearching, setIsSearching] = useState(false);
     const [selectedAsset, setSelectedAsset] = useState(null);
     const [modalCurrency, setModalCurrency] = useState('USD');
+    const [modalAmount, setModalAmount] = useState('');
+    const [modalAvgPrice, setModalAvgPrice] = useState('');
 
     const fetchData = async () => {
         try {
@@ -445,6 +447,8 @@ const PortfolioOverview = () => {
                                     setShowAddModal(false);
                                     setSelectedAsset(null);
                                     setSearchQuery('');
+                                    setModalAmount('');
+                                    setModalAvgPrice('');
                                     fetchData();
                                 }}>
                                 <div className="space-y-2 relative">
@@ -508,6 +512,8 @@ const PortfolioOverview = () => {
                                             name="amount" 
                                             type="number" 
                                             step="any"
+                                            value={modalAmount}
+                                            onChange={(e) => setModalAmount(e.target.value)}
                                             required
                                             className="w-full bg-secondary/50 border border-border p-4 rounded-2xl font-black italic outline-none focus:border-primary transition-all"
                                         />
@@ -519,7 +525,9 @@ const PortfolioOverview = () => {
                                                 name="avgPrice" 
                                                 type="number" 
                                                 step="any"
-                                                placeholder={language === 'TR' ? 'Maliyet' : 'Cost'}
+                                                value={modalAvgPrice}
+                                                onChange={(e) => setModalAvgPrice(e.target.value)}
+                                                placeholder={language === 'TR' ? 'Birim Fiyat' : 'Unit Price'}
                                                 required
                                                 className="flex-1 bg-secondary/50 border border-border p-4 rounded-2xl font-black italic outline-none focus:border-primary transition-all"
                                             />
@@ -535,6 +543,15 @@ const PortfolioOverview = () => {
                                         </div>
                                     </div>
                                 </div>
+
+                                {modalAmount && modalAvgPrice && !isNaN(parseFloat(modalAmount)) && !isNaN(parseFloat(modalAvgPrice)) && (
+                                    <div className="p-4 bg-primary/10 border border-primary/20 rounded-2xl flex justify-between items-center animate-in slide-in-from-bottom-2 fade-in">
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Toplam Maliyet</span>
+                                        <span className="text-lg font-black italic text-primary">
+                                            {(parseFloat(modalAmount) * parseFloat(modalAvgPrice)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} {modalCurrency}
+                                        </span>
+                                    </div>
+                                )}
 
                                 <button type="submit" className="w-full premium-button py-4 text-sm">
                                     PORTFÖYE EKLE
