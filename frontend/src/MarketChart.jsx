@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ChevronLeft, RefreshCw, Repeat, BarChart3, 
-  Info, Zap, Maximize2, ExternalLink, Search, Play
+  Info, Zap, Maximize2, ExternalLink, Search, Play, Shield
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import api from './api';
