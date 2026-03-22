@@ -20,6 +20,7 @@ const PortfolioOverview = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [availableAssets, setAvailableAssets] = useState([]);
     const [selectedChartAsset, setSelectedChartAsset] = useState(null);
+    const [displayCurrency, setDisplayCurrency] = useState('USD');
     
     // Search State
     const [searchQuery, setSearchQuery] = useState('');
@@ -69,15 +70,32 @@ const PortfolioOverview = () => {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    const totalValue = holdings.reduce((sum, h) => sum + Number(h.value || 0), 0);
-    const totalInvested = holdings.reduce((sum, h) => sum + Number(h.totalInvested || 0), 0);
+    // Helper to get value in display currency
+    const getVal = (valInNC, nc) => {
+        const usdtry = holdings[0]?.usdtry || 32.5;
+        if (displayCurrency === nc) return valInNC;
+        if (displayCurrency === 'TRY' && nc === 'USD') return valInNC * usdtry;
+        if (displayCurrency === 'USD' && nc === 'TRY') return valInNC / usdtry;
+        return valInNC;
+    };
+
+    const getValFromPC = (valInPC, pc) => {
+        const usdtry = holdings[0]?.usdtry || 32.5;
+        if (displayCurrency === pc) return valInPC;
+        if (displayCurrency === 'TRY' && pc === 'USD') return valInPC * usdtry;
+        if (displayCurrency === 'USD' && pc === 'TRY') return valInPC / usdtry;
+        return valInPC;
+    };
+
+    const totalValue = holdings.reduce((sum, h) => sum + getVal(h.valueInNC, h.naturalCurrency), 0);
+    const totalInvested = holdings.reduce((sum, h) => sum + getValFromPC(Number(h.totalInvested), h.purchaseCurrency), 0);
     const totalPL = totalValue - totalInvested;
     const totalPLPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
 
     const PREMIUM_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
     const chartData = holdings.map((h, i) => ({
         name: h.symbol,
-        value: Number(h.value || 0),
+        value: getVal(h.valueInNC, h.naturalCurrency),
         color: PREMIUM_COLORS[i % PREMIUM_COLORS.length]
     })).filter(d => d.value > 0);
 
@@ -99,7 +117,23 @@ const PortfolioOverview = () => {
                     </h1>
                     <p className="text-muted-foreground font-medium">Real-time cross-asset risk monitoring and allocation analysis.</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-6">
+                    {/* Currency Toggle */}
+                    <div className="flex bg-secondary/30 rounded-2xl p-1 border border-white/5">
+                        <button 
+                            onClick={() => setDisplayCurrency('USD')}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${displayCurrency === 'USD' ? 'bg-primary text-white shadow-lg' : 'opacity-40 hover:opacity-100'}`}
+                        >
+                            USD
+                        </button>
+                        <button 
+                            onClick={() => setDisplayCurrency('TRY')}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${displayCurrency === 'TRY' ? 'bg-primary text-white shadow-lg' : 'opacity-40 hover:opacity-100'}`}
+                        >
+                            TRY
+                        </button>
+                    </div>
+
                     <button 
                         onClick={() => setShowAddModal(true)}
                         className="premium-button py-3 px-6 flex items-center gap-2 group"
@@ -109,7 +143,10 @@ const PortfolioOverview = () => {
                     </button>
                     <div className="px-6 py-3 bg-primary/10 border border-primary/20 rounded-3xl backdrop-blur-md">
                         <span className="text-[10px] font-black uppercase tracking-widest opacity-50 block">Total Value</span>
-                        <span className="text-xl font-black italic">${totalValue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        <span className="text-xl font-black italic">
+                            {displayCurrency === 'USD' ? '$' : '₺'}
+                            {totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </span>
                     </div>
                 </div>
             </header>
@@ -172,7 +209,7 @@ const PortfolioOverview = () => {
                                     <span className="text-[10px] font-black uppercase tracking-widest opacity-40 block mb-2">Net Portfolio Return</span>
                                     <div className={`text-6xl font-black italic tracking-tighter ${totalPL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                         {totalPL >= 0 ? '+' : ''}{totalPL.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                                        <span className="text-2xl ml-2 font-black">$</span>
+                                        <span className="text-2xl ml-2 font-black">{displayCurrency === 'USD' ? '$' : '₺'}</span>
                                     </div>
                                     <div className={`mt-2 font-black text-sm flex items-center justify-center gap-2 ${totalPLPercent >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                         {totalPLPercent >= 0 ? <ArrowUpRight size={18} /> : <ArrowDownLeft size={18} />}
@@ -183,7 +220,10 @@ const PortfolioOverview = () => {
                                 <div className="grid grid-cols-2 gap-6 min-w-0">
                                     <div className="p-4 rounded-3xl bg-secondary/30 border border-border/50 overflow-hidden">
                                         <span className="text-[10px] font-black uppercase tracking-widest opacity-40 block mb-1 truncate">Total Invested</span>
-                                        <span className="text-lg font-black italic underline decoration-primary/20 truncate block">${totalInvested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                        <span className="text-lg font-black italic underline decoration-primary/20 truncate block">
+                                            {displayCurrency === 'USD' ? '$' : '₺'}
+                                            {totalInvested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                        </span>
                                     </div>
                                     <div className="p-4 rounded-3xl bg-secondary/30 border border-border/50 overflow-hidden">
                                         <span className="text-[10px] font-black uppercase tracking-widest opacity-40 block mb-1 truncate">Active Assets</span>
@@ -200,9 +240,12 @@ const PortfolioOverview = () => {
                             <thead>
                                 <tr className="border-b border-border/50">
                                     <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40">Asset</th>
-                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40">Entry (Avg)</th>
+                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40">Amount</th>
+                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40">Avg Cost</th>
+                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40">Total Cost</th>
                                     <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40">Live Price</th>
-                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40">P/L (USD)</th>
+                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40 text-right">Market Value</th>
+                                    <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40 text-right">P/L</th>
                                     <th className="p-4 text-[10px] font-black uppercase tracking-widest opacity-40 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -218,13 +261,38 @@ const PortfolioOverview = () => {
                                                 <span className="font-black italic underline decoration-primary/20">{row.symbol}</span>
                                             </div>
                                         </td>
-                                        <td className="p-4 font-bold text-sm text-muted-foreground">${Number(row.avgPrice).toLocaleString()}</td>
-                                        <td className="p-4 font-bold text-sm">${Number(row.currentPrice).toLocaleString()}</td>
-                                        <td className={`p-4 font-black text-xs ${row.pl >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                            <div className="flex items-center gap-1">
-                                                {row.pl >= 0 ? <Plus size={12} /> : ''}
-                                                {row.pl.toLocaleString(undefined, {maximumFractionDigits: 2})}
-                                                <span className="ml-1 opacity-60">({row.plPercent.toFixed(1)}%)</span>
+                                        <td className="p-4 font-black italic text-xs">{Number(row.amount).toLocaleString()}</td>
+                                        <td className="p-4">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-sm">
+                                                    {displayCurrency === 'USD' ? '$' : '₺'}
+                                                    {getValFromPC(Number(row.avgPrice), row.purchaseCurrency).toLocaleString()}
+                                                </span>
+                                                <span className="text-[10px] opacity-40">{Number(row.avgPrice).toLocaleString()} {row.purchaseCurrency}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 font-bold text-sm text-muted-foreground whitespace-nowrap">
+                                            {displayCurrency === 'USD' ? '$' : '₺'}
+                                            {getValFromPC(Number(row.totalInvested), row.purchaseCurrency).toLocaleString()}
+                                        </td>
+                                        <td className="p-4 font-bold text-sm whitespace-nowrap">
+                                            {displayCurrency === 'USD' ? '$' : '₺'}
+                                            {getVal(Number(row.currentPrice), row.naturalCurrency).toLocaleString()}
+                                        </td>
+                                        <td className="p-4 font-black text-sm text-right whitespace-nowrap">
+                                            {displayCurrency === 'USD' ? '$' : '₺'}
+                                            {getVal(Number(row.valueInNC), row.naturalCurrency).toLocaleString()}
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <div className="flex flex-col items-end">
+                                                <div className={`font-black text-xs ${row.pl >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                    {row.pl >= 0 ? '+' : ''}
+                                                    {getValFromPC(row.pl, row.purchaseCurrency).toLocaleString(undefined, {maximumFractionDigits: 2})}
+                                                    <span className="ml-1">{displayCurrency}</span>
+                                                </div>
+                                                <span className={`text-[10px] font-black ${row.pl >= 0 ? 'text-emerald-500/50' : 'text-rose-500/50'}`}>
+                                                    {row.plPercent >= 0 ? '▲' : '▼'} {Math.abs(row.plPercent).toFixed(1)}%
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="p-4 text-right">
@@ -337,7 +405,8 @@ const PortfolioOverview = () => {
                                         symbol: formData.get('symbol'),
                                         amount: parseFloat(formData.get('amount')),
                                         avgPrice: parseFloat(formData.get('avgPrice')),
-                                        market: formData.get('market') || 'STOCK'
+                                        market: formData.get('market') || 'STOCK',
+                                        purchaseCurrency: formData.get('purchaseCurrency') || 'USD'
                                     };
                                     if (!data.symbol) return alert('Lütfen geçerli bir varlık seçin.');
                                     await api.post('/portfolio', data);
@@ -408,14 +477,23 @@ const PortfolioOverview = () => {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-2">Ortalama Maliyet</label>
-                                        <input 
-                                            name="avgPrice" 
-                                            type="number" 
-                                            step="any"
-                                            required
-                                            className="w-full bg-secondary/50 border border-border p-4 rounded-2xl font-black italic outline-none focus:border-primary transition-all"
-                                        />
+                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-2">Birim Maliyet</label>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                name="avgPrice" 
+                                                type="number" 
+                                                step="any"
+                                                required
+                                                className="flex-1 bg-secondary/50 border border-border p-4 rounded-2xl font-black italic outline-none focus:border-primary transition-all"
+                                            />
+                                            <select 
+                                                name="purchaseCurrency"
+                                                className="bg-secondary/50 border border-border px-4 rounded-2xl font-black italic outline-none focus:border-primary appearance-none"
+                                            >
+                                                <option value="USD">USD</option>
+                                                <option value="TRY">TRY</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
 
