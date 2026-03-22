@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-console.log("Bypassing CDN cache v5");
+console.log("Bypassing CDN cache v6");
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
