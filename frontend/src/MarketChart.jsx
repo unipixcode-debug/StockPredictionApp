@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import api from './api';
+import { TradingChart } from './TradingChart';
 
 const MarketChart = () => {
     const { symbol } = useParams();
@@ -20,6 +21,31 @@ const MarketChart = () => {
     const [liveSearchResults, setLiveSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [historicalData, setHistoricalData] = useState([]);
+    const [isLocalChart, setIsLocalChart] = useState(false);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+    // Detect if this symbol belongs to a restricted market (BIST)
+    useEffect(() => {
+        const isBist = symbol && (symbol.toUpperCase().includes('BIST') || symbol.toUpperCase().endsWith('.IS'));
+        setIsLocalChart(isBist);
+        
+        if (isBist) {
+            fetchLocalHistory();
+        }
+    }, [symbol]);
+
+    async function fetchLocalHistory() {
+        setIsHistoryLoading(true);
+        try {
+            const data = await api.get(`/market/history?symbol=${symbol}&timeframe=1D&limit=300`);
+            setHistoricalData(data || []);
+        } catch (error) {
+            console.error("Local history fetch failed:", error);
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    }
 
     // TradingView Dynamic Widget Mount
     useEffect(() => {
@@ -255,14 +281,46 @@ const MarketChart = () => {
             </div>
 
             {/* Chart Container */}
-            <div className="flex-1 glass-card relative group shadow-2xl overflow-hidden border-border/50">
-                <div id="tv_chart_container" className="w-full h-full" />
+            <div className="flex-1 glass-card relative group shadow-2xl overflow-hidden border-border/50 bg-black/20">
+                {isLocalChart ? (
+                    <div className="w-full h-full p-4 flex flex-col">
+                        {isHistoryLoading ? (
+                            <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+                                <RefreshCw className="animate-spin text-primary w-12 h-12" />
+                                <span className="text-xs font-black uppercase tracking-widest opacity-40 italic">Yerel Veri Hazırlanıyor...</span>
+                            </div>
+                        ) : historicalData.length > 0 ? (
+                            <div className="flex-1 w-full h-full relative">
+                                <TradingChart 
+                                    data={historicalData} 
+                                    height={window.innerHeight - 350}
+                                    type="candlestick"
+                                />
+                                <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center space-x-2">
+                                    <Shield size={10} className="text-amber-500" />
+                                    <span className="text-amber-500 text-[8px] font-black uppercase tracking-widest">Yerel Motor (TradingView Kısıtlaması)</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
+                                <BarChart3 className="text-muted-foreground w-16 h-16 mb-4 opacity-20" />
+                                <h3 className="text-xl font-black uppercase italic">Veri Akışı Kesildi</h3>
+                                <p className="text-sm text-muted-foreground max-w-xs mt-2 font-medium">Bu sembol için şu an canlı veri alınamıyor. Lütfen daha sonra tekrar deneyin.</p>
+                                <button onClick={fetchLocalHistory} className="mt-6 px-6 py-2 bg-secondary rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary hover:text-primary-foreground transition-all">Tekrar Dene</button>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div id="tv_chart_container" className="w-full h-full" />
+                )}
                 
                 {/* Decorative Borders */}
                 <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-primary/20 to-transparent" />
                 <div className="pointer-events-none absolute bottom-4 right-4 flex items-center space-x-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <BarChart3 size={12} className="text-primary" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Powered by TradingView</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/40">
+                        {isLocalChart ? "Powered by PredictPro Engine" : "Powered by TradingView"}
+                    </span>
                 </div>
             </div>
 
