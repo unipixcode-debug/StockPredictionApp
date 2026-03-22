@@ -72,19 +72,23 @@ const PortfolioOverview = () => {
 
     // Helper to get value in display currency
     const getVal = (valInNC, nc) => {
-        const usdtry = holdings[0]?.usdtry || 32.5;
-        if (displayCurrency === nc) return valInNC;
-        if (displayCurrency === 'TRY' && nc === 'USD') return valInNC * usdtry;
-        if (displayCurrency === 'USD' && nc === 'TRY') return valInNC / usdtry;
-        return valInNC;
+        const v = parseFloat(valInNC || 0);
+        if (isNaN(v)) return 0;
+        const usdtry = parseFloat(holdings.find(h => h.usdtry)?.usdtry || 32.5);
+        if (displayCurrency === nc) return v;
+        if (displayCurrency === 'TRY' && nc === 'USD') return v * usdtry;
+        if (displayCurrency === 'USD' && nc === 'TRY') return v / usdtry;
+        return v;
     };
 
     const getValFromPC = (valInPC, pc) => {
-        const usdtry = holdings[0]?.usdtry || 32.5;
-        if (displayCurrency === pc) return valInPC;
-        if (displayCurrency === 'TRY' && pc === 'USD') return valInPC * usdtry;
-        if (displayCurrency === 'USD' && pc === 'TRY') return valInPC / usdtry;
-        return valInPC;
+        const v = parseFloat(valInPC || 0);
+        if (isNaN(v)) return 0;
+        const usdtry = parseFloat(holdings.find(h => h.usdtry)?.usdtry || 32.5);
+        if (displayCurrency === pc) return v;
+        if (displayCurrency === 'TRY' && pc === 'USD') return v * usdtry;
+        if (displayCurrency === 'USD' && pc === 'TRY') return v / usdtry;
+        return v;
     };
 
     const totalValue = holdings.reduce((sum, h) => sum + getVal(h.valueInNC, h.naturalCurrency), 0);
