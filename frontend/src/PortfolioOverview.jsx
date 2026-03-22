@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-console.log("Bypassing CDN cache v6");
+console.log("Bypassing CDN cache v7");
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
@@ -116,13 +116,7 @@ const PortfolioOverview = () => {
     const totalPL = totalValue - totalInvested;
     const totalPLPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
 
-    // Helpers for safe, per-row native currency symbols
-    const getNcSym = (nc, dc) => {
-        const safe_nc = nc || 'USD';
-        const effective = (dc === safe_nc) ? safe_nc : dc;
-        return effective === 'TRY' ? '₺' : '$';
-    };
-    const getPcSym = (pc) => (pc || 'USD') === 'TRY' ? '₺' : '$';
+    const ds = displayCurrency === 'TRY' ? '₺' : '$';
 
     const PREMIUM_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
     const chartData = (holdings || []).map((h, i) => ({
@@ -299,22 +293,22 @@ const PortfolioOverview = () => {
                                         <td className="p-4">
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-sm">
-                                                    {getPcSym(row.purchaseCurrency)}
+                                                    {ds}
                                                     {getValFromPC(Number(row.avgPrice), row.purchaseCurrency || 'USD').toLocaleString()}
                                                 </span>
                                                 <span className="text-[10px] opacity-40">{Number(row.avgPrice).toLocaleString()} {row.purchaseCurrency || 'USD'}</span>
                                             </div>
                                         </td>
                                         <td className="p-4 font-bold text-sm text-muted-foreground whitespace-nowrap">
-                                            {getPcSym(row.purchaseCurrency)}
+                                            {ds}
                                             {getValFromPC(Number(row.totalInvested), row.purchaseCurrency || 'USD').toLocaleString()}
                                         </td>
                                         <td className="p-4 font-bold text-sm whitespace-nowrap">
-                                            {getNcSym(row.naturalCurrency, displayCurrency)}
+                                            {ds}
                                             {getVal(Number(row.currentPrice), row.naturalCurrency || 'USD', row).toLocaleString()}
                                         </td>
                                         <td className="p-4 font-black text-sm text-right whitespace-nowrap">
-                                            {getNcSym(row.naturalCurrency, displayCurrency)}
+                                            {ds}
                                             {getVal(row.valueInNC, row.naturalCurrency || 'USD', row).toLocaleString()}
                                         </td>
                                         <td className="p-4 text-right">
