@@ -67,11 +67,11 @@ const MoneyFlow = () => {
 
     const centerPos = { x: 50, y: 58 };
     const nodePositions = useMemo(() => [
-        { x: 85, y: 40 },     // EMTİA
-        { x: 55, y: 5 },      // KRİPTO
-        { x: 30, y: 79 },     // HİSSE
-        { x: 10, y: 35 },     // TAHVİL
-        { x: 70, y: 79 },     // NAKİT
+        { x: 73, y: 32 },     // EMTİA
+        { x: 45, y: 3 },      // KRİPTO
+        { x: 22, y: 75 },     // HİSSE
+        { x: 14, y: 30 },     // TAHVİL
+        { x: 64, y: 75 },     // NAKİT
     ], []);
 
     const rayEndpoints = useMemo(() => {

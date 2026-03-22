@@ -45,12 +45,7 @@ const Dashboard = () => {
     setShowDisclaimer(false);
   };
 
-  const symbolSuggestions = [
-    { name: 'BTC-USD', market: 'Crypto' }, { name: 'ETH-USD', market: 'Crypto' }, { name: 'SOL-USD', market: 'Crypto' }, { name: 'XRPUSD', market: 'Crypto' },
-    { name: 'AAPL', market: 'US Stock' }, { name: 'NVDA', market: 'US Stock' }, { name: 'TSLA', market: 'US Stock' }, { name: 'MSFT', market: 'US Stock' },
-    { name: 'THYAO.IS', market: 'BIST' }, { name: 'ASELS.IS', market: 'BIST' }, { name: 'EREGL.IS', market: 'BIST' }, { name: 'KCHOL.IS', market: 'BIST' },
-    { name: 'XAUUSD', market: 'Commodity' }, { name: 'GC=F', market: 'Commodity' }, { name: 'SI=F', market: 'Commodity' }, { name: 'BRENT', market: 'Commodity' }, { name: 'EURUSD', market: 'FX' }
-  ];
+
 
   useEffect(() => {
     fetchData();
@@ -65,6 +60,29 @@ const Dashboard = () => {
     }, 4000);
     return () => clearInterval(interval);
   }, [news]);
+
+  const [liveSearchResults, setLiveSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Debounced Live Search Effect
+  useEffect(() => {
+    if (searchSymbol.length < 2) {
+      setLiveSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await api.get(`/market/search?q=${searchSymbol}&_t=${Date.now()}`);
+        setLiveSearchResults(res || []);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchSymbol]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -347,31 +365,39 @@ const Dashboard = () => {
                     exit={{ opacity: 0, y: 5 }}
                     className="absolute z-50 left-0 right-0 mt-2 bg-[#0c0c0e]/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl"
                   >
-                    {symbolSuggestions
-                      .filter(s => s.name.toLowerCase().includes(searchSymbol.toLowerCase()))
-                      .slice(0, 5)
-                      .map((s, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setSearchSymbol(s.name);
-                            setShowSuggestions(false);
-                          }}
-                          className="w-full px-5 py-3 flex items-center justify-between hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-xs font-black">
-                              {s.name.substring(0, 1)}
-                            </div>
-                            <span className="text-sm font-bold text-foreground">{s.name}</span>
-                          </div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50">{s.market}</span>
-                        </button>
-                      ))}
-                    {symbolSuggestions.filter(s => s.name.toLowerCase().includes(searchSymbol.toLowerCase())).length === 0 && (
-                      <div className="px-5 py-3 text-xs text-muted-foreground font-medium italic">
-                        Öneri bulunamadı: "{searchSymbol}"
+                    {isSearching ? (
+                      <div className="px-5 py-3 text-xs text-muted-foreground font-medium italic animate-pulse flex items-center justify-center">
+                        <RefreshCw size={14} className="animate-spin mr-2" /> Canlı piyasa taranıyor...
                       </div>
+                    ) : (
+                      liveSearchResults.length > 0 ? (
+                        liveSearchResults
+                          .slice(0, 5)
+                          .map((s, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setSearchSymbol(s.symbol);
+                                setShowSuggestions(false);
+                              }}
+                              className="w-full px-5 py-3 flex items-center justify-between hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-xs font-black">
+                                  {s.symbol.substring(0, 1)}
+                                </div>
+                                <span className="text-sm font-bold text-foreground">{s.symbol}</span>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50">{s.market}</span>
+                            </button>
+                          ))
+                      ) : (
+                        searchSymbol.length >= 2 && (
+                          <div className="px-5 py-3 text-xs text-muted-foreground font-medium italic">
+                            Sonuç bulunamadı: "{searchSymbol}"
+                          </div>
+                        )
+                      )
                     )}
                   </motion.div>
                 )}

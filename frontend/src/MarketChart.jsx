@@ -3,8 +3,10 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ChevronLeft, RefreshCw, Repeat, BarChart3, 
-  Info, Zap, Maximize2, ExternalLink
+  Info, Zap, Maximize2, ExternalLink, Search, Play
 } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import api from './api';
 
 const MarketChart = () => {
     const { symbol } = useParams();
@@ -12,8 +14,32 @@ const MarketChart = () => {
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const name = queryParams.get('name') || symbol;
-    
+
     const [currency, setCurrency] = useState('USD');
+    const [searchSymbol, setSearchSymbol] = useState('');
+    const [liveSearchResults, setLiveSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    // Debounced Live Search Effect
+    useEffect(() => {
+        if (searchSymbol.length < 2) {
+            setLiveSearchResults([]);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const res = await api.get(`/market/search?q=${searchSymbol}&_t=${Date.now()}`);
+                setLiveSearchResults(res || []);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchSymbol]);
     // Map common names to TradingView symbols
     const getTVSymbol = (s, cur) => {
         const mapping = {
@@ -74,6 +100,9 @@ const MarketChart = () => {
         if (s && s.endsWith && s.endsWith('.IS')) {
             return `BIST:${s.replace('.IS', '')}`;
         }
+        if (s && s.endsWith && s.endsWith('USDT') && !s.includes(':')) {
+            return `BINANCE:${s}`;
+        }
         return mapping[s] || s;
     };
 
@@ -107,17 +136,73 @@ const MarketChart = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-4 w-full md:w-auto mt-4 md:mt-0">
+                    {/* Live Search Bar for Quick Jump */}
+                    <div className="relative flex-1 sm:w-64 group/search">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Piyasa Ara (örn: ROSEUSDT)"
+                                value={searchSymbol}
+                                onChange={(e) => setSearchSymbol(e.target.value)}
+                                onFocus={() => setShowSuggestions(true)}
+                                className="w-full bg-secondary/30 border border-border rounded-full py-2.5 pl-10 pr-4 text-sm font-bold placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 transition-colors backdrop-blur-md uppercase placeholder:normal-case shadow-inner"
+                            />
+                            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/search:text-primary transition-colors" />
+                        </div>
+
+                        <AnimatePresence>
+                            {showSuggestions && searchSymbol.length > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 5 }}
+                                    className="absolute right-0 z-50 mt-2 w-64 md:w-80 bg-[#0c0c0e]/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl"
+                                >
+                                    {isSearching ? (
+                                        <div className="px-5 py-3 text-xs text-muted-foreground font-medium italic animate-pulse flex items-center justify-center">
+                                            <RefreshCw size={14} className="animate-spin mr-2" /> Taranıyor...
+                                        </div>
+                                    ) : liveSearchResults.length > 0 ? (
+                                        liveSearchResults.slice(0, 5).map((s, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => {
+                                                    setSearchSymbol('');
+                                                    setShowSuggestions(false);
+                                                    navigate(`/chart/${s.symbol}?name=${s.symbol}`);
+                                                }}
+                                                className="w-full px-5 py-3 flex items-center justify-between hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                                            >
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-xs font-black">
+                                                        {s.symbol.substring(0, 1)}
+                                                    </div>
+                                                    <span className="text-sm font-bold text-foreground truncate max-w-[120px] text-left">{s.symbol}</span>
+                                                </div>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50 shrink-0 ml-2">{s.market.substring(0,8)}</span>
+                                            </button>
+                                        ))
+                                    ) : searchSymbol.length >= 2 && (
+                                        <div className="px-5 py-3 text-xs text-muted-foreground font-medium italic">
+                                            Sonuç bulunamadı: "{searchSymbol}"
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
                     <button 
                         onClick={() => setCurrency(currency === 'USD' ? 'TRY' : 'USD')}
-                        className="flex items-center space-x-3 px-6 py-3 bg-secondary/80 border border-border text-foreground hover:border-primary/50 rounded-2xl transition-all shadow-xl group active:scale-95"
+                        className="hidden md:flex items-center space-x-3 px-6 py-3 bg-secondary/80 border border-border text-foreground hover:border-primary/50 rounded-2xl transition-all shadow-xl group active:scale-95 shrink-0"
                     >
                         <div className="w-8 h-8 rounded-xl bg-background flex items-center justify-center border border-border group-hover:bg-primary/10 transition-all">
                              <Repeat size={16} className="text-primary" />
                         </div>
                         <span className="font-black italic uppercase tracking-tighter text-lg">{currency}</span>
                     </button>
-                    <button className="w-14 h-14 bg-secondary/50 border border-border rounded-2xl flex items-center justify-center text-muted-foreground hover:text-primary transition-all active:scale-90">
+                    <button className="hidden md:flex w-14 h-14 bg-secondary/50 border border-border rounded-2xl items-center justify-center text-muted-foreground hover:text-primary transition-all active:scale-90 shrink-0 cursor-pointer" onClick={() => window.open(window.location.href, '_blank', 'fullscreen=yes')}>
                         <Maximize2 size={24} />
                     </button>
                 </div>

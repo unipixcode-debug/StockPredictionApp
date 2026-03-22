@@ -69,15 +69,16 @@ const PortfolioOverview = () => {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    const totalValue = holdings.reduce((sum, h) => sum + (h.value || 0), 0);
-    const totalInvested = holdings.reduce((sum, h) => sum + (h.totalInvested || 0), 0);
+    const totalValue = holdings.reduce((sum, h) => sum + Number(h.value || 0), 0);
+    const totalInvested = holdings.reduce((sum, h) => sum + Number(h.totalInvested || 0), 0);
     const totalPL = totalValue - totalInvested;
     const totalPLPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
 
-    const chartData = holdings.map(h => ({
+    const PREMIUM_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
+    const chartData = holdings.map((h, i) => ({
         name: h.symbol,
-        value: h.value || 0,
-        color: h.market === 'CRYPTO' ? '#f59e0b' : h.market === 'STOCK' ? '#10b981' : '#6366f1'
+        value: Number(h.value || 0),
+        color: PREMIUM_COLORS[i % PREMIUM_COLORS.length]
     })).filter(d => d.value > 0);
 
     if (loading && holdings.length === 0) {
@@ -153,7 +154,7 @@ const PortfolioOverview = () => {
                                 {holdings.slice(0, 4).map((asset, i) => (
                                     <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-secondary/30">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: asset.market === 'CRYPTO' ? '#f59e0b' : '#10b981' }} />
+                                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: chartData.find(c => c.name === asset.symbol)?.color || '#fff' }} />
                                             <span className="text-xs font-black">{asset.symbol}</span>
                                         </div>
                                         <span className="text-xs font-bold opacity-60">{((asset.value / totalValue) * 100).toFixed(1)}%</span>
@@ -179,14 +180,14 @@ const PortfolioOverview = () => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="p-4 rounded-3xl bg-secondary/30 border border-border/50">
-                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40 block mb-1">Total Invested</span>
-                                        <span className="text-lg font-black italic underline decoration-primary/20">${totalInvested.toLocaleString()}</span>
+                                <div className="grid grid-cols-2 gap-6 min-w-0">
+                                    <div className="p-4 rounded-3xl bg-secondary/30 border border-border/50 overflow-hidden">
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40 block mb-1 truncate">Total Invested</span>
+                                        <span className="text-lg font-black italic underline decoration-primary/20 truncate block">${totalInvested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                     </div>
-                                    <div className="p-4 rounded-3xl bg-secondary/30 border border-border/50">
-                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40 block mb-1">Active Assets</span>
-                                        <span className="text-lg font-black italic underline decoration-cyan-500/20">{holdings.length} Positions</span>
+                                    <div className="p-4 rounded-3xl bg-secondary/30 border border-border/50 overflow-hidden">
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40 block mb-1 truncate">Active Assets</span>
+                                        <span className="text-lg font-black italic underline decoration-cyan-500/20 truncate block">{holdings.length} Positions</span>
                                     </div>
                                 </div>
                             </div>
