@@ -74,7 +74,8 @@ const PortfolioOverview = () => {
     const getVal = (valInNC, nc) => {
         const v = parseFloat(valInNC || 0);
         if (isNaN(v)) return 0;
-        const usdtry = parseFloat(holdings.find(h => h.usdtry)?.usdtry || 32.5);
+        const rawUsdTry = holdings.find(h => h.usdtry)?.usdtry;
+        const usdtry = parseFloat(rawUsdTry) || 32.5;
         if (displayCurrency === nc) return v;
         if (displayCurrency === 'TRY' && nc === 'USD') return v * usdtry;
         if (displayCurrency === 'USD' && nc === 'TRY') return v / usdtry;
@@ -84,7 +85,8 @@ const PortfolioOverview = () => {
     const getValFromPC = (valInPC, pc) => {
         const v = parseFloat(valInPC || 0);
         if (isNaN(v)) return 0;
-        const usdtry = parseFloat(holdings.find(h => h.usdtry)?.usdtry || 32.5);
+        const rawUsdTry = holdings.find(h => h.usdtry)?.usdtry;
+        const usdtry = parseFloat(rawUsdTry) || 32.5;
         if (displayCurrency === pc) return v;
         if (displayCurrency === 'TRY' && pc === 'USD') return v * usdtry;
         if (displayCurrency === 'USD' && pc === 'TRY') return v / usdtry;
