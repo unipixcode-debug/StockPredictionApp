@@ -1,7 +1,7 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const YF = require('yahoo-finance2').default;
-const yahooFinance = new YF({ suppressNotices: ['yahooSurvey'] });
+const yahooFinance = new YF({ suppressNotices: ['ripHistorical', 'yahooSurvey'] });
 const binance = require('binance-api-node').default;
 const binanceClient = binance();
 const scraperService = require('./scraperService');
@@ -188,19 +188,21 @@ class MarketDataService {
                 };
                 
                 const querySymbol = symbolMap[symbol.toUpperCase()] || symbol.toUpperCase();
-                const period1 = new Date();
+                const period1Date = new Date();
                 
-                if (timeframe === '1D') period1.setFullYear(period1.getFullYear() - 1);
-                else if (timeframe === '1W') period1.setFullYear(period1.getFullYear() - 5);
-                else if (timeframe === '1M') period1.setFullYear(1990);
-                else period1.setMonth(period1.getMonth() - 1); 
+                if (timeframe === '1D') period1Date.setFullYear(period1Date.getFullYear() - 1);
+                else if (timeframe === '1W') period1Date.setFullYear(period1Date.getFullYear() - 5);
+                else if (timeframe === '1M') period1Date.setFullYear(1990);
+                else period1Date.setMonth(period1Date.getMonth() - 1); 
                 
-                const result = await yahooFinance.historical(querySymbol, {
+                const period1 = Math.floor(period1Date.getTime() / 1000);
+                const result = await yahooFinance.chart(querySymbol, {
                     period1: period1,
                     interval: intervalMap[timeframe] || '1d'
                 });
                 
-                return result.map(c => {
+                const quotes = result.quotes || [];
+                return quotes.map(c => {
                     const ts = Math.floor(c.date.getTime() / 1000);
                     return {
                         time: ts,
@@ -209,7 +211,7 @@ class MarketDataService {
                         low: c.low,
                         close: c.close,
                         value: c.close, // fallback for line series
-                        volume: c.volume
+                        volume: c.adjclose ? c.adjclose : (c.volume || 0)
                     };
                 });
             }
