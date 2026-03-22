@@ -27,6 +27,7 @@ const PortfolioOverview = () => {
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
     const [selectedAsset, setSelectedAsset] = useState(null);
+    const [modalCurrency, setModalCurrency] = useState('USD');
 
     const fetchData = async () => {
         try {
@@ -36,6 +37,7 @@ const PortfolioOverview = () => {
                 api.get('/portfolio/analysis'),
                 api.get('/market/assets')
             ]);
+            console.log('Portfolio Response:', portfolioData);
             setHoldings(portfolioData);
             setAnalysis(analysisData);
             setAvailableAssets(assetsData);
@@ -71,11 +73,19 @@ const PortfolioOverview = () => {
     }, [searchQuery]);
 
     // Helper to get value in display currency
-    const getVal = (valInNC, nc) => {
-        const v = parseFloat(valInNC || 0);
+    const getVal = (valInNC, nc, h) => {
+        // Ultimate fallback chain: valInNC -> h.value -> (amount * currentPrice)
+        let v = parseFloat(valInNC);
+        if (isNaN(v)) v = parseFloat(h?.value);
+        if (isNaN(v)) v = (parseFloat(h?.amount || 0) * parseFloat(h?.currentPrice || 0));
+        
         if (isNaN(v)) return 0;
-        const rawUsdTry = holdings.find(h => h.usdtry)?.usdtry;
+        
+        const rawUsdTry = (holdings || []).find(x => x.usdtry)?.usdtry;
         const usdtry = parseFloat(rawUsdTry) || 32.5;
+        
+        if (!nc) nc = (h?.symbol?.endsWith('.IS') ? 'TRY' : 'USD');
+        
         if (displayCurrency === nc) return v;
         if (displayCurrency === 'TRY' && nc === 'USD') return v * usdtry;
         if (displayCurrency === 'USD' && nc === 'TRY') return v / usdtry;
@@ -93,15 +103,15 @@ const PortfolioOverview = () => {
         return v;
     };
 
-    const totalValue = holdings.reduce((sum, h) => sum + getVal(h.valueInNC, h.naturalCurrency), 0);
-    const totalInvested = holdings.reduce((sum, h) => sum + getValFromPC(Number(h.totalInvested), h.purchaseCurrency), 0);
+    const totalValue = (holdings || []).reduce((sum, h) => sum + getVal(h.valueInNC, h.naturalCurrency, h), 0);
+    const totalInvested = (holdings || []).reduce((sum, h) => sum + getValFromPC(Number(h.totalInvested), h.purchaseCurrency), 0);
     const totalPL = totalValue - totalInvested;
     const totalPLPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
 
     const PREMIUM_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
-    const chartData = holdings.map((h, i) => ({
+    const chartData = (holdings || []).map((h, i) => ({
         name: h.symbol,
-        value: getVal(h.valueInNC, h.naturalCurrency),
+        value: getVal(h.valueInNC, h.naturalCurrency, h),
         color: PREMIUM_COLORS[i % PREMIUM_COLORS.length]
     })).filter(d => d.value > 0);
 
@@ -200,7 +210,9 @@ const PortfolioOverview = () => {
                                             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: chartData.find(c => c.name === asset.symbol)?.color || '#fff' }} />
                                             <span className="text-xs font-black">{asset.symbol}</span>
                                         </div>
-                                        <span className="text-xs font-bold opacity-60">{((asset.value / totalValue) * 100).toFixed(1)}%</span>
+                                        <span className="text-xs font-bold opacity-60">
+                                            {((getVal(asset.valueInNC, asset.naturalCurrency, asset) / (totalValue || 1)) * 100).toFixed(1)}%
+                                        </span>
                                     </div>
                                 ))}
                             </div>
@@ -283,11 +295,11 @@ const PortfolioOverview = () => {
                                         </td>
                                         <td className="p-4 font-bold text-sm whitespace-nowrap">
                                             {displayCurrency === 'USD' ? '$' : '₺'}
-                                            {getVal(Number(row.currentPrice), row.naturalCurrency).toLocaleString()}
+                                            {getVal(Number(row.currentPrice), row.naturalCurrency, row).toLocaleString()}
                                         </td>
                                         <td className="p-4 font-black text-sm text-right whitespace-nowrap">
                                             {displayCurrency === 'USD' ? '$' : '₺'}
-                                            {getVal(Number(row.valueInNC), row.naturalCurrency).toLocaleString()}
+                                            {getVal(row.valueInNC, row.naturalCurrency, row).toLocaleString()}
                                         </td>
                                         <td className="p-4 text-right">
                                             <div className="flex flex-col items-end">
@@ -454,6 +466,12 @@ const PortfolioOverview = () => {
                                                         setSelectedAsset(result);
                                                         setSearchQuery(result.symbol);
                                                         setSearchResults([]);
+                                                        // Smart Currency Defaulting
+                                                        if (result.market === 'BIST' || result.symbol?.endsWith('.IS')) {
+                                                            setModalCurrency('TRY');
+                                                        } else {
+                                                            setModalCurrency('USD');
+                                                        }
                                                     }}
                                                     className="p-3 hover:bg-primary/20 cursor-pointer flex justify-between items-center transition-colors border-b border-white/5 last:border-b-0"
                                                 >
@@ -483,18 +501,21 @@ const PortfolioOverview = () => {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-2">Birim Maliyet</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-2">Alış Para Birimi</label>
                                         <div className="flex gap-2">
                                             <input 
                                                 name="avgPrice" 
                                                 type="number" 
                                                 step="any"
+                                                placeholder={language === 'TR' ? 'Maliyet' : 'Cost'}
                                                 required
                                                 className="flex-1 bg-secondary/50 border border-border p-4 rounded-2xl font-black italic outline-none focus:border-primary transition-all"
                                             />
                                             <select 
                                                 name="purchaseCurrency"
-                                                className="bg-secondary/50 border border-border px-4 rounded-2xl font-black italic outline-none focus:border-primary appearance-none"
+                                                value={modalCurrency}
+                                                onChange={(e) => setModalCurrency(e.target.value)}
+                                                className="bg-primary/20 border border-primary/30 px-6 rounded-2xl font-black italic outline-none focus:border-primary transition-all cursor-pointer hover:bg-primary/30"
                                             >
                                                 <option value="USD">USD</option>
                                                 <option value="TRY">TRY</option>

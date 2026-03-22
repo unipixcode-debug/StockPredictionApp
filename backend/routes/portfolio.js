@@ -18,12 +18,12 @@ router.get('/', isAuthenticated, async (req, res) => {
 // Add/Update holding
 router.post('/', isAuthenticated, async (req, res) => {
     try {
-        const { symbol, market, amount, avgPrice } = req.body;
+        const { symbol, market, amount, avgPrice, purchaseCurrency } = req.body;
         const totalInvested = amount * avgPrice;
 
         const [holding, created] = await Portfolio.findOrCreate({
             where: { userId: req.user.id, symbol },
-            defaults: { market, amount, avgPrice, totalInvested }
+            defaults: { market, amount, avgPrice, totalInvested, purchaseCurrency: purchaseCurrency || 'USD' }
         });
 
         if (!created) {
@@ -31,6 +31,7 @@ router.post('/', isAuthenticated, async (req, res) => {
             holding.avgPrice = avgPrice;
             holding.totalInvested = totalInvested;
             holding.market = market;
+            holding.purchaseCurrency = purchaseCurrency || 'USD';
             await holding.save();
         }
 

@@ -14,6 +14,8 @@ class PortfolioService {
             const analyzedHoldings = await Promise.all(holdings.map(async h => {
                 const symbolKey = h.symbol.toLowerCase();
                 const indicator = indicators ? indicators[symbolKey] : null;
+                const rawUsdTry = (indicators && indicators.usdtry && indicators.usdtry.price) ? indicators.usdtry.price : 32.5;
+                const usdtry = parseFloat(rawUsdTry) || 32.5;
                 
                 let currentPrice = 0;
                 if (indicator && indicator.price) {
@@ -22,17 +24,39 @@ class PortfolioService {
                     currentPrice = await marketDataService.fetchPrice(h.symbol);
                 }
 
-                const value = h.amount * currentPrice;
-                const pl = value - Number(h.totalInvested);
-                const plPercent = Number(h.totalInvested) > 0 ? (pl / Number(h.totalInvested)) * 100 : 0;
+                // Identify Natural Currency (NC) of the asset
+                const isTurkish = h.symbol.toUpperCase().endsWith('.IS') || h.symbol.toUpperCase().startsWith('TRUNC:');
+                const NC = isTurkish ? 'TRY' : 'USD';
+                const PC = h.purchaseCurrency || 'USD';
 
-                return {
+                // 1. Current Value in NC
+                const valueInNC = h.amount * currentPrice;
+                
+                // 2. Normalize Current Value to Purchase Currency (PC) for P/L calculation
+                let valueInPC = valueInNC;
+                if (NC === 'USD' && PC === 'TRY') {
+                    valueInPC = valueInNC * usdtry;
+                } else if (NC === 'TRY' && PC === 'USD') {
+                    valueInPC = valueInNC / usdtry;
+                }
+
+                const pl = parseFloat(valueInPC) - parseFloat(h.totalInvested || 0);
+                const plPercent = parseFloat(h.totalInvested) > 0 ? (pl / parseFloat(h.totalInvested)) * 100 : 0;
+
+                const result = {
                     ...h.toJSON(),
-                    currentPrice,
-                    value,
-                    pl,
-                    plPercent
+                    amount: parseFloat(h.amount),
+                    avgPrice: parseFloat(h.avgPrice),
+                    totalInvested: parseFloat(h.totalInvested),
+                    currentPrice: parseFloat(currentPrice),
+                    valueInPC: parseFloat(valueInPC),
+                    valueInNC: parseFloat(valueInNC),
+                    usdtry: parseFloat(usdtry),
+                    pl: parseFloat(pl),
+                    plPercent: parseFloat(plPercent),
+                    naturalCurrency: NC
                 };
+                return result;
             }));
 
             return analyzedHoldings;

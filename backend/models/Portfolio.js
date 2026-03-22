@@ -37,6 +37,11 @@ const Portfolio = sequelize.define('Portfolio', {
         type: DataTypes.DECIMAL(20, 8),
         allowNull: false,
         defaultValue: 0
+    },
+    purchaseCurrency: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: 'USD'
     }
 }, {
     timestamps: true,

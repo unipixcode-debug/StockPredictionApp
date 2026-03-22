@@ -87,9 +87,9 @@ app.get('/', (req, res) => {
 
 // Sync Database and Start Server
 console.log('🔄 Synchronizing database...');
-sequelize.sync({ alter: true })
+sequelize.sync({ alter: false })
     .then(() => {
-        console.log('✅ Database synchronized');
+        console.log('✅ Database synchronized (Alter skipped)');
         
         // Start Background Tasks ONLY after DB is ready
         cacheService.startBackgroundUpdates();

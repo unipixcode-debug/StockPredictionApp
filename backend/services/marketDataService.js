@@ -22,28 +22,39 @@ const TRUNCGIL_ASSETS = [
 class MarketDataService {
     async getGlobalIndicators() {
         try {
-            console.log('📊 Fetching global indicators (Pentagon Spectrum)...');
+            console.log('📊 Fetching global indicators (Parallel)...');
             
-            const indicators = {
-                vix: await this.fetchFromInvesting('https://www.investing.com/indices/us-30-vix'),
-                dxy: await this.fetchFromInvesting('https://www.investing.com/indices/usdollar'),
-                gold: await this.fetchFromInvesting('https://www.investing.com/currencies/xau-usd'),
-                silver: await this.fetchFromInvesting('https://www.investing.com/currencies/xag-usd'),
-                oil: await this.fetchFromInvesting('https://www.investing.com/commodities/crude-oil'),
-                sp500: await this.fetchFromInvesting('https://www.investing.com/indices/us-spx-500'),
-                nasdaq: await this.fetchFromInvesting('https://www.investing.com/indices/nq-100'),
-                us10y: await this.fetchFromInvesting('https://www.investing.com/rates-bonds/u.s.-10-year-bond-yield'),
-                us02y: await this.fetchFromInvesting('https://www.investing.com/rates-bonds/u.s.-2-year-bond-yield'),
-                eurusd: await this.fetchFromInvesting('https://www.investing.com/currencies/eur-usd'),
-                gbpusd: await this.fetchFromInvesting('https://www.investing.com/currencies/gbp-usd'),
-                usdtry: await this.fetchFromInvesting('https://www.investing.com/currencies/usd-try'),
-                aapl: await this.fetchFromInvesting('https://www.investing.com/equities/apple-computer-inc'),
-                tsla: await this.fetchFromInvesting('https://www.investing.com/equities/tesla-motors'),
-                msft: await this.fetchFromInvesting('https://www.investing.com/equities/microsoft-corp'),
-                amzn: await this.fetchFromInvesting('https://www.investing.com/equities/amazon-com-inc'),
-                nvda: await this.fetchFromInvesting('https://www.investing.com/equities/nvidia-corp'),
-                googl: await this.fetchFromInvesting('https://www.investing.com/equities/google-inc'),
+            const urls = {
+                vix: 'https://www.investing.com/indices/us-30-vix',
+                dxy: 'https://www.investing.com/indices/usdollar',
+                gold: 'https://www.investing.com/currencies/xau-usd',
+                silver: 'https://www.investing.com/currencies/xag-usd',
+                oil: 'https://www.investing.com/commodities/crude-oil',
+                sp500: 'https://www.investing.com/indices/us-spx-500',
+                nasdaq: 'https://www.investing.com/indices/nq-100',
+                us10y: 'https://www.investing.com/rates-bonds/u.s.-10-year-bond-yield',
+                us02y: 'https://www.investing.com/rates-bonds/u.s.-2-year-bond-yield',
+                eurusd: 'https://www.investing.com/currencies/eur-usd',
+                gbpusd: 'https://www.investing.com/currencies/gbp-usd',
+                usdtry: 'https://www.investing.com/currencies/usd-try',
+                aapl: 'https://www.investing.com/equities/apple-computer-inc',
+                tsla: 'https://www.investing.com/equities/tesla-motors',
+                msft: 'https://www.investing.com/equities/microsoft-corp',
+                amzn: 'https://www.investing.com/equities/amazon-com-inc',
+                nvda: 'https://www.investing.com/equities/nvidia-corp',
+                googl: 'https://www.investing.com/equities/google-inc',
             };
+
+            const entries = Object.entries(urls);
+            const scrapeResults = await Promise.allSettled(entries.map(([key, url]) => this.fetchFromInvesting(url)));
+            
+            const indicators = {};
+            scrapeResults.forEach((res, i) => {
+                const key = entries[i][0];
+                if (res.status === 'fulfilled' && res.value) {
+                    indicators[key] = res.value;
+                }
+            });
 
             const cryptoData = await this.fetchTopCryptosFromBinance(100);
             Object.assign(indicators, cryptoData);
@@ -52,13 +63,13 @@ class MarketDataService {
             if (!indicators.vix) indicators.vix = { price: 15.65, change: -1.2 };
             if (!indicators.dxy) indicators.dxy = { price: 103.45, change: 0.15 };
             if (!indicators.gold) indicators.gold = { price: 2160.50, change: 0.25 };
-            if (!indicators.us10y) indicators.us10y = { price: 4.32, change: 0.5 };
+            if (!indicators.usdtry) indicators.usdtry = { price: 32.5, change: 0.1 };
             if (!indicators.btc) indicators.btc = { price: 70000, change: 1.2, marketCap: 1.3e12 };
 
             return indicators;
         } catch (error) {
             console.error('Error in getGlobalIndicators:', error);
-            return { vix: { price: 16, change: 0 }, dxy: { price: 104, change: 0 } };
+            return { vix: { price: 16, change: 0 }, dxy: { price: 104, change: 0 }, usdtry: { price: 32.5, change: 0 } };
         }
     }
 
@@ -296,8 +307,19 @@ class MarketDataService {
         try {
             if (symbol.startsWith('TRUNC:')) {
                 const cleanSym = symbol.replace('TRUNC:', '');
-                const res = await axios.get('https://finans.truncgil.com/v3/today.json');
-                const data = res.data;
+                
+                // --- TRUNC Cache logic ---
+                if (!this._truncCache || (Date.now() - this._truncCacheTime > 60000)) {
+                    try {
+                        const res = await axios.get('https://finans.truncgil.com/v3/today.json', { timeout: 5000 });
+                        this._truncCache = res.data;
+                        this._truncCacheTime = Date.now();
+                    } catch (e) {
+                        console.error('TRUNC API Error:', e.message);
+                    }
+                }
+
+                const data = this._truncCache || {};
                 if (data[cleanSym] && data[cleanSym].Selling) {
                     const priceStr = data[cleanSym].Selling.replace(/\./g, '').replace(',', '.');
                     return parseFloat(priceStr);
