@@ -21,6 +21,44 @@ const MarketChart = () => {
     const [isSearching, setIsSearching] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
 
+    // TradingView Dynamic Widget Mount
+    useEffect(() => {
+        const containerId = 'tv_chart_container';
+        const container = document.getElementById(containerId);
+        if(!container) return;
+
+        // Clean previous widget
+        container.innerHTML = '';
+
+        const script = document.createElement('script');
+        script.src = 'https://s3.tradingview.com/tv.js';
+        script.async = true;
+        script.onload = () => {
+            if (window.TradingView) {
+                new window.TradingView.widget({
+                    "autosize": true,
+                    "symbol": getTVSymbol(symbol, currency),
+                    "interval": "D",
+                    "timezone": "Etc/UTC",
+                    "theme": "dark",
+                    "style": "1",
+                    "locale": "tr",
+                    "enable_publishing": false,
+                    "backgroundColor": "transparent",
+                    "hide_top_toolbar": false,
+                    "hide_legend": false,
+                    "save_image": false,
+                    "container_id": containerId
+                });
+            }
+        };
+        container.appendChild(script);
+
+        return () => {
+             container.innerHTML = '';
+        }
+    }, [symbol, currency]);
+
     // Debounced Live Search Effect
     useEffect(() => {
         if (searchSymbol.length < 2) {
@@ -97,6 +135,14 @@ const MarketChart = () => {
             'bonds': 'TVC:US10Y'
         };
 
+        if (s && s.startsWith('TRUNC:')) {
+            if(s.includes('altin') || s.includes('cumhuriyet')) return 'TVC:GOLD';
+            if(s.includes('gumus')) return 'TVC:SILVER';
+            if(s.includes('USD')) return 'FX_IDC:USDTRY';
+            if(s.includes('EUR')) return 'FX_IDC:EURTRY';
+            if(s.includes('GBP')) return 'FX_IDC:GBPTRY';
+            return 'TVC:GOLD';
+        }
         if (s && s.endsWith && s.endsWith('.IS')) {
             return `BIST:${s.replace('.IS', '')}`;
         }
@@ -180,7 +226,7 @@ const MarketChart = () => {
                                                     </div>
                                                     <span className="text-sm font-bold text-foreground truncate max-w-[120px] text-left">{s.symbol}</span>
                                                 </div>
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50 shrink-0 ml-2">{s.market.substring(0,8)}</span>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50 shrink-0 ml-2">{(s.typeDisp || s.market || '').substring(0,8)}</span>
                                             </button>
                                         ))
                                     ) : searchSymbol.length >= 2 && (
@@ -210,15 +256,11 @@ const MarketChart = () => {
 
             {/* Chart Container */}
             <div className="flex-1 glass-card relative group shadow-2xl overflow-hidden border-border/50">
-                <iframe
-                    title="TradingView Chart"
-                    src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=${tvSymbol}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&theme=dark&style=1&timezone=Etc%2FUTC&studies=[]&locale=tr`}
-                    style={{ width: '100%', height: '100%', border: 'none' }}
-                />
+                <div id="tv_chart_container" className="w-full h-full" />
                 
                 {/* Decorative Borders */}
                 <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-primary/20 to-transparent" />
-                <div className="absolute bottom-4 right-4 flex items-center space-x-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="pointer-events-none absolute bottom-4 right-4 flex items-center space-x-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <BarChart3 size={12} className="text-primary" />
                     <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Powered by TradingView</span>
                 </div>

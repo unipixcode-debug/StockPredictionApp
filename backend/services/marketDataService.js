@@ -2,7 +2,22 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const YF = require('yahoo-finance2').default;
 const yahooFinance = new YF({ suppressNotices: ['yahooSurvey'] });
-const binanceClient = require('binance-api-node').default();
+const binance = require('binance-api-node').default;
+const binanceClient = binance();
+const scraperService = require('./scraperService');
+
+const TRUNCGIL_ASSETS = [
+    { symbol: 'TRUNC:gram-altin', shortname: 'Gram Altın', longname: 'Gram Altın (Serbest Piyasa)', typeDisp: 'Gold', exchange: 'KAPALİÇARŞI' },
+    { symbol: 'TRUNC:ceyrek-altin', shortname: 'Çeyrek Altın', longname: 'Çeyrek Altın (Yeni)', typeDisp: 'Gold', exchange: 'KAPALİÇARŞI' },
+    { symbol: 'TRUNC:yarim-altin', shortname: 'Yarım Altın', longname: 'Yarım Altın (Yeni)', typeDisp: 'Gold', exchange: 'KAPALİÇARŞI' },
+    { symbol: 'TRUNC:tam-altin', shortname: 'Tam Altın', longname: 'Tam Altın (Yeni)', typeDisp: 'Gold', exchange: 'KAPALİÇARŞI' },
+    { symbol: 'TRUNC:cumhuriyet-altini', shortname: 'Cumhuriyet Altını', longname: 'Cumhuriyet Altını', typeDisp: 'Gold', exchange: 'KAPALİÇARŞI' },
+    { symbol: 'TRUNC:ata-altin', shortname: 'Ata Altın', longname: 'Ata Lira', typeDisp: 'Gold', exchange: 'KAPALİÇARŞI' },
+    { symbol: 'TRUNC:gumus', shortname: 'Gümüş', longname: 'Gümüş (Gram)', typeDisp: 'Silver', exchange: 'KAPALİÇARŞI' },
+    { symbol: 'TRUNC:USD', shortname: 'Dolar', longname: 'Amerikan Doları (Serbest Piyasa)', typeDisp: 'Currency', exchange: 'KAPALİÇARŞI' },
+    { symbol: 'TRUNC:EUR', shortname: 'Euro', longname: 'Euro (Serbest Piyasa)', typeDisp: 'Currency', exchange: 'KAPALİÇARŞI' },
+    { symbol: 'TRUNC:GBP', shortname: 'İngiliz Sterlini', longname: 'İngiliz Sterlini', typeDisp: 'Currency', exchange: 'KAPALİÇARŞI' }
+];
 
 class MarketDataService {
     async getGlobalIndicators() {
@@ -208,24 +223,45 @@ class MarketDataService {
         try {
             if (!query || query.length < 2) return [];
             
-            const [yahooResult, binancePrices] = await Promise.all([
+            const qLower = query.toLowerCase();
+            const localResults = TRUNCGIL_ASSETS.filter(a => 
+                a.shortname.toLowerCase().includes(qLower) || 
+                a.longname.toLowerCase().includes(qLower)
+            );
+
+            // Parallel search execution
+            const [yahooResultsRaw, binanceResultsRaw] = await Promise.allSettled([
                 yahooFinance.search(query).catch(e => { console.error('Yahoo Search Error:', e.message); return { quotes: [] }; }),
                 binanceClient.prices().catch(e => { console.error('Binance Search Error:', e.message); return {}; })
             ]);
 
             const queryUpper = query.toUpperCase();
-            const binanceMatches = Object.keys(binancePrices)
+
+            const yahooResult = yahooResultsRaw.status === 'fulfilled' ? yahooResultsRaw.value : { quotes: [] };
+            const binancePrices = binanceResultsRaw.status === 'fulfilled' ? binanceResultsRaw.value : {};
+
+            const binanceData = Object.keys(binancePrices)
                 .filter(k => k.includes(queryUpper) && k.endsWith('USDT'))
                 .slice(0, 5)
                 .map(k => ({
                     symbol: k,
-                    name: k.replace('USDT', ''),
-                    market: 'CRYPTO',
-                    exchange: 'BINANCE',
-                    type: 'CRYPTOCURRENCY'
+                    shortname: k.replace('USDT', ''),
+                    longname: k.replace('USDT', '') + ' / USDT',
+                    typeDisp: 'Crypto',
+                    exchange: 'BINANCE'
+                }));
+
+            const filteredBinance = binanceData
+                .filter(res => res && res.symbol)
+                .map(res => ({
+                    symbol: res.symbol,
+                    shortname: res.shortname,
+                    longname: res.longname,
+                    typeDisp: 'Crypto',
+                    exchange: 'BINANCE'
                 }));
             
-            const yahooMatches = yahooResult.quotes
+            const filteredYahoo = yahooResult.quotes
                 .filter(q => q.quoteType !== 'OPTION' && q.quoteType !== 'MUTUALFUND' && q.symbol && q.symbol.trim() !== '') // filter out noise
                 .slice(0, 10) // top 10 results
                 .map(q => {
@@ -238,14 +274,16 @@ class MarketDataService {
 
                     return {
                         symbol: q.symbol,
-                        name: q.shortname || q.longname || q.symbol,
-                        market: marketType,
-                        exchange: q.exchange || 'N/A',
-                        type: q.quoteType
+                        shortname: q.shortname || q.longname || q.symbol,
+                        longname: q.longname || q.shortname || q.symbol,
+                        typeDisp: marketType,
+                        exchange: q.exchange || 'N/A'
                     };
                 });
 
-            return [...binanceMatches, ...yahooMatches];
+            // Merge everything: TRUNC > Binance > Yahoo
+            return [...localResults, ...filteredBinance, ...filteredYahoo];
+            
         } catch (error) {
             console.error('Error searching assets:', error.message);
             return [];
@@ -254,6 +292,23 @@ class MarketDataService {
 
     async fetchPrice(symbol) {
         try {
+            if (symbol.startsWith('TRUNC:')) {
+                const cleanSym = symbol.replace('TRUNC:', '');
+                const res = await axios.get('https://finans.truncgil.com/v3/today.json');
+                const data = res.data;
+                if (data[cleanSym] && data[cleanSym].Selling) {
+                    const priceStr = data[cleanSym].Selling.replace(/\./g, '').replace(',', '.');
+                    return parseFloat(priceStr);
+                }
+                return 100;
+            }
+
+            // BINANCE NATIVE CATCH
+            if (symbol.endsWith('USDT') && !symbol.includes('.') && !symbol.includes('=')) {
+                const prices = await binanceClient.prices({ symbol: symbol });
+                return parseFloat(prices[symbol] || 0);
+            }
+
             const upperSymbol = symbol.toUpperCase();
             const isCrypto = upperSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP'].includes(upperSymbol);
             if (isCrypto) {

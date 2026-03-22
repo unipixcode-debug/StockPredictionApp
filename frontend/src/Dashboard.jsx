@@ -388,7 +388,7 @@ const Dashboard = () => {
                                 </div>
                                 <span className="text-sm font-bold text-foreground">{s.symbol}</span>
                               </div>
-                              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50">{s.market}</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50">{s.typeDisp || s.market || ''}</span>
                             </button>
                           ))
                       ) : (
