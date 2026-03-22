@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
+import { createChart, ColorType, CandlestickSeries, LineSeries, AreaSeries } from 'lightweight-charts';
 
 export const TradingChart = ({
     data,
@@ -53,11 +53,11 @@ export const TradingChart = ({
 
         let series;
         if (type === 'candlestick') {
-            series = chart.addCandlestickSeries({ upColor, downColor, borderVisible: false, wickUpColor: upColor, wickDownColor: downColor });
+            series = chart.addSeries(CandlestickSeries, { upColor, downColor, borderVisible: false, wickUpColor: upColor, wickDownColor: downColor });
         } else if (type === 'line') {
-            series = chart.addLineSeries({ color: lineColor, lineWidth: 2 });
+            series = chart.addSeries(LineSeries, { color: lineColor, lineWidth: 2 });
         } else {
-            series = chart.addAreaSeries({ 
+            series = chart.addSeries(AreaSeries, { 
                 lineColor, 
                 topColor: `${lineColor}88`, 
                 bottomColor: 'rgba(59, 130, 246, 0.04)' 
