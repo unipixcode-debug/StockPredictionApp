@@ -505,7 +505,7 @@ const PortfolioOverview = () => {
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-4">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-2">Miktar</label>
                                         <input 
@@ -529,7 +529,7 @@ const PortfolioOverview = () => {
                                                 onChange={(e) => setModalAvgPrice(e.target.value)}
                                                 placeholder={language === 'TR' ? 'Birim Fiyat' : 'Unit Price'}
                                                 required
-                                                className="flex-1 bg-secondary/50 border border-border p-4 rounded-2xl font-black italic outline-none focus:border-primary transition-all"
+                                                className="flex-1 w-full min-w-0 bg-secondary/50 border border-border p-4 rounded-2xl font-black italic outline-none focus:border-primary transition-all"
                                             />
                                             <div className="flex bg-secondary/50 rounded-2xl p-1 border border-border shrink-0 items-center">
                                                 <button 
