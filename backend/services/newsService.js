@@ -1,9 +1,5 @@
-let yahooFinance = require('yahoo-finance2');
-if (yahooFinance.default) yahooFinance = yahooFinance.default;
-
-if (typeof yahooFinance.setGlobalConfig === 'function') {
-    yahooFinance.setGlobalConfig({ validation: { logErrors: false } });
-}
+const YF = require('yahoo-finance2').default;
+const yahooFinance = new YF({ suppressNotices: ['yahooSurvey'] });
 const axios = require('axios');
 const cheerio = require('cheerio');
 const NewsSummary = require('../models/NewsSummary');
@@ -131,6 +127,67 @@ class NewsService {
             console.log(`✅ Background News Sync completed. Processed ${count} new items.`);
         } catch (error) {
             console.error('SyncNews Error:', error.message);
+        }
+    }
+
+    async getSentimentAggregation(days = 7) {
+        try {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - days);
+
+            const summaries = await NewsSummary.findAll({
+                where: {
+                    createdAt: { [Op.gte]: cutoffDate },
+                    impacts: { [Op.ne]: null }
+                },
+                attributes: ['impacts', 'sourceName']
+            });
+
+            const assetMap = {};
+
+            summaries.forEach(news => {
+                let impacts = [];
+                try {
+                    impacts = typeof news.impacts === 'string' ? JSON.parse(news.impacts) : news.impacts;
+                } catch (e) { return; }
+
+                if (!Array.isArray(impacts)) return;
+
+                impacts.forEach(imp => {
+                    const asset = imp.asset;
+                    if (!assetMap[asset]) {
+                        assetMap[asset] = { asset: asset, totalScore: 0, count: 0, sources: {} };
+                    }
+
+                    const score = parseInt(imp.score) * (imp.direction === 'NEGATIVE' ? -1 : 1);
+                    assetMap[asset].totalScore += score;
+                    assetMap[asset].count += 1;
+
+                    const source = news.sourceName || 'Other';
+                    if (!assetMap[asset].sources[source]) {
+                        assetMap[asset].sources[source] = { scoreSum: 0, count: 0 };
+                    }
+                    assetMap[asset].sources[source].scoreSum += score;
+                    assetMap[asset].sources[source].count += 1;
+                });
+            });
+
+            return Object.values(assetMap).map(data => {
+                const avg = Math.round(data.totalScore / data.count);
+                const sourceDetails = Object.entries(data.sources).map(([name, sdata]) => ({
+                    name, avgScore: Math.round(sdata.scoreSum / sdata.count), count: sdata.count
+                })).sort((a, b) => b.count - a.count).slice(0, 5);
+
+                return {
+                    asset: data.asset,
+                    averageScore: avg,
+                    totalCount: data.count,
+                    sources: sourceDetails
+                };
+            }).sort((a, b) => b.totalCount - a.totalCount);
+        } catch (error) {
+            console.error('getSentimentAggregation Error:', error.message);
+            return [];
         }
     }
 

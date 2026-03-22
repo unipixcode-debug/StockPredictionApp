@@ -79,6 +79,7 @@ class FlowService {
         if (type === 'crypto') {
             const keys = Object.keys(indicators).filter(k => !['vix','dxy','gold','silver','oil','sp500','nasdaq','us10y','us02y','eurusd','gbpusd','usdtry'].includes(k));
             keys.slice(0, 100).forEach(k => {
+                if (!indicators[k]) return;
                 list.push({ name: k.toUpperCase(), price: indicators[k].price, change: indicators[k].change * mult, value: indicators[k].marketCap / 1e12 });
             });
             list.push({ name: 'DİĞER KRİPTO', value: 0.15, change: 0, isOther: true });

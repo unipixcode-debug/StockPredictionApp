@@ -2,12 +2,8 @@ const marketDataService = require('./marketDataService');
 const newsService = require('./newsService');
 const Prediction = require('../models/Prediction');
 const aiService = require('./aiService');
-let yahooFinance = require('yahoo-finance2');
-if (yahooFinance.default) yahooFinance = yahooFinance.default;
-
-if (typeof yahooFinance.setGlobalConfig === 'function') {
-    yahooFinance.setGlobalConfig({ validation: { logErrors: false } });
-}
+const YF = require('yahoo-finance2').default;
+const yahooFinance = new YF({ suppressNotices: ['yahooSurvey'] });
 
 class PredictionEngine {
     /**

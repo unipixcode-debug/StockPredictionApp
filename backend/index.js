@@ -17,14 +17,11 @@ require('./config/passport'); // Import passport config
 const sequelize = require('./config/database');
 
 // Import Models to Sync
-const User = require('./models/User');
-const Prediction = require('./models/Prediction');
-const DataSource = require('./models/DataSource');
-const NewsSummary = require('./models/NewsSummary');
-const ChatMessage = require('./models/ChatMessage');
-const AIProvider = require('./models/AIProvider');
-const AdminLog = require('./models/AdminLog');
-const DailyMarketInsight = require('./models/DailyMarketInsight');
+const {
+    User, Prediction, DataSource, NewsSummary, ChatMessage,
+    AIProvider, AdminLog, DailyMarketInsight,
+    Portfolio, PortfolioHistory, PortfolioPrediction
+} = require('./models');
 
 const predictionRoutes = require('./routes/predictions');
 const adminRoutes = require('./routes/admin');
@@ -33,18 +30,13 @@ const marketRoutes = require('./routes/market');
 const aiRoutes = require('./routes/ai');
 const aiAdminRoutes = require('./routes/aiAdmin');
 const paymentRoutes = require('./routes/payment');
+const portfolioRoutes = require('./routes/portfolio');
 const cacheService = require('./services/cacheService');
 const creditService = require('./services/creditService');
 const scraperService = require('./services/scraperService');
 const newsService = require('./services/newsService');
 
 const app = express();
-
-// Start Background Tasks
-cacheService.startBackgroundUpdates();
-creditService.startBackgroundTasks();
-scraperService.startBackgroundTasks();
-newsService.startBackgroundTasks();
 
 // Middleware
 app.use(express.json());
@@ -86,26 +78,32 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin/ai', aiAdminRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/portfolio', portfolioRoutes);
 
 // Basic Route for testing
 app.get('/', (req, res) => {
     res.json({ message: 'Prediction API is running' });
 });
 
-const PORT = process.env.PORT || 5000;
-
-// Start server immediately — DB sync is non-blocking
-app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
-});
-
-// Sync Database in background (non-blocking)
+// Sync Database and Start Server
+console.log('🔄 Synchronizing database...');
 sequelize.sync({ alter: true })
     .then(() => {
         console.log('✅ Database synchronized');
+        
+        // Start Background Tasks ONLY after DB is ready
+        cacheService.startBackgroundUpdates();
+        creditService.startBackgroundTasks();
+        scraperService.startBackgroundTasks();
+        newsService.startBackgroundTasks();
+
+        const PORT = process.env.PORT || 5000;
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`✅ Server running on port ${PORT}`);
+        });
     })
     .catch(err => {
-        console.error('⚠️  Database sync failed (server still running):', err.message);
-        console.error('   Market stats & AI features still work. Only prediction history requires DB.');
+        console.error('❌ Database sync failed. Server cannot start:', err.message);
+        process.exit(1);
     });
 

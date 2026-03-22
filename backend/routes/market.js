@@ -93,6 +93,48 @@ router.get('/news', async (req, res) => {
     }
 });
 
+// Historical Market Data for Multi-Asset Charts
+router.get('/history', async (req, res) => {
+    try {
+        const { symbol, timeframe, limit } = req.query;
+        if (!symbol) return res.status(400).json({ error: 'Symbol is required' });
+        
+        const data = await marketDataService.getHistoricalData(symbol, timeframe || '1D', limit || 365);
+        res.json(data);
+    } catch (error) {
+        console.error('History API error:', error);
+        res.status(500).json({ error: 'Failed to fetch historical market data' });
+    }
+});
+
+// Universal Asset Search API
+router.get('/search', async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+        const { q } = req.query;
+        if (!q) return res.json([]);
+        
+        const results = await marketDataService.searchAssets(q);
+        res.json(results);
+    } catch (error) {
+        console.error('Search API error:', error);
+        res.status(500).json({ error: 'Failed to search assets' });
+    }
+});
+
+// News Sentiment Summary API for Visualization
+router.get('/news-sentiment-summary', async (req, res) => {
+    try {
+        const days = parseInt(req.query.days) || 7;
+        const result = await newsService.getSentimentAggregation(days);
+
+        res.json(result);
+    } catch (error) {
+        console.error('Sentiment Summary API error:', error);
+        res.status(500).json({ error: 'Failed to fetch sentiment summary' });
+    }
+});
+
 // Deep Article Reader & Translator
 router.get('/read-article', async (req, res) => {
     try {
@@ -245,13 +287,39 @@ router.get('/insights', async (req, res) => {
     }
 });
 
-// S&P 500 Heatmap Data
 router.get('/heatmap', async (req, res) => {
     try {
         const data = await marketDataService.getHeatmapData();
         res.json(data);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch heatmap data' });
+    }
+});
+
+router.get('/assets', async (req, res) => {
+    try {
+        const indicators = await marketDataService.getGlobalIndicators();
+        if (!indicators) return res.json([]);
+        
+        const assets = Object.keys(indicators).map(key => {
+            const isCrypto = !['vix', 'dxy', 'gold', 'silver', 'oil', 'sp500', 'nasdaq', 'us10y', 'us02y', 'eurusd', 'gbpusd', 'usdtry'].includes(key);
+            let market = 'STOCK';
+            if (isCrypto) market = 'CRYPTO';
+            else if (['gold', 'silver', 'oil'].includes(key)) market = 'COMMODITY';
+            else if (['vix', 'dxy', 'sp500', 'nasdaq'].includes(key)) market = 'INDEX';
+            else if (['us10y', 'us02y'].includes(key)) market = 'BOND';
+            else if (['eurusd', 'gbpusd', 'usdtry'].includes(key)) market = 'FIAT';
+
+            return {
+                symbol: key.toUpperCase(),
+                name: key.toUpperCase(),
+                market: market
+            };
+        });
+        res.json(assets);
+    } catch (error) {
+        console.error('Assets API error:', error);
+        res.status(500).json({ error: 'Failed to fetch assets' });
     }
 });
 

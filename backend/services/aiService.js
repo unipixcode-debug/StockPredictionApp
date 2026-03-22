@@ -501,6 +501,27 @@ class AIService {
             throw error;
         }
     }
+
+    async analyzePortfolio(portfolioData) {
+        try {
+            const prompt = `Analyze this digital asset portfolio and provide a professional, concise summary in Turkish.
+            
+            Portfolio Data:
+            ${JSON.stringify(portfolioData)}
+
+            Instructions:
+            1. Evaluate the overall risk based on 'sentiment' and 'status' (PROFIT/LOSS).
+            2. Identify the strongest and weakest assets.
+            3. Provide a 'Market Outlook' summary.
+            4. Keep the tone professional but encouraging.
+            5. Return the result in Markdown format.`;
+
+            return await this.generateContent(prompt, "gemini-flash-latest");
+        } catch (error) {
+            console.error('Error in analyzePortfolio:', error.message);
+            return "Portföy analizi şu an yapılamıyor.";
+        }
+    }
 }
 
 module.exports = new AIService();

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Newspaper, ExternalLink, RefreshCw, Calendar, ArrowRight, Clock, Zap, Coins } from 'lucide-react';
+import { Newspaper, ExternalLink, RefreshCw, Calendar, ArrowRight, Clock, Zap, Coins, TrendingUp, TrendingDown } from 'lucide-react';
 import api from './api';
 import { useLanguage } from './LanguageContext';
 import { useAuth } from './AuthContext';
@@ -31,14 +31,11 @@ const News = () => {
   const [articleContent, setArticleContent] = useState("");
   const [articleLoading, setArticleLoading] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
+  const [selectedAssetSymbol, setSelectedAssetSymbol] = useState(null);
 
   useEffect(() => {
-    if (user?.newsletterSubscribed || user?.role === 'admin' || user?.role === 'developer') {
-        fetchNews();
-    } else {
-        setLoading(false);
-    }
-  }, [language, user?.newsletterSubscribed, timeframe]); 
+    fetchNews();
+  }, [language, timeframe]); 
 
   const handleSubscribe = async () => {
     const cost = 5; 
@@ -119,9 +116,15 @@ const News = () => {
     }
   };
 
-  const filteredNews = activeSource === t('AllSources') 
+  let filteredNews = activeSource === t('AllSources') 
     ? news 
     : news.filter(item => (item.sourceName || t('OtherSource')) === activeSource);
+
+  if (selectedAssetSymbol) {
+    filteredNews = filteredNews.filter(item => 
+      item.impacts?.some(imp => imp.asset === selectedAssetSymbol)
+    );
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -165,51 +168,33 @@ const News = () => {
         </button>
       </header>
 
-      {!(user?.newsletterSubscribed || user?.role === 'admin' || user?.role === 'developer' || import.meta.env.DEV) ? (
-        <div className="flex flex-col items-center justify-center py-20 px-6">
-          <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="glass-card p-12 text-center flex flex-col items-center justify-center space-y-8 border-primary/20 bg-primary/5 max-w-2xl w-full"
-          >
-              <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center border border-primary/20 shadow-[0_0_30px_rgba(0,242,254,0.1)]">
-                  <Newspaper className="text-primary" size={40} />
-              </div>
-              <div className="max-w-md">
-                  <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-4">
-                      {language === 'TR' ? 'Haber Analizini Aktif Et' : 'Activate News Analysis'}
-                  </h2>
-                  <p className="text-muted-foreground font-medium leading-relaxed">
-                      {language === 'TR' 
-                          ? 'Yapay zeka destekli piyasa haberleri ve önem puanlaması özelliğini kullanmak için bültene abone olun.' 
-                          : 'Subscribe to our newsletter to use AI-powered market news and importance scoring feature.'}
-                  </p>
-                  <div className="mt-6 inline-flex items-center space-x-2 px-4 py-2 bg-secondary/50 rounded-full border border-border">
-                      <Coins className="text-primary" size={16} />
-                      <span className="text-sm font-black tracking-tight text-foreground">
-                          5 {language === 'TR' ? 'Kredi / Ay' : 'Credits / Month'}
-                      </span>
-                  </div>
-              </div>
-              <button
-                  onClick={handleSubscribe}
-                  disabled={subscribing}
-                  className="premium-button px-12 py-4 text-lg group overflow-hidden"
-              >
-                  <span className="relative z-10 flex items-center space-x-3">
-                      {subscribing ? <RefreshCw className="animate-spin" size={20} /> : <Zap size={20} fill="currentColor" />}
-                      <span>{language === 'TR' ? 'HEMEN AKTİF ET' : 'ACTIVATE NOW'}</span>
-                  </span>
-              </button>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-50">
-                  {language === 'TR' ? 'İstediğiniz zaman iptal edebilirsiniz.' : 'Cancel anytime.'}
-              </p>
-          </motion.div>
-        </div>
-      ) : (
-        <>
-          {/* Timeframe Filter */}
+      {/* Sentiment Analysis Dashboard (Heatmap & Bar Charts) */}
+      <SentimentAnalysis 
+          days={timeframe} 
+          selectedSymbol={selectedAssetSymbol} 
+          onSelect={setSelectedAssetSymbol} 
+      />
+
+      <>
+          {/* Filter Status & Timeframe Filter */}
           <div className="flex flex-col space-y-6">
+            {selectedAssetSymbol && (
+              <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-2xl">
+                <div className="flex items-center space-x-3">
+                    <Zap size={16} className="text-primary animate-pulse" />
+                    <span className="text-xs font-black uppercase tracking-widest">
+                        {language === 'TR' ? `${selectedAssetSymbol} ANALİZİ FİLTRELENDİ` : `${selectedAssetSymbol} ANALYSIS FILTERED`}
+                    </span>
+                </div>
+                <button 
+                    onClick={() => setSelectedAssetSymbol(null)}
+                    className="text-[10px] font-black uppercase tracking-widest bg-primary/20 hover:bg-primary/30 px-3 py-1 rounded-lg transition-colors"
+                >
+                    {language === 'TR' ? 'FİLTREYİ TEMİZLE' : 'CLEAR FILTER'}
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center space-x-4 mb-2">
                <Clock size={16} className="text-primary" />
                <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{language === 'TR' ? 'Tarih Filtresi' : 'Date Filter'}</span>
@@ -354,7 +339,6 @@ const News = () => {
             </motion.div>
           )}
         </>
-      )}
 
       {/* Article Reader Modal */}
       {selectedArticle && (
@@ -430,6 +414,170 @@ const News = () => {
         </div>
       )}
     </motion.div>
+  );
+};
+
+const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [localSelectedAsset, setLocalSelectedAsset] = useState(null);
+  const { language } = useLanguage();
+
+  useEffect(() => {
+    fetchSentiment();
+  }, [days]);
+
+  useEffect(() => {
+    if (data.length > 0 && selectedSymbol) {
+        const found = data.find(item => item.asset === selectedSymbol);
+        if (found) setLocalSelectedAsset(found);
+    }
+  }, [selectedSymbol, data]);
+
+  const fetchSentiment = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get(`/market/news-sentiment-summary?days=${days}`);
+      // Sort data by average score descending
+      const sorted = [...res].sort((a, b) => b.averageScore - a.averageScore);
+      setData(sorted);
+      
+      if (sorted.length > 0) {
+        if (selectedSymbol) {
+            const found = sorted.find(a => a.asset === selectedSymbol);
+            if (found) setLocalSelectedAsset(found);
+            else setLocalSelectedAsset(sorted[0]);
+        } else if (!localSelectedAsset) {
+            setLocalSelectedAsset(sorted[0]);
+        }
+      }
+    } catch (e) {
+      console.error('Sentiment fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getColor = (score) => {
+    if (score >= 40) return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
+    if (score >= 10) return 'text-emerald-400/80 bg-emerald-400/5 border-emerald-400/10';
+    if (score <= -40) return 'text-rose-500 bg-rose-500/10 border-rose-500/20';
+    if (score <= -10) return 'text-rose-400/80 bg-rose-400/5 border-rose-400/10';
+    return 'text-amber-400 bg-amber-400/10 border-amber-400/20';
+  };
+
+  if (loading && data.length === 0) return (
+    <div className="glass-card p-8 animate-pulse flex flex-col space-y-4">
+      <div className="h-6 w-48 bg-white/5 rounded" />
+      <div className="flex space-x-3">
+        {[1,2,3,4,5].map(i => <div key={i} className="h-10 w-24 bg-white/5 rounded-xl" />)}
+      </div>
+    </div>
+  );
+
+  if (!loading && data.length === 0) return null;
+
+  return (
+    <motion.section 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8"
+    >
+      <div className="flex items-center space-x-3">
+        <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+          <Zap size={18} className="text-primary" />
+        </div>
+        <h2 className="text-xl font-black uppercase italic tracking-tighter">
+          {language === 'TR' ? 'Haber Duyarlılık Isı Haritası' : 'News Sentiment Heatmap'}
+        </h2>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+        {/* Asset Heatmap Chips */}
+        <div className="xl:col-span-5 space-y-4">
+          <div className="flex flex-wrap gap-3">
+            {data.map((item) => (
+              <button
+                key={item.asset}
+                onClick={() => {
+                   setLocalSelectedAsset(item);
+                   onSelect(item.asset);
+                }}
+                className={`
+                  px-6 py-3 rounded-2xl border transition-all duration-300 flex items-center space-x-3
+                  ${selectedSymbol === item.asset ? 'ring-2 ring-primary ring-offset-4 ring-offset-background scale-105 shadow-xl' : 'hover:scale-102'}
+                  ${getColor(item.averageScore)}
+                `}
+              >
+                <span className="font-black tracking-tighter">{item.asset}</span>
+                <span className="text-xs font-bold opacity-80">{item.averageScore > 0 ? '+' : ''}{item.averageScore}%</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-40 italic">
+            {language === 'TR' ? '* Son 7 günlük haberetki analizi ortalaması' : '* Avg of last 7 days news impact analysis'}
+          </p>
+        </div>
+
+        {/* Breakdown Bar Chart */}
+        {localSelectedAsset && (
+          <div className="xl:col-span-7 glass-card p-8 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+               <TrendingUp size={80} className={localSelectedAsset.averageScore >= 0 ? 'text-emerald-500' : 'text-rose-500'} />
+            </div>
+            
+            <div className="flex justify-between items-end mb-8">
+              <div>
+                <h3 className="text-2xl font-black italic tracking-tighter uppercase mb-1">{localSelectedAsset.asset} {language === 'TR' ? 'Analizi' : 'Analysis'}</h3>
+                <p className="text-xs font-bold text-muted-foreground opacity-60 uppercase tracking-widest">
+                  {localSelectedAsset.totalCount} {language === 'TR' ? 'Haber Kaynağı' : 'News Sources'}
+                </p>
+              </div>
+              <div className={`text-4xl font-black italic tracking-tighter ${localSelectedAsset.averageScore >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                %{localSelectedAsset.averageScore}
+              </div>
+            </div>
+
+            <div className="space-y-5">
+              {/* Average Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                  <span>{language === 'TR' ? 'GENEL ORTALAMA' : 'WEIGHTED AVERAGE'}</span>
+                  <span className={localSelectedAsset.averageScore >= 0 ? 'text-emerald-500' : 'text-rose-500'}>{localSelectedAsset.averageScore}%</span>
+                </div>
+                <div className="h-3 bg-secondary/50 rounded-full overflow-hidden border border-white/5">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, Math.abs(localSelectedAsset.averageScore))}%` }}
+                    className={`h-full ${localSelectedAsset.averageScore >= 0 ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]'}`}
+                    style={{ marginLeft: localSelectedAsset.averageScore >= 0 ? '0' : 'auto' }}
+                  />
+                </div>
+              </div>
+
+              {/* Source Breakdown Bars */}
+              <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                {localSelectedAsset.sources.map((src, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="flex justify-between text-[9px] font-black uppercase tracking-widest opacity-70">
+                      <span>{src.name}</span>
+                      <span className={src.avgScore >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{src.avgScore}%</span>
+                    </div>
+                    <div className="h-1.5 bg-secondary/30 rounded-full overflow-hidden">
+                       <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, Math.abs(src.avgScore))}%` }}
+                        className={`h-full ${src.avgScore >= 0 ? 'bg-emerald-400' : 'bg-rose-400'}`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.section>
   );
 };
 

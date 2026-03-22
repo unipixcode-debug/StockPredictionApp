@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from './api';
 import { useLanguage } from './LanguageContext';
+import { ChartModal } from './ChartModal';
 
 const Market360 = () => {
     const { t, language } = useLanguage();
@@ -14,6 +15,7 @@ const Market360 = () => {
     const [insights, setInsights] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedSector, setSelectedSector] = useState('All');
+    const [selectedChartAsset, setSelectedChartAsset] = useState(null);
 
     useEffect(() => {
         fetchMarket360Data();
@@ -98,7 +100,11 @@ const Market360 = () => {
                             ))
                         ) : (
                             filteredData.map((stock, i) => (
-                                <HeatmapCell key={i} stock={stock} />
+                                <HeatmapCell 
+                                    key={i} 
+                                    stock={stock} 
+                                    onClick={() => setSelectedChartAsset(stock.symbol)} 
+                                />
                             ))
                         )}
                     </div>
@@ -172,11 +178,18 @@ const Market360 = () => {
                     </div>
                 </div>
             </div>
+
+            {/* TradingView Chart Modal */}
+            <ChartModal 
+                symbol={selectedChartAsset} 
+                isOpen={!!selectedChartAsset} 
+                onClose={() => setSelectedChartAsset(null)} 
+            />
         </div>
     );
 };
 
-const HeatmapCell = ({ stock }) => {
+const HeatmapCell = ({ stock, onClick }) => {
     const change = stock.change || 0;
     const isUp = change >= 0;
     const absChange = Math.abs(change).toFixed(2);
@@ -189,8 +202,9 @@ const HeatmapCell = ({ stock }) => {
 
     return (
         <motion.div 
+            onClick={onClick}
             whileHover={{ scale: 1.05, zIndex: 10 }}
-            className={`rounded-2xl border flex flex-col items-center justify-center text-center p-4 transition-all relative overflow-hidden group shadow-2xl`}
+            className={`rounded-2xl border flex flex-col items-center justify-center text-center p-4 transition-all relative overflow-hidden group shadow-2xl cursor-pointer`}
             style={{ 
                 backgroundColor: bgColor,
                 borderColor: isUp ? 'rgba(16, 185, 129, 0.3)' : 'rgba(225, 29, 72, 0.3)'
