@@ -41,7 +41,7 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cors());
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(morgan('dev'));
 
 app.use(

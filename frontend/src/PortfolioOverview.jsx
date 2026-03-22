@@ -32,19 +32,24 @@ const PortfolioOverview = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [portfolioData, analysisData, assetsData] = await Promise.all([
+            // Load portfolio data first — don't block on slow AI analysis
+            const [portfolioData, assetsData] = await Promise.all([
                 api.get('/portfolio'),
-                api.get('/portfolio/analysis'),
                 api.get('/market/assets')
             ]);
-            console.log('Portfolio Response:', portfolioData);
             setHoldings(portfolioData);
-            setAnalysis(analysisData);
             setAvailableAssets(assetsData);
         } catch (error) {
             console.error('Error fetching portfolio:', error);
         } finally {
             setLoading(false);
+        }
+        // Load AI analysis separately (slow, non-blocking)
+        try {
+            const analysisData = await api.get('/portfolio/analysis');
+            setAnalysis(analysisData);
+        } catch (err) {
+            console.warn('AI analysis unavailable:', err);
         }
     };
 
@@ -466,12 +471,10 @@ const PortfolioOverview = () => {
                                                         setSelectedAsset(result);
                                                         setSearchQuery(result.symbol);
                                                         setSearchResults([]);
-                                                        // Smart Currency Defaulting
-                                                        if (result.market === 'BIST' || result.symbol?.endsWith('.IS')) {
-                                                            setModalCurrency('TRY');
-                                                        } else {
-                                                            setModalCurrency('USD');
-                                                        }
+                                                        // Smart currency default: TRY for BIST, USD otherwise
+                                                        setModalCurrency(
+                                                            result.market === 'BIST' || result.symbol?.endsWith('.IS') ? 'TRY' : 'USD'
+                                                        );
                                                     }}
                                                     className="p-3 hover:bg-primary/20 cursor-pointer flex justify-between items-center transition-colors border-b border-white/5 last:border-b-0"
                                                 >
