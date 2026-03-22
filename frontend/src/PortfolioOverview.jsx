@@ -519,7 +519,7 @@ const PortfolioOverview = () => {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-2">Alış Para Birimi</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-2">Birim Fiyatı & Kur</label>
                                         <div className="flex gap-2">
                                             <input 
                                                 name="avgPrice" 
@@ -531,15 +531,22 @@ const PortfolioOverview = () => {
                                                 required
                                                 className="flex-1 bg-secondary/50 border border-border p-4 rounded-2xl font-black italic outline-none focus:border-primary transition-all"
                                             />
-                                            <select 
-                                                name="purchaseCurrency"
-                                                value={modalCurrency}
-                                                onChange={(e) => setModalCurrency(e.target.value)}
-                                                className="bg-primary/20 border border-primary/30 px-6 rounded-2xl font-black italic outline-none focus:border-primary transition-all cursor-pointer hover:bg-primary/30"
-                                            >
-                                                <option value="USD">USD</option>
-                                                <option value="TRY">TRY</option>
-                                            </select>
+                                            <div className="flex bg-secondary/50 rounded-2xl p-1 border border-border shrink-0 items-center">
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setModalCurrency('USD')}
+                                                    className={`px-3 py-2 rounded-xl text-xs font-black transition-all ${modalCurrency === 'USD' ? 'bg-cyan-500 text-black shadow-lg' : 'opacity-50 hover:opacity-100'}`}
+                                                >
+                                                    USD
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setModalCurrency('TRY')}
+                                                    className={`px-3 py-2 rounded-xl text-xs font-black transition-all ${modalCurrency === 'TRY' ? 'bg-cyan-500 text-black shadow-lg' : 'opacity-50 hover:opacity-100'}`}
+                                                >
+                                                    TRY
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
