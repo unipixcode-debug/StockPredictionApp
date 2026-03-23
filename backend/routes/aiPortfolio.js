@@ -123,17 +123,18 @@ router.get('/:id/history', async (req, res) => {
 
         const assets = typeof port.assets === 'string' ? JSON.parse(port.assets) : port.assets;
         
-        // Generate a 30-day timeline array
-        const past30Days = [];
-        const today = new Date();
-        for (let i = 29; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(d.getDate() - i);
-            past30Days.push(d.toISOString().split('T')[0]);
+        // Generate a 72-hour timeline array
+        const pastHours = [];
+        const now = new Date();
+        now.setMinutes(0, 0, 0);
+        for (let i = 71; i >= 0; i--) {
+            const d = new Date(now);
+            d.setHours(d.getHours() - i);
+            pastHours.push(d.toISOString());
         }
 
         const historyData = {};
-        for (const date of past30Days) {
+        for (const date of pastHours) {
             historyData[date] = { date, totalValue: 0 };
             assets.forEach(a => historyData[date][a.symbol] = 0);
         }
@@ -143,7 +144,7 @@ router.get('/:id/history', async (req, res) => {
             let symbolData = [];
             try {
                 // Assume marketDataService gets Yahoo finance series format [{date, close}, ...]
-                const series = await marketDataService.getHistoricalData(asset.symbol, '1D', 30);
+                const series = await marketDataService.getHistoricalData(asset.symbol, '1h', 72);
                 if (Array.isArray(series.data)) {
                     symbolData = series.data;
                 } else if (Array.isArray(series)) {
@@ -153,18 +154,21 @@ router.get('/:id/history', async (req, res) => {
                 console.warn("Could not fetch history for", asset.symbol);
             }
             
-            // Map fetched data to dates. For missing days (weekends), forward-fill.
+            // Map fetched data to dates. For missing hours, forward-fill.
             let lastPrice = asset.entryPrice || 1; 
             if (symbolData.length > 0) lastPrice = symbolData[0].close || symbolData[0].price || symbolData[0].value || lastPrice;
             
             const priceMap = {};
             symbolData.forEach(d => {
-                const dateKey = new Date(d.time || d.date || d.timestamp).toISOString().split('T')[0];
+                const ms = (d.time < 100000000000) ? (d.time * 1000) : d.time;
+                const dObj = new Date(ms || d.date || d.timestamp);
+                dObj.setMinutes(0, 0, 0); // truncate to hour
+                const dateKey = dObj.toISOString();
                 priceMap[dateKey] = d.close || d.value || d.price || lastPrice;
             });
 
-            for (let i = 0; i < past30Days.length; i++) {
-                const date = past30Days[i];
+            for (let i = 0; i < pastHours.length; i++) {
+                const date = pastHours[i];
                 if (priceMap[date]) {
                     lastPrice = priceMap[date];
                 }
@@ -174,7 +178,7 @@ router.get('/:id/history', async (req, res) => {
         }
 
         // Sum up total values constraint
-        for (const date of past30Days) {
+        for (const date of pastHours) {
             let sum = 0;
             assets.forEach(a => {
                 sum += historyData[date][a.symbol];

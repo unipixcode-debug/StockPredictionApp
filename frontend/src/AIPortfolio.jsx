@@ -151,31 +151,38 @@ const AIPortfolio = () => {
           <div className="space-y-8">
               {/* Stats Row */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                   <div className="glass-card p-6 flex items-center space-x-4">
-                       <div className="w-14 h-14 bg-secondary/50 rounded-2xl flex items-center justify-center border border-border">
-                           <DollarSign className="text-primary" size={24} />
+                   <div className="glass-card p-6 flex flex-col justify-center space-y-1 relative">
+                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 flex items-center justify-between">
+                           <span>Portföy Değeri</span>
+                       </p>
+                       <div className="flex items-end space-x-2">
+                           <h2 className="text-3xl font-black tracking-tighter font-mono">${latestValue.toFixed(2)}</h2>
                        </div>
-                       <div>
-                           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Portföy Değeri</p>
-                           <h2 className="text-3xl font-black tracking-tighter font-mono">{latestValue.toFixed(2)} <span className="text-sm font-sans tracking-normal opacity-50">Birim</span></h2>
-                       </div>
+                       <p className="text-xs font-bold text-muted-foreground opacity-70">BAŞLANGIÇ: $100.00</p>
                    </div>
 
-                   <div className="glass-card p-6 flex items-center space-x-4">
-                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${isProfit ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30'}`}>
-                           {isProfit ? <TrendingUp className="text-emerald-500" size={24} /> : <TrendingDown className="text-rose-500" size={24} />}
+                   <div className="glass-card p-6 flex flex-col justify-center space-y-1 relative">
+                       <div className="flex justify-between items-start">
+                           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
+                               {language === 'TR' ? '72 Saatlik Getiri (Net)' : '72 Hour Return (Net)'}
+                           </p>
+                           <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${isProfit ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30'}`}>
+                               {isProfit ? <TrendingUp className="text-emerald-500" size={14} /> : <TrendingDown className="text-rose-500" size={14} />}
+                           </div>
                        </div>
-                       <div>
-                           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">30 Günlük Getiri (Net)</p>
+                       <div className="flex items-baseline space-x-2">
                            <h2 className={`text-3xl font-black tracking-tighter font-mono ${isProfit ? 'text-emerald-500' : 'text-rose-500'}`}>
-                               {isProfit ? '+' : ''}{profit.toFixed(2)}%
+                               {isProfit ? '+$' : '-$'}{Math.abs(latestValue - 100).toFixed(2)}
                            </h2>
+                           <p className={`text-sm font-bold opacity-80 ${isProfit ? 'text-emerald-500' : 'text-rose-500'}`}>
+                               ({isProfit ? '+' : ''}{profit.toFixed(2)}%)
+                           </p>
                        </div>
                    </div>
 
                    <div className="glass-card p-6 flex flex-col justify-center relative overflow-hidden group">
                        <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2 flex items-center justify-between">
-                           <span><Bot size={12} className="inline mr-1"/> Yapay Zeka Özeti ve Strateji</span>
+                           <span><Bot size={12} className="inline mr-1"/> {language === 'TR' ? 'Yapay Zeka Özeti ve Strateji' : 'AI Summary & Strategy'}</span>
                            <button onClick={() => handleDelete(activePortfolio.id)} className="text-rose-500/50 hover:text-rose-500 p-1 bg-rose-500/10 rounded-lg transition-colors" title="Portföyü Sil"><Trash2 size={12}/></button>
                        </p>
                        <p className="text-xs text-muted-foreground italic leading-relaxed line-clamp-3 group-hover:line-clamp-none transition-all">
@@ -200,8 +207,18 @@ const AIPortfolio = () => {
                                   </linearGradient>
                               </defs>
                               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
-                              <XAxis dataKey="date" tick={{fontSize: 10, fill: '#888'}} tickLine={false} axisLine={false} minTickGap={20} />
-                              <YAxis tick={{fontSize: 10, fill: '#888', fontFamily: 'monospace'}} tickLine={false} axisLine={false} domain={['dataMin - 5', 'dataMax + 5']} />
+                              <XAxis 
+                                  dataKey="date" 
+                                  tickFormatter={(val) => {
+                                      const d = new Date(val);
+                                      return `${d.getDate()}/${d.getMonth()+1} ${d.getHours().toString().padStart(2,'0')}:00`;
+                                  }}
+                                  tick={{fontSize: 10, fill: '#888'}} 
+                                  tickLine={false} 
+                                  axisLine={false} 
+                                  minTickGap={30} 
+                              />
+                              <YAxis tickFormatter={(val) => `$${val}`} tick={{fontSize: 10, fill: '#888', fontFamily: 'monospace'}} tickLine={false} axisLine={false} domain={['dataMin - 2', 'dataMax + 2']} />
                               <Tooltip content={<CustomTooltip />} />
                               <Area type="monotone" dataKey="totalValue" name="Toplam Değer" stroke={isProfit ? "#10b981" : "#00f2fe"} strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
                           </AreaChart>
@@ -244,7 +261,17 @@ const AIPortfolio = () => {
                           <ResponsiveContainer width="100%" height="100%">
                               <LineChart data={historyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
-                                  <XAxis dataKey="date" tick={{fontSize: 10, fill: '#888'}} tickLine={false} axisLine={false} minTickGap={20} />
+                                  <XAxis 
+                                      dataKey="date" 
+                                      tickFormatter={(val) => {
+                                          const d = new Date(val);
+                                          return `${d.getDate()}/${d.getMonth()+1} ${d.getHours().toString().padStart(2,'0')}:00`;
+                                      }}
+                                      tick={{fontSize: 10, fill: '#888'}} 
+                                      tickLine={false} 
+                                      axisLine={false} 
+                                      minTickGap={30} 
+                                  />
                                   <YAxis tick={{fontSize: 10, fill: '#888', fontFamily: 'monospace'}} tickLine={false} axisLine={false} />
                                   <Tooltip content={<CustomTooltip />} />
                                   <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '10px' }} iconType="circle" />
