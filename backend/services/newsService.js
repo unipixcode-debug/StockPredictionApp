@@ -20,22 +20,29 @@ class NewsService {
                     createdAt: { [Op.gte]: oneWeekAgo }
                 },
                 order: [['createdAt', 'DESC']],
-                limit: 50
+                limit: 500
             });
 
             if (dbNews.length > 0) {
-                return dbNews.map(item => ({
-                    title: (targetLang === 'TR' ? item.titleTR : item.titleEN) || item.titleEN,
-                    contentSnippet: (targetLang === 'TR' ? item.snippetTR : item.snippetEN) || item.snippetEN,
-                    link: item.url,
-                    pubDate: item.createdAt,
-                    sourceName: item.sourceName || 'Piyasa', 
-                    importanceScore: item.importanceScore || 50,
-                    sentimentScore: item.sentimentScore || 50,
-                    tags: item.tags || '',
-                    impacts: item.impacts || [],
-                    isTranslated: !!item.titleTR
-                }));
+                return dbNews.map(item => {
+                    let parsedImpacts = [];
+                    try {
+                        parsedImpacts = typeof item.impacts === 'string' ? JSON.parse(item.impacts) : (item.impacts || []);
+                    } catch(e) {}
+
+                    return {
+                        title: (targetLang === 'TR' ? item.titleTR : item.titleEN) || item.titleEN,
+                        contentSnippet: (targetLang === 'TR' ? item.snippetTR : item.snippetEN) || item.snippetEN,
+                        link: item.url,
+                        pubDate: item.createdAt,
+                        sourceName: item.sourceName || 'Piyasa', 
+                        importanceScore: item.importanceScore || 50,
+                        sentimentScore: item.sentimentScore || 50,
+                        tags: item.tags || '',
+                        impacts: parsedImpacts,
+                        isTranslated: !!item.titleTR
+                    };
+                });
             }
 
             // Fallback if DB is completely empty (usually first run)
