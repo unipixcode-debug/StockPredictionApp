@@ -316,7 +316,7 @@ const AIScanner = () => {
                                                                 y={levels.entry} 
                                                                 stroke="#3b82f6" 
                                                                 strokeDasharray="3 3" 
-                                                                label={{ position: 'right', value: 'Giriş', fill: '#3b82f6', fontSize: 10, fontWeight: 'bold' }} 
+                                                                label={{ position: 'right', value: `Giriş: ${levels.entry.toFixed(2)}`, fill: '#3b82f6', fontSize: 10, fontWeight: 'bold' }} 
                                                             />
                                                         )}
                                                         {levels.tp && (
@@ -324,7 +324,7 @@ const AIScanner = () => {
                                                                 y={levels.tp} 
                                                                 stroke="#10b981" 
                                                                 strokeDasharray="3 3" 
-                                                                label={{ position: 'right', value: 'Hedef', fill: '#10b981', fontSize: 10, fontWeight: 'bold' }} 
+                                                                label={{ position: 'right', value: `Hedef: ${levels.tp.toFixed(2)}`, fill: '#10b981', fontSize: 10, fontWeight: 'bold' }} 
                                                             />
                                                         )}
                                                         {levels.sl && (
@@ -332,7 +332,7 @@ const AIScanner = () => {
                                                                 y={levels.sl} 
                                                                 stroke="#ef4444" 
                                                                 strokeDasharray="3 3" 
-                                                                label={{ position: 'right', value: 'Stop', fill: '#ef4444', fontSize: 10, fontWeight: 'bold' }} 
+                                                                label={{ position: 'right', value: `Stop: ${levels.sl.toFixed(2)}`, fill: '#ef4444', fontSize: 10, fontWeight: 'bold' }} 
                                                             />
                                                         )}
                                                     </LineChart>
