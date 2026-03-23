@@ -12,7 +12,7 @@ const AIPortfolio = () => {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [selectedAssetFilter, setSelectedAssetFilter] = useState(null);
+  const [selectedAssets, setSelectedAssets] = useState(['TOTAL']);
 
   useEffect(() => {
     fetchData();
@@ -68,6 +68,16 @@ const AIPortfolio = () => {
     } catch (e) {
       alert("Hata oluştu.");
     }
+  };
+
+  const toggleAsset = (symbol) => {
+    setSelectedAssets(prev => {
+      if (prev.includes(symbol)) {
+        return prev.filter(s => s !== symbol);
+      } else {
+        return [...prev, symbol];
+      }
+    });
   };
 
   const colors = ['#00f2fe', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4', '#eab308'];
@@ -215,22 +225,30 @@ const AIPortfolio = () => {
                              Performans Grafiği
                           </h3>
                           <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase mt-1">
-                             {selectedAssetFilter ? `${selectedAssetFilter} Varlığına Odaklanıldı` : 'Toplam Portföy ve Varlık Dağılımı'}
+                             {selectedAssets.length === 1 && selectedAssets[0] !== 'TOTAL' ? `${selectedAssets[0]} Varlığına Odaklanıldı` : 'Portföy Performans Analizi'}
                           </p>
                       </div>
                       
                       <div className="flex flex-wrap gap-2">
                          <button 
-                            onClick={() => setSelectedAssetFilter(null)}
-                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${!selectedAssetFilter ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary/50 border-border text-muted-foreground hover:bg-secondary'}`}
+                            onClick={() => setSelectedAssets(['TOTAL', ...activePortfolio.assets.map(a => a.symbol)])}
+                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${(selectedAssets.length === activePortfolio.assets.length + 1) ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary/50 border-border text-muted-foreground hover:bg-secondary'}`}
                          >
-                             Hepsi
+                             {language === 'TR' ? 'Hepsi' : 'All'}
                          </button>
+
+                         <button 
+                            onClick={() => toggleAsset('TOTAL')}
+                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${selectedAssets.includes('TOTAL') ? 'border-primary text-primary bg-primary/10' : 'bg-secondary/20 border-border/30 text-muted-foreground hover:bg-secondary/40'}`}
+                         >
+                             {language === 'TR' ? 'Toplam' : 'Total'}
+                         </button>
+
                          {activePortfolio.assets.map((asset, i) => (
                              <button 
                                 key={asset.symbol}
-                                onClick={() => setSelectedAssetFilter(asset.symbol)}
-                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${selectedAssetFilter === asset.symbol ? 'border-primary text-primary' : 'bg-secondary/20 border-border/30 text-muted-foreground hover:bg-secondary/40'}`}
+                                onClick={() => toggleAsset(asset.symbol)}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${selectedAssets.includes(asset.symbol) ? 'border-primary text-primary bg-primary/10' : 'bg-secondary/20 border-border/30 text-muted-foreground hover:bg-secondary/40'}`}
                              >
                                  {asset.symbol.split('USDT')[0]}
                              </button>
@@ -262,34 +280,35 @@ const AIPortfolio = () => {
                               />
                               <Tooltip content={<CustomTooltip />} cursor={{stroke: '#ffffff10', strokeWidth: 1}} />
                               
-                              {/* Always show total if no filter, or only the filtered asset */}
-                              {!selectedAssetFilter && (
+                               {/* Total Value Line */}
+                               {selectedAssets.includes('TOTAL') && (
                                 <Line 
                                     type="monotone" 
                                     dataKey="totalValue" 
-                                    name="Toplam Değer" 
+                                    name={language === 'TR' ? 'Toplam Değer' : 'Total Value'}
                                     stroke="#00f2fe" 
                                     strokeWidth={4} 
                                     dot={false}
+                                    strokeOpacity={selectedAssets.length > 1 ? 0.7 : 1}
                                     animationDuration={2000}
                                 />
-                              )}
-
-                              {activePortfolio.assets.map((asset, i) => (
-                                  (selectedAssetFilter === null || selectedAssetFilter === asset.symbol) && (
-                                    <Line 
-                                        key={asset.symbol}
-                                        type="monotone" 
-                                        dataKey={asset.symbol} 
-                                        name={asset.symbol}
-                                        stroke={colors[i % colors.length]} 
-                                        strokeWidth={selectedAssetFilter === asset.symbol ? 4 : 1.5}
-                                        strokeOpacity={selectedAssetFilter ? (selectedAssetFilter === asset.symbol ? 1 : 0.1) : 0.4}
-                                        dot={false}
-                                        animationDuration={1500}
-                                    />
-                                  )
-                              ))}
+                               )}
+ 
+                               {activePortfolio.assets.map((asset, i) => (
+                                   selectedAssets.includes(asset.symbol) && (
+                                     <Line 
+                                         key={asset.symbol}
+                                         type="monotone" 
+                                         dataKey={asset.symbol} 
+                                         name={asset.symbol}
+                                         stroke={colors[i % colors.length]} 
+                                         strokeWidth={selectedAssets.length === 1 ? 4 : 2}
+                                         strokeOpacity={selectedAssets.length === 1 ? 1 : 0.8}
+                                         dot={false}
+                                         animationDuration={1500}
+                                     />
+                                   )
+                               ))}
                               
                               <Legend wrapperStyle={{ fontSize: '9px', fontWeight: '900', paddingTop: '30px', textTransform: 'uppercase', fontStyle: 'italic' }} iconType="circle" />
                           </LineChart>
@@ -301,15 +320,14 @@ const AIPortfolio = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {activePortfolio.assets.map((asset, i) => {
                       const color = colors[i % colors.length];
-                      const isTargeted = selectedAssetFilter === asset.symbol;
                       return (
                           <motion.div 
                               initial={{ scale: 0.95, opacity: 0 }} 
                               whileInView={{ scale: 1, opacity: 1 }}
                               transition={{ delay: i * 0.05 }}
                               key={asset.symbol} 
-                              onClick={() => setSelectedAssetFilter(isTargeted ? null : asset.symbol)}
-                              className={`p-6 rounded-3xl border transition-all cursor-pointer group relative overflow-hidden ${isTargeted ? 'bg-primary/10 border-primary shadow-[0_0_40px_rgba(0,242,254,0.1)]' : 'bg-secondary/20 border-border/30 hover:border-border'}`}
+                              onClick={() => toggleAsset(asset.symbol)}
+                              className={`p-6 rounded-3xl border transition-all cursor-pointer group relative overflow-hidden ${selectedAssets.includes(asset.symbol) ? 'bg-primary/10 border-primary shadow-[0_0_40px_rgba(0,242,254,0.1)]' : 'bg-secondary/20 border-border/30 hover:border-border'}`}
                           >
                               {/* AI Score Badge */}
                               <div className="absolute top-4 right-4 flex flex-col items-end">
