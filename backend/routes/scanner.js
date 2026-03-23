@@ -32,6 +32,7 @@ router.post('/analyze', async (req, res) => {
         Haber Duyarlılığı: ${JSON.stringify(sentimentSummary.slice(0, 3))}
 
         GÖREV: Varlık için net bir işlem kararı (AL, SAT veya BEKLE) ver.
+        Pozisyon yönünü (LONG veya SHORT) ve yatırım vadesini (KISA VADE veya UZUN VADE) belirle.
         Teknik seviyelere göre Giriş, Hedef (TP) ve Stop Loss (SL) seviyelerini belirle.
         2 cümlelik bir strateji açıklaması yap.
 
@@ -39,6 +40,8 @@ router.post('/analyze', async (req, res) => {
         
         Format gereksinimi (Satır satır göster, tablo yapma):
         Karar : [AL/SAT/BEKLE]
+        Yön : [LONG/SHORT]
+        Vade : [KISA VADE/UZUN VADE]
         Giriş : [Fiyat]
         Hedef (TP) : [Seviye]
         Stop (SL) : [Seviye]

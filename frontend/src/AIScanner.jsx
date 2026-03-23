@@ -265,10 +265,47 @@ const AIScanner = () => {
                                             </div>
                                         </div>
                                         
-                                        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 mb-4">
-                                            <ReactMarkdown className="markdown-content">
-                                                {analysis}
-                                            </ReactMarkdown>
+                                        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 mb-4 space-y-3">
+                                            {analysis.split('\n').filter(line => line.trim()).map((line, i) => {
+                                                const isDirection = line.includes('Yön :');
+                                                const isHorizon = line.includes('Vade :');
+                                                const isLong = line.toUpperCase().includes('LONG') || line.toUpperCase().includes('AL');
+                                                const isShort = line.toUpperCase().includes('SHORT') || line.toUpperCase().includes('SAT');
+                                                const isRationale = line.includes('Strateji Notu :');
+
+                                                if (isRationale) {
+                                                    return (
+                                                        <div key={i} className="pt-2 border-t border-primary/10 mt-2">
+                                                            <span className="text-[10px] font-black uppercase tracking-widest text-primary/60 block mb-1">Strateji Notu</span>
+                                                            <p className="text-sm text-foreground/80 leading-relaxed italic">
+                                                                {line.replace('Strateji Notu :', '').trim()}
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                let textColor = 'text-foreground/90';
+                                                if (isDirection) {
+                                                    if (isLong) textColor = 'text-emerald-500 font-bold';
+                                                    else if (isShort) textColor = 'text-rose-500 font-bold';
+                                                } else if (isHorizon) {
+                                                    textColor = 'text-amber-500 font-bold';
+                                                } else if (line.includes('Karar :')) {
+                                                    if (isLong) textColor = 'text-emerald-500 font-bold';
+                                                    else if (isShort) textColor = 'text-rose-500 font-bold';
+                                                }
+
+                                                return (
+                                                    <div key={i} className="flex justify-between items-center text-xs border-b border-primary/5 pb-2 last:border-0">
+                                                        <span className="font-black uppercase tracking-widest text-muted-foreground/60 text-[9px]">
+                                                            {line.split(':')[0]}
+                                                        </span>
+                                                        <span className={`font-bold ${textColor}`}>
+                                                            {line.split(':').slice(1).join(':').trim()}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                         
                                         <div className="flex items-center justify-center p-3 bg-rose-500/5 border border-rose-500/10 rounded-xl">
