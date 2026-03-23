@@ -117,6 +117,25 @@ const AIPortfolio = () => {
          </button>
       </header>
 
+      {/* Legal Disclaimer Banner */}
+      <div className="bg-amber-500/10 border border-amber-500/20 p-5 md:p-6 rounded-2xl flex items-start space-x-5 shadow-2xl">
+          <div className="text-amber-500 mt-1 shrink-0 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
+              <svg fill="currentColor" viewBox="0 0 24 24" className="w-6 h-6">
+                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+          </div>
+          <div>
+              <h4 className="text-amber-500 font-black uppercase tracking-widest text-sm mb-2">
+                  {language === 'TR' ? 'Yasal Uyarı (Disclaimer)' : 'Legal Disclaimer'}
+              </h4>
+              <p className="text-muted-foreground text-xs leading-relaxed text-amber-500/80">
+                  {language === 'TR' 
+                  ? 'YASAL UYARI: Bu sayfada sunulan AI Portföy dağılımları ve stratejik analizler hiçbir şekilde yatırım tavsiyesi, danışmanlık hizmeti veya finansal yönlendirme niteliği taşımamaktadır. Bu modül, yalnızca uygulamanın makroekonomik metriklerini, algoritmik veri işleme kapasitesini ve yapay zeka entegrasyonunu test etmek amacıyla deneysel olarak geliştirilmiş bir kontrol sistemidir. Alınacak her türlü yatırım kararı tamamen kullanıcının kendi sorumluluğunda olup, sistem hiçbir hukuki veya maddi mesuliyet kabul etmez.' 
+                  : 'DISCLAIMER: The AI Portfolio allocations and strategic analyses presented on this page do not constitute investment advice, consulting services, or financial guidance in any way. This module is an experimental control system developed solely to test the application\'s macroeconomic metrics, algorithmic data processing capacity, and artificial intelligence integration. Any execution based on this data is entirely at the user\'s own risk, and the system accepts no legal or financial liability.'}
+              </p>
+          </div>
+      </div>
+
       {loading ? (
           <div className="flex items-center justify-center py-32">
              <Activity className="animate-pulse text-primary/30" size={48} />

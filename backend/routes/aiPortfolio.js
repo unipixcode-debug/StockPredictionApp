@@ -25,7 +25,7 @@ router.post('/', async (req, res) => {
         
         Recent Sentiment Top Assets: ${JSON.stringify(sentimentSummary.slice(0, 5))}
         
-        Allocate EXACTLY 100 units across 4-8 assets (Crypto, Stocks, Metals, Cash). Use realistic distinct symbol tickers (like BTC, SP500, GOLD, NVDA, USD, DXY, VIX).
+        Allocate EXACTLY 100 units across 4-8 assets (Crypto, Stocks, Metals, Cash). Use INDIVIDUAL, directly investable and distinct symbol tickers. DO NOT allocate any units to indices or abstract macro indicators like SP500, DXY, or VIX. If you want exposure to these indicators, you MUST choose real individual constituent stocks (like AAPL, MSFT, TSLA, NVDA) instead. You can use commodities like GOLD, OIL, and forex like USD. But strictly ZERO allocations directly to SP500, DXY, or VIX.
         For entry prices, approximate if you dont know, or use: BTC=${btcPrice}, SP500=${spyPrice}, GOLD=${goldPrice}.
         Provide a rationale. Keep it stable and deeply analyzed. Do not respond with anything outside the JSON.
         Format requirement:
