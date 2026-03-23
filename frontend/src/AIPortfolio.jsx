@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, RefreshCw, Trash2, TrendingUp, TrendingDown, DollarSign, Activity, Zap, ShieldCheck, PieChart, Target, AlertTriangle } from 'lucide-react';
+import { Bot, RefreshCw, Trash2, TrendingUp, TrendingDown, DollarSign, Activity, Zap, ShieldCheck, PieChart, Target, AlertTriangle, ChevronRight, Filter } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import api from './api';
 import { useLanguage } from './LanguageContext';
@@ -12,6 +12,7 @@ const AIPortfolio = () => {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [selectedAssetFilter, setSelectedAssetFilter] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -124,7 +125,7 @@ const AIPortfolio = () => {
             >
                 <RefreshCw size={18} className={generating ? "animate-spin" : ""} />
                 <span>
-                    {generating ? (language === 'TR' ? 'Strateji Hazırlanıyor...' : 'Strategizing...') : (language === 'TR' ? 'Yeni Portföy' : 'New Portfolio')}
+                    {generating ? (language === 'TR' ? 'Strateji Üretiliyor...' : 'Generating...') : (language === 'TR' ? 'Yeni Portföy' : 'New Portfolio')}
                 </span>
             </button>
          </div>
@@ -144,8 +145,8 @@ const AIPortfolio = () => {
               </h4>
               <p className="text-muted-foreground text-[10px] leading-relaxed font-medium">
                   {language === 'TR' 
-                  ? 'YASAL UYARI: Bu sayfadaki AI Portföy verileri yatırım tavsiyesi niteliği taşımaz. Deneysel bir algoritma tarafından üretilen referans değerlerdir.' 
-                  : 'DISCLAIMER: This AI Portfolio is for experimental/educational purposes and does not constitute financial advice.'}
+                  ? 'YASAL UYARI: Bu sayfadaki AI Portföy verileri yatırım tavsiyesi değildir. Başlangıç tutarı $100 baz alınarak simüle edilir.' 
+                  : 'DISCLAIMER: This AI Portfolio is for experimental/educational purposes based on a $100 hypothetical start.'}
               </p>
           </div>
       </div>
@@ -160,8 +161,8 @@ const AIPortfolio = () => {
       ) : !activePortfolio ? (
           <div className="glass-card p-20 text-center flex flex-col items-center border border-dashed border-border/50 rounded-[40px]">
              <Bot size={64} className="text-muted-foreground/20 mb-6" />
-             <h3 className="text-xl font-black uppercase italic tracking-tighter mb-2">Strateji Bulunamadı</h3>
-             <p className="text-muted-foreground text-sm mb-8 max-w-sm">Piyasa tarayıcısı üzerinden veri toplayıp ilk stratejinizi oluşturmak için butona basın.</p>
+             <h3 className="text-xl font-black uppercase italic tracking-tighter mb-2">Strateji Mevcut Değil</h3>
+             <p className="text-muted-foreground text-sm mb-8 max-w-sm">Global piyasaları tarayıp en yüksek puanlı varlıklarla portföy oluşturmak için ANALİZİ BAŞLAT butonuna basın.</p>
              <button onClick={handleGenerate} disabled={generating} className="bg-primary hover:bg-primary/90 text-primary-foreground px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-primary/20">
                 ANALİZİ BAŞLAT
              </button>
@@ -171,21 +172,21 @@ const AIPortfolio = () => {
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass-card p-8 group hover:border-primary/50 transition-colors">
-                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">Mevcut Değer (100 Üzerinden)</p>
+                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">Mevcut Değer (Portfolio Value)</p>
                        <div className="flex items-baseline space-x-2">
                            <h2 className="text-4xl font-black tracking-tighter italic">${latestValue.toFixed(2)}</h2>
-                           <span className="text-xs font-bold text-muted-foreground/60 uppercase">Base: $100</span>
+                           <span className="text-xs font-bold text-muted-foreground/60 uppercase">BASE: $100.00</span>
                        </div>
                    </motion.div>
 
                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className={`glass-card p-8 border-l-4 ${isProfit ? 'border-l-emerald-500 shadow-[inset_10px_0_20px_rgba(16,185,129,0.05)]' : 'border-l-rose-500 shadow-[inset_10px_0_20px_rgba(244,63,94,0.05)]'}`}>
-                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">72 Saatlik Performans</p>
+                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">Net PNL (%)</p>
                        <div className="flex items-baseline space-x-3">
                            <h2 className={`text-4xl font-black tracking-tighter italic ${isProfit ? 'text-emerald-500' : 'text-rose-500'}`}>
                                {isProfit ? '+' : ''}{profit.toFixed(2)}%
                            </h2>
                            <span className={`text-xs font-bold ${isProfit ? 'text-emerald-500/60' : 'text-rose-500/60'}`}>
-                               Gelişim
+                               {isProfit ? 'Kâr' : 'Zarar'}
                            </span>
                        </div>
                    </motion.div>
@@ -193,7 +194,7 @@ const AIPortfolio = () => {
                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="glass-card p-8 relative overflow-hidden group">
                        <div className="flex justify-between items-start mb-3">
                            <p className="text-[10px] font-black uppercase tracking-widest text-primary italic flex items-center">
-                               <Bot size={10} className="mr-1"/> AI Strateji Notu
+                               <RefreshCw size={10} className="mr-1"/> AI Analiz Özeti
                            </p>
                            <button onClick={() => handleDelete(activePortfolio.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:text-rose-400 p-1.5 bg-rose-500/10 rounded-xl" title="Sil">
                                <Trash2 size={12}/>
@@ -205,7 +206,7 @@ const AIPortfolio = () => {
                    </motion.div>
               </div>
 
-              {/* Chart */}
+              {/* Advanced Chart System */}
               <div className="glass-card p-8 rounded-[40px]">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
                       <div>
@@ -213,19 +214,33 @@ const AIPortfolio = () => {
                              <Activity className="mr-3 text-primary" size={24}/>
                              Performans Grafiği
                           </h3>
-                          <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase mt-1">72 Saatlik Simülasyon Verisi</p>
+                          <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase mt-1">
+                             {selectedAssetFilter ? `${selectedAssetFilter} Varlığına Odaklanıldı` : 'Toplam Portföy ve Varlık Dağılımı'}
+                          </p>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2">
+                         <button 
+                            onClick={() => setSelectedAssetFilter(null)}
+                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${!selectedAssetFilter ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary/50 border-border text-muted-foreground hover:bg-secondary'}`}
+                         >
+                             Hepsi
+                         </button>
+                         {activePortfolio.assets.map((asset, i) => (
+                             <button 
+                                key={asset.symbol}
+                                onClick={() => setSelectedAssetFilter(asset.symbol)}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${selectedAssetFilter === asset.symbol ? 'border-primary text-primary' : 'bg-secondary/20 border-border/30 text-muted-foreground hover:bg-secondary/40'}`}
+                             >
+                                 {asset.symbol.split('USDT')[0]}
+                             </button>
+                         ))}
                       </div>
                   </div>
 
                   <div className="h-[400px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <defs>
-                                  <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="5%" stopColor="#00f2fe" stopOpacity={0.2}/>
-                                      <stop offset="95%" stopColor="#00f2fe" stopOpacity={0}/>
-                                  </linearGradient>
-                              </defs>
+                          <LineChart data={historyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                               <XAxis 
                                   dataKey="date" 
@@ -243,90 +258,110 @@ const AIPortfolio = () => {
                                 tick={{fontSize: 9, fill: '#666', fontFamily: 'monospace', fontWeight: 'bold'}} 
                                 tickLine={false} 
                                 axisLine={false} 
-                                domain={['dataMin - 1', 'dataMax + 1']} 
+                                domain={['auto', 'auto']} 
                               />
-                              <Tooltip content={<CustomTooltip />} cursor={{stroke: '#00f2fe20', strokeWidth: 2}} />
-                              <Area 
-                                type="monotone" 
-                                dataKey="totalValue" 
-                                name="Toplam Değer" 
-                                stroke="#00f2fe" 
-                                strokeWidth={4} 
-                                fillOpacity={1} 
-                                fill="url(#colorTotal)" 
-                              />
-                          </AreaChart>
+                              <Tooltip content={<CustomTooltip />} cursor={{stroke: '#ffffff10', strokeWidth: 1}} />
+                              
+                              {/* Always show total if no filter, or only the filtered asset */}
+                              {!selectedAssetFilter && (
+                                <Line 
+                                    type="monotone" 
+                                    dataKey="totalValue" 
+                                    name="Toplam Değer" 
+                                    stroke="#00f2fe" 
+                                    strokeWidth={4} 
+                                    dot={false}
+                                    animationDuration={2000}
+                                />
+                              )}
+
+                              {activePortfolio.assets.map((asset, i) => (
+                                  (selectedAssetFilter === null || selectedAssetFilter === asset.symbol) && (
+                                    <Line 
+                                        key={asset.symbol}
+                                        type="monotone" 
+                                        dataKey={asset.symbol} 
+                                        name={asset.symbol}
+                                        stroke={colors[i % colors.length]} 
+                                        strokeWidth={selectedAssetFilter === asset.symbol ? 4 : 1.5}
+                                        strokeOpacity={selectedAssetFilter ? (selectedAssetFilter === asset.symbol ? 1 : 0.1) : 0.4}
+                                        dot={false}
+                                        animationDuration={1500}
+                                    />
+                                  )
+                              ))}
+                              
+                              <Legend wrapperStyle={{ fontSize: '9px', fontWeight: '900', paddingTop: '30px', textTransform: 'uppercase', fontStyle: 'italic' }} iconType="circle" />
+                          </LineChart>
                       </ResponsiveContainer>
                   </div>
               </div>
 
               {/* Detailed Asset Cards */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                  <div className="lg:col-span-12 glass-card p-8 rounded-[40px]">
-                      <h3 className="text-xl font-black uppercase italic tracking-tighter mb-8 flex items-center">
-                        <PieChart className="mr-3 text-primary" size={20} />
-                        Varlık Dağılımı ve İşlem Hedefleri
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                          {activePortfolio.assets.map((asset, i) => {
-                              const color = colors[i % colors.length];
-                              return (
-                                  <motion.div 
-                                      initial={{ scale: 0.95, opacity: 0 }} 
-                                      animate={{ scale: 1, opacity: 1 }}
-                                      transition={{ delay: i * 0.05 }}
-                                      key={asset.symbol} 
-                                      className="bg-secondary/20 p-6 rounded-3xl border border-border/30 hover:border-primary/50 transition-all group relative overflow-hidden"
-                                  >
-                                      {/* AI Score Badge */}
-                                      <div className="absolute top-4 right-4 flex flex-col items-end">
-                                          <div className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">AI Score</div>
-                                          <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-black text-xs ${
-                                              (asset.aiScore || 0) > 70 ? 'border-emerald-500 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 
-                                              'border-primary/30 text-primary'
-                                          }`}>
-                                              {Math.round(asset.aiScore || 0)}
-                                          </div>
-                                      </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {activePortfolio.assets.map((asset, i) => {
+                      const color = colors[i % colors.length];
+                      const isTargeted = selectedAssetFilter === asset.symbol;
+                      return (
+                          <motion.div 
+                              initial={{ scale: 0.95, opacity: 0 }} 
+                              whileInView={{ scale: 1, opacity: 1 }}
+                              transition={{ delay: i * 0.05 }}
+                              key={asset.symbol} 
+                              onClick={() => setSelectedAssetFilter(isTargeted ? null : asset.symbol)}
+                              className={`p-6 rounded-3xl border transition-all cursor-pointer group relative overflow-hidden ${isTargeted ? 'bg-primary/10 border-primary shadow-[0_0_40px_rgba(0,242,254,0.1)]' : 'bg-secondary/20 border-border/30 hover:border-border'}`}
+                          >
+                              {/* AI Score Badge */}
+                              <div className="absolute top-4 right-4 flex flex-col items-end">
+                                  <div className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">AI Score</div>
+                                  <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-black text-xs ${
+                                      (asset.aiScore || 0) > 70 ? 'border-emerald-500 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 
+                                      'border-primary/30 text-primary'
+                                  }`}>
+                                      {Math.round(asset.aiScore || 0) || '-'}
+                                  </div>
+                              </div>
 
-                                      <div className="flex items-center space-x-4 mb-6">
-                                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-[10px] text-white shadow-xl" style={{ backgroundColor: color }}>
-                                              {asset.symbol.substring(0,3)}
-                                          </div>
-                                          <div>
-                                              <p className="font-black text-lg uppercase italic tracking-tighter">{asset.symbol}</p>
-                                              <div className="flex items-center space-x-2">
-                                                  <span className="text-[10px] font-black text-primary italic">%{Number(asset.allocation).toFixed(0)} Allocation</span>
-                                              </div>
-                                          </div>
+                              <div className="flex items-center space-x-4 mb-6">
+                                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-[10px] text-white shadow-xl" style={{ backgroundColor: color }}>
+                                      {asset.symbol.substring(0,3)}
+                                  </div>
+                                  <div>
+                                      <p className="font-black text-lg uppercase italic tracking-tighter">{asset.symbol}</p>
+                                      <div className="flex items-center space-x-2">
+                                          <span className="text-[10px] font-black text-primary italic">%{Number(asset.allocation).toFixed(0)} Pay</span>
                                       </div>
+                                  </div>
+                              </div>
 
-                                      <div className="grid grid-cols-3 gap-2">
-                                          <div className="bg-secondary/40 p-3 rounded-2xl border border-border/50">
-                                              <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">Giriş</p>
-                                              <p className="font-mono text-[11px] font-black italic tracking-tighter">
-                                                  {asset.entryPrice > 1 ? asset.entryPrice.toLocaleString() : asset.entryPrice.toFixed(4)}
-                                              </p>
-                                          </div>
-                                          <div className="bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20">
-                                              <p className="text-[8px] font-black uppercase tracking-widest text-emerald-500 mb-1 flex items-center"><Target size={8} className="mr-1"/> Hedef</p>
-                                              <p className="font-mono text-[11px] font-black text-emerald-500 italic tracking-tighter">
-                                                  {asset.targetPrice > 1 ? asset.targetPrice.toLocaleString() : asset.targetPrice?.toFixed(4) || '-'}
-                                              </p>
-                                          </div>
-                                          <div className="bg-rose-500/10 p-3 rounded-2xl border border-rose-500/20">
-                                              <p className="text-[8px] font-black uppercase tracking-widest text-rose-500 mb-1 flex items-center"><AlertTriangle size={8} className="mr-1"/> Stop</p>
-                                              <p className="font-mono text-[11px] font-black text-rose-500 italic tracking-tighter">
-                                                  {asset.stopLoss > 1 ? asset.stopLoss.toLocaleString() : asset.stopLoss?.toFixed(4) || '-'}
-                                              </p>
-                                          </div>
-                                      </div>
-                                  </motion.div>
-                              );
-                          })}
-                      </div>
-                  </div>
+                              <div className="grid grid-cols-3 gap-2">
+                                  <div className="bg-secondary/40 p-3 rounded-2xl border border-border/50">
+                                      <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1">Giriş</p>
+                                      <p className="font-mono text-[10px] font-black italic tracking-tighter">
+                                          {asset.entryPrice > 1 ? asset.entryPrice.toLocaleString(undefined, { maximumFractionDigits: 2 }) : asset.entryPrice.toFixed(4)}
+                                      </p>
+                                  </div>
+                                  <div className="bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20">
+                                      <p className="text-[8px] font-black uppercase tracking-widest text-emerald-500 mb-1 flex items-center">Hedef</p>
+                                      <p className="font-mono text-[10px] font-black text-emerald-500 italic tracking-tighter">
+                                          {asset.targetPrice > 1 ? asset.targetPrice.toLocaleString(undefined, { maximumFractionDigits: 2 }) : asset.targetPrice?.toFixed(4) || '-'}
+                                      </p>
+                                  </div>
+                                  <div className="bg-rose-500/10 p-3 rounded-2xl border border-rose-500/20">
+                                      <p className="text-[8px] font-black uppercase tracking-widest text-rose-500 mb-1 flex items-center">Stop</p>
+                                      <p className="font-mono text-[10px] font-black text-rose-500 italic tracking-tighter">
+                                          {asset.stopLoss > 1 ? asset.stopLoss.toLocaleString(undefined, { maximumFractionDigits: 2 }) : asset.stopLoss?.toFixed(4) || '-'}
+                                      </p>
+                                  </div>
+                                  
+                              </div>
+                              <div className="mt-4 flex items-center justify-between text-[8px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
+                                  <span>Miktar: {Number(asset.quantity || 0).toFixed(6)}</span>
+                                  <ChevronRight size={12} className={`transition-transform ${isTargeted ? 'rotate-90' : ''}`} />
+                              </div>
+                          </motion.div>
+                      );
+                  })}
               </div>
           </div>
       )}

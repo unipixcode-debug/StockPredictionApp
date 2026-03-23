@@ -172,11 +172,12 @@ class MarketDataService {
     async getHistoricalData(symbol, timeframe = '1D', limit = 100) {
         try {
             const upperSymbol = symbol.toUpperCase();
+            const intervalMap = { '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w', '1M': '1m' };
+            const interval = intervalMap[timeframe] || '1d';
+            
             const isCrypto = upperSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(upperSymbol);
             
             if (isCrypto) {
-                const intervalMap = { '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w', '1M': '1M' };
-                const interval = intervalMap[timeframe] || '1d';
                 const limitInt = parseInt(limit) || 100;
                 
                 const bSymbol = upperSymbol.endsWith('USDT') ? upperSymbol : upperSymbol + 'USDT';
@@ -212,7 +213,7 @@ class MarketDataService {
                 const period1 = Math.floor(period1Date.getTime() / 1000);
                 const result = await yahooFinance.chart(querySymbol, {
                     period1: period1,
-                    interval: intervalMap[timeframe] || '1d'
+                    interval: interval === '1d' ? '1d' : interval // Yahoo uses 1d/1wk/1mo lowercase but 1h/1m is different
                 });
                 
                 const quotes = result.quotes || [];
