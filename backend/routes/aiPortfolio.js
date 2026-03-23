@@ -12,39 +12,46 @@ router.post('/', async (req, res) => {
         const pressure = marketDataService.calculateMarketPressure(indicators);
         const sentimentSummary = await newsService.getSentimentAggregation(3);
         
-        // Fetch Top 15 from each market for AI to choose
-        const cryptoScan = await marketDataService.getScannerData('crypto', 15);
+        // Fetch Top symbols from each market for AI to choose
+        const cryptoScan = await marketDataService.getScannerData('crypto', 20);
         const nasdaqScan = await marketDataService.getScannerData('nasdaq', 10);
         const bistScan = await marketDataService.getScannerData('bist', 10);
         
         const allScannerResults = [...cryptoScan, ...nasdaqScan, ...bistScan];
-        const scannerText = allScannerResults.map(s => `${s.symbol}: RSI=${s.rsi?.toFixed(1)}, Score=${s.aiScore}, Signal=${s.signal}`).join('\n');
+        
+        // Create a lookup map for real-time validation and entry prices
+        const assetMap = {};
+        allScannerResults.forEach(s => {
+            assetMap[s.symbol] = s;
+        });
+
+        const scannerText = allScannerResults.map(s => `${s.symbol}: RSI=${s.rsi?.toFixed(1)}, Score=${Math.round(s.aiScore)}, Signal=${s.signal}`).join('\n');
 
         const prompt = `Act as an elite quantitative analyst. Create a 100-unit portfolio based on the PROVIDED technical data and current news sentiment.
         
-        TECHNICAL DATA (Use these symbols for your allocation):
+        TECHNICAL DATA (ONLY CHOOSE FROM THESE SPECIFIC SYMBOLS):
         ${scannerText}
 
-        Macro Context:
+        Macro Context (FOR REFERENCE ONLY, DO NOT INVEST IN THESE):
         VIX: ${indicators?.vix?.price} | DXY: ${indicators?.dxy?.price}
         Market Pressure Score: ${pressure} (0=Bullish, 100=Bearish)
         
         Recent News Sentiment (Summary): ${JSON.stringify(sentimentSummary.slice(0, 5))}
         
-        Allocate EXACTLY 100 units across 4-7 assets. 
-        RULES:
-        1. ONLY choose from the symbols listed in the TECHNICAL DATA section above.
-        2. NEVER use SP500, DXY, VIX, GOLD, or GOLD_GRAM as names of assets in the "assets" array. Use their specific tickers (e.g., TSLA, BTCUSDT, AAPL, THYAO.IS).
-        3. Prioritize assets with AI Score > 70 or RSI below 35 for "Buy" opportunities.
-        4. Provide a rationale strictly based on the provided technicals and current market pressure.
+        Allocate EXACTLY 100 units across 5-7 assets. 
+        MANDATORY RULES:
+        1. ONLY choose assets from the TECHNICAL DATA symbols list above.
+        2. HYPER-IMPORTANT: NEVER use "SP500", "DXY", "VIX", "GOLD", "GOLD_GRAM", or "USD" as investment names in "assets".
+        3. Prioritize assets with AI Score > 75.
+        4. For each asset, you MUST specify a "targetPrice" and "stopLoss" relative to current price logic.
         
         Output format:
         \`\`\`json
         {
-            "name": "Yapay Zeka Teknik Analiz Portföyü",
-            "rationale": "Scanner verilerindeki RSI ve MACD uyumsuzluklarına göre...",
+            "name": "Global AI Teknik Strateji Portföyü",
+            "rationale": "Analiz raporu...",
             "assets": [
-                {"symbol": "BTCUSDT", "allocation": 30, "entryPrice": 65000},
+                {"symbol": "BTCUSDT", "allocation": 25, "targetPrice": 72000, "stopLoss": 64000},
                 ...
             ]
         }
@@ -60,20 +67,28 @@ router.post('/', async (req, res) => {
             }
             parsed = JSON.parse(cleanJson);
             
+            // 1. Filter out hallucinated assets (like SP500, GOLD if they sneaked in)
+            parsed.assets = parsed.assets.filter(a => assetMap[a.symbol]);
+
+            if (parsed.assets.length === 0) throw new Error("AI failed to select valid assets from the provided list.");
+
             let totalAlloc = 0;
             parsed.assets.forEach(a => totalAlloc += parseFloat(a.allocation));
-            if(Math.abs(totalAlloc - 100) > 1) {
-                // Normalization if AI messes up the exact 100 logic
-                parsed.assets.forEach(a => {
-                   a.allocation = (a.allocation / totalAlloc) * 100; 
-                });
-            }
             
-            // Calculate entry qty
-            parsed.assets = parsed.assets.map(a => ({
-                ...a,
-                quantity: parseFloat(a.allocation) / parseFloat(a.entryPrice || 1)
-            }));
+            // 2. Normalize and Enrichment with REAL prices to prevent $447 inflation
+            parsed.assets = parsed.assets.map(a => {
+                const scannerInfo = assetMap[a.symbol];
+                const allocation = (parseFloat(a.allocation) / totalAlloc) * 100;
+                const entryPrice = scannerInfo.price;
+                return {
+                    ...a,
+                    allocation,
+                    entryPrice,
+                    rsi: scannerInfo.rsi,
+                    aiScore: scannerInfo.aiScore,
+                    quantity: allocation / entryPrice
+                };
+            });
         } catch (e) {
             console.error(e);
             return res.status(500).json({ error: "Yapay zeka portföy formatını hatalı oluşturdu." });
@@ -132,7 +147,6 @@ router.get('/:id/history', async (req, res) => {
 
         const assets = typeof port.assets === 'string' ? JSON.parse(port.assets) : port.assets;
         
-        // Generate a 72-hour timeline array
         const pastHours = [];
         const now = new Date();
         now.setMinutes(0, 0, 0);
@@ -148,11 +162,9 @@ router.get('/:id/history', async (req, res) => {
             assets.forEach(a => historyData[date][a.symbol] = 0);
         }
 
-        // Fetch backtest data for each asset
         for (const asset of assets) {
             let symbolData = [];
             try {
-                // Assume marketDataService gets Yahoo finance series format [{date, close}, ...]
                 const series = await marketDataService.getHistoricalData(asset.symbol, '1h', 72);
                 if (Array.isArray(series.data)) {
                     symbolData = series.data;
@@ -163,7 +175,6 @@ router.get('/:id/history', async (req, res) => {
                 console.warn("Could not fetch history for", asset.symbol);
             }
             
-            // Map fetched data to dates. For missing hours, forward-fill.
             let lastPrice = asset.entryPrice || 1; 
             if (symbolData.length > 0) lastPrice = symbolData[0].close || symbolData[0].price || symbolData[0].value || lastPrice;
             
@@ -171,7 +182,7 @@ router.get('/:id/history', async (req, res) => {
             symbolData.forEach(d => {
                 const ms = (d.time < 100000000000) ? (d.time * 1000) : d.time;
                 const dObj = new Date(ms || d.date || d.timestamp);
-                dObj.setMinutes(0, 0, 0); // truncate to hour
+                dObj.setMinutes(0, 0, 0); 
                 const dateKey = dObj.toISOString();
                 priceMap[dateKey] = d.close || d.value || d.price || lastPrice;
             });
@@ -186,13 +197,11 @@ router.get('/:id/history', async (req, res) => {
             }
         }
 
-        // Sum up total values constraint
         for (const date of pastHours) {
             let sum = 0;
             assets.forEach(a => {
                 sum += historyData[date][a.symbol];
             });
-            // If sum is wildly incorrect, fallback logic to 100 points scaling
             historyData[date].totalValue = sum || 100;
         }
 

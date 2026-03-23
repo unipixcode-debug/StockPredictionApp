@@ -98,6 +98,17 @@ const AIScanner = () => {
                         ))}
                     </div>
 
+                    <button 
+                        onClick={fetchScanner} 
+                        disabled={loading}
+                        className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-4 py-2.5 rounded-2xl flex items-center space-x-2 transition-all group active:scale-95"
+                    >
+                        <RefreshCw size={14} className={loading ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">
+                            {loading ? (language === 'TR' ? 'Taranıyor...' : 'Scanning...') : (language === 'TR' ? 'Taramayı Başlat' : 'Start Scan')}
+                        </span>
+                    </button>
+
                     <div className="relative flex-1 md:w-48">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                         <input 
