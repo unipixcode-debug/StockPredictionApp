@@ -16,6 +16,7 @@ import DeveloperPanel from './DeveloperPanel';
 import Chatbot from './Chatbot';
 import Market360 from './Market360';
 import PortfolioOverview from './PortfolioOverview';
+import AIPortfolio from './AIPortfolio';
 import Credits from './Credits';
 import Profile from './Profile';
 import AIProviderManagement from './AIProviderManagement';
@@ -75,6 +76,7 @@ function AppLayout() {
             <SidebarLink to="/news" icon={<Newspaper size={22} />} label={t('News')} />
             <SidebarLink to="/flow" icon={<Receipt size={22} />} label={t('MoneyFlow')} />
             <SidebarLink to="/market-360" icon={<Globe size={22} />} label="Market 360" />
+            <SidebarLink to="/ai-portfolio" icon={<Bot size={22} />} label="AI Portföy" />
             <SidebarLink to="/portfolio" icon={<Wallet size={22} />} label="Portföy" />
             <SidebarLink to="/charts" icon={<BarChart3 size={22} />} label="Grafikler" />
             <SidebarLink to="/analysis" icon={<LineChart size={22} />} label={t('Analysis')} />
@@ -124,6 +126,7 @@ function AppLayout() {
               <Route path="/flow" element={<MoneyFlow />} />
               <Route path="/flow/:assetId" element={<AssetDetails />} />
               <Route path="/market-360" element={<Market360 />} />
+              <Route path="/ai-portfolio" element={<AIPortfolio />} />
               <Route path="/portfolio" element={<PortfolioOverview />} />
               <Route path="/charts" element={<Navigate to="/chart/BTC-USD?name=Bitcoin" replace />} />
               <Route path="/chart/:symbol" element={<MarketChart />} />
