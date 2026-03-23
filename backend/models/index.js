@@ -9,6 +9,7 @@ const DailyMarketInsight = require('./DailyMarketInsight');
 const Portfolio = require('./Portfolio');
 const PortfolioHistory = require('./PortfolioHistory');
 const PortfolioPrediction = require('./PortfolioPrediction');
+const AIPortfolio = require('./AIPortfolio');
 
 // Associations
 User.hasMany(Portfolio, { foreignKey: 'userId' });
@@ -31,5 +32,6 @@ module.exports = {
     DailyMarketInsight,
     Portfolio,
     PortfolioHistory,
-    PortfolioPrediction
+    PortfolioPrediction,
+    AIPortfolio
 };
