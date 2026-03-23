@@ -11,32 +11,39 @@ router.post('/', async (req, res) => {
         const indicators = await marketDataService.getGlobalIndicators();
         const pressure = marketDataService.calculateMarketPressure(indicators);
         const sentimentSummary = await newsService.getSentimentAggregation(3);
+        const scannerResults = await marketDataService.getScannerData(15);
         
         const btcPrice = indicators?.btc?.price || 65000;
-        const spyPrice = indicators?.sp500?.price || 5000;
-        const goldPrice = indicators?.gold?.price || 2300;
         
-        const prompt = `Act as an elite quantitative analyst. Create a 100-unit portfolio based on the CURRENT macroeconomic data and news sentiment.
-        Macro Data:
-        VIX: ${indicators?.vix?.price} 
-        DXY: ${indicators?.dxy?.price} 
-        BTC: ${btcPrice} 
+        const scannerText = scannerResults.map(s => `${s.symbol}: Fiyat=${s.price}, RSI=${s.rsi.toFixed(1)}, Sinyal=${s.signal}`).join('\n');
+
+        const prompt = `Act as an elite quantitative analyst. Create a 100-unit portfolio based on the PROVIDED technical data and current news sentiment.
+        
+        TECHNICAL DATA (Use these symbols for your allocation):
+        ${scannerText}
+
+        Macro Context:
+        VIX: ${indicators?.vix?.price} | DXY: ${indicators?.dxy?.price}
         Market Pressure Score: ${pressure} (0=Bullish, 100=Bearish)
         
-        Recent Sentiment Top Assets: ${JSON.stringify(sentimentSummary.slice(0, 5))}
+        Recent News Sentiment (Summary): ${JSON.stringify(sentimentSummary.slice(0, 5))}
         
-        Allocate EXACTLY 100 units across 4-8 assets (Crypto, Stocks, Metals, Cash). Use INDIVIDUAL, directly investable and distinct symbol tickers. DO NOT allocate any units to indices or abstract macro indicators like SP500, DXY, or VIX. If you want exposure to these indicators, you MUST choose real individual constituent stocks (like AAPL, MSFT, TSLA, NVDA) instead. You can use commodities like GOLD, OIL, and forex like USD. But strictly ZERO allocations directly to SP500, DXY, or VIX.
-        For entry prices, approximate if you dont know, or use: BTC=${btcPrice}, SP500=${spyPrice}, GOLD=${goldPrice}.
-        Provide a rationale. Keep it stable and deeply analyzed. Do not respond with anything outside the JSON.
-        Format requirement:
+        Allocate EXACTLY 100 units across 4-7 assets. 
+        RULES:
+        1. ONLY choose from the symbols listed in the TECHNICAL DATA section above.
+        2. DO NOT use indices like SP500, DXY, or VIX as assets.
+        3. Prioritize assets with RSI below 40 for "Buy" opportunities or strong MACD trends.
+        4. Focus on USDT pairs only.
+        5. Provide a rationale explaining why you picked these specifically based on their RSI/MACD/Sentiment.
+        
+        Output format:
         \`\`\`json
         {
-            "name": "Dengeli Yapay Zeka Makro Portföyü",
-            "rationale": "Mevcut VIX ve DXY baz alınarak risk iştahına göre tasarlandı...",
+            "name": "Yapay Zeka Teknik Analiz Portföyü",
+            "rationale": "Scanner verilerindeki RSI ve MACD uyumsuzluklarına göre...",
             "assets": [
-                {"symbol": "BTC", "allocation": 30, "entryPrice": ${btcPrice}},
-                {"symbol": "SP500", "allocation": 40, "entryPrice": ${spyPrice}},
-                {"symbol": "GOLD", "allocation": 30, "entryPrice": ${goldPrice}}
+                {"symbol": "BTCUSDT", "allocation": 30, "entryPrice": 65000},
+                ...
             ]
         }
         \`\`\`

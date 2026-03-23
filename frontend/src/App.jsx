@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate, Navigate } from 'react-router-dom';
 import { 
   Activity, BarChart3, User, Settings, Database, Moon, Sun, 
-  LayoutDashboard, Receipt, LineChart, LogOut, Newspaper, Bot, Coins, Sparkles, Wallet, Globe
+  LayoutDashboard, Receipt, LineChart, LogOut, Newspaper, Bot, Coins, Sparkles, Wallet, Globe, Zap
 } from 'lucide-react';
 
 import Dashboard from './Dashboard';
@@ -19,6 +19,7 @@ import PortfolioOverview from './PortfolioOverview';
 import AIPortfolio from './AIPortfolio';
 import Credits from './Credits';
 import Profile from './Profile';
+import AIScanner from './AIScanner';
 import AIProviderManagement from './AIProviderManagement';
 import { AuthProvider, useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
@@ -76,6 +77,7 @@ function AppLayout() {
             <SidebarLink to="/news" icon={<Newspaper size={22} />} label={t('News')} />
             <SidebarLink to="/flow" icon={<Receipt size={22} />} label={t('MoneyFlow')} />
             <SidebarLink to="/market-360" icon={<Globe size={22} />} label="Market 360" />
+            <SidebarLink to="/scanner" icon={<Zap size={22} />} label={language === 'TR' ? 'Tarayıcı' : 'Scanner'} />
             <SidebarLink to="/ai-portfolio" icon={<Bot size={22} />} label="AI Portföy" />
             <SidebarLink to="/portfolio" icon={<Wallet size={22} />} label="Portföy" />
             <SidebarLink to="/charts" icon={<BarChart3 size={22} />} label="Grafikler" />
@@ -126,6 +128,7 @@ function AppLayout() {
               <Route path="/flow" element={<MoneyFlow />} />
               <Route path="/flow/:assetId" element={<AssetDetails />} />
               <Route path="/market-360" element={<Market360 />} />
+              <Route path="/scanner" element={<AIScanner />} />
               <Route path="/ai-portfolio" element={<AIPortfolio />} />
               <Route path="/portfolio" element={<PortfolioOverview />} />
               <Route path="/charts" element={<Navigate to="/chart/BTC-USD?name=Bitcoin" replace />} />

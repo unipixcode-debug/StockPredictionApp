@@ -347,6 +347,120 @@ class MarketDataService {
             return 100; 
         }
     }
+
+    // --- TECHNICAL INDICATORS (Ported from Python Scanner) ---
+    calculateRSI(prices, period = 14) {
+        if (prices.length <= period) return 50;
+        let gains = 0;
+        let losses = 0;
+
+        for (let i = 1; i <= period; i++) {
+            const diff = prices[i] - prices[i - 1];
+            if (diff >= 0) gains += diff;
+            else losses -= diff;
+        }
+
+        let avgGain = gains / period;
+        let avgLoss = losses / period;
+
+        for (let i = period + 1; i < prices.length; i++) {
+            const diff = prices[i] - prices[i - 1];
+            let gain = 0;
+            let loss = 0;
+            if (diff >= 0) gain = diff;
+            else loss = -diff;
+
+            avgGain = (avgGain * (period - 1) + gain) / period;
+            avgLoss = (avgLoss * (period - 1) + loss) / period;
+        }
+
+        if (avgLoss === 0) return 100;
+        const rs = avgGain / avgLoss;
+        return 100 - (100 / (1 + rs));
+    }
+
+    calculateEMA(prices, period) {
+        const k = 2 / (period + 1);
+        let ema = prices[0];
+        for (let i = 1; i < prices.length; i++) {
+            ema = (prices[i] * k) + (ema * (1 - k));
+        }
+        return ema;
+    }
+
+    calculateMACD(prices) {
+        if (prices.length < 26) return { macd: 0, signal: 0, hist: 0 };
+        
+        // Simple MACD calculation (Last values)
+        const getEmaArray = (data, p) => {
+            let emaArr = [data[0]];
+            const k = 2 / (p + 1);
+            for(let i=1; i<data.length; i++) {
+                emaArr.push(data[i] * k + emaArr[i-1] * (1-k));
+            }
+            return emaArr;
+        };
+
+        const ema12 = getEmaArray(prices, 12);
+        const ema26 = getEmaArray(prices, 26);
+        const macdLine = ema12.map((v, i) => v - ema26[i]);
+        const signalLine = getEmaArray(macdLine, 9);
+
+        return {
+            macd: macdLine[macdLine.length - 1],
+            signal: signalLine[signalLine.length - 1],
+            hist: macdLine[macdLine.length - 1] - signalLine[signalLine.length - 1]
+        };
+    }
+
+    async getScannerData(limit = 50) {
+        try {
+            const tickers = await binanceClient.dailyStats();
+            const usdtTickers = tickers
+                .filter(t => t.symbol.endsWith('USDT') && !t.symbol.includes('UP') && !t.symbol.includes('DOWN'))
+                .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+                .slice(0, limit);
+
+            const results = [];
+            for (const t of usdtTickers) {
+                try {
+                    const candles = await this.getHistoricalData(t.symbol, '1h', 50);
+                    if (candles.length < 30) continue;
+
+                    const prices = candles.map(c => c.close);
+                    const rsi = this.calculateRSI(prices);
+                    const macdData = this.calculateMACD(prices);
+                    const ema50 = this.calculateEMA(prices, 50);
+                    const ema200 = this.calculateEMA(prices, 200);
+
+                    let signal = "NÖTR";
+                    let tag = "neutral";
+                    if (rsi < 30) { signal = "AŞIRI SATIM (AL)"; tag = "buy"; }
+                    else if (rsi > 70) { signal = "AŞIRI ALIM (SAT)"; tag = "sell"; }
+                    else if (macdData.hist > 0 && prices[prices.length-1] > ema50) { signal = "POZİTİF TREND"; tag = "buy"; }
+
+                    results.push({
+                        symbol: t.symbol,
+                        price: parseFloat(t.lastPrice),
+                        change: parseFloat(t.priceChangePercent),
+                        volume: parseFloat(t.quoteVolume) / 1000000,
+                        rsi: rsi,
+                        macd: macdData,
+                        ema50,
+                        ema200,
+                        signal,
+                        tag
+                    });
+                } catch (e) {
+                    console.error(`Scanner error for ${t.symbol}:`, e.message);
+                }
+            }
+            return results;
+        } catch (error) {
+            console.error('Scanner fetch error:', error);
+            return [];
+        }
+    }
 }
 
 module.exports = new MarketDataService();
