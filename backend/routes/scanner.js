@@ -24,20 +24,25 @@ router.post('/analyze', async (req, res) => {
         const { symbol, rsi, macd, price } = req.body;
         const sentimentSummary = await newsService.getSentimentAggregation(3);
         
-        const prompt = `Act as an AI Trading Bot. Analyze the following specific asset:
-        Symbol: ${symbol}
-        Current Price: ${price}
+        const prompt = `Sen profesyonel bir AI Trading Botusun. Aşağıdaki teknik verileri analiz et:
+        Sembol: ${symbol}
+        Fiyat: ${price}
         RSI (14): ${rsi}
         MACD: ${JSON.stringify(macd)}
-        Recent Market News Sentiment: ${JSON.stringify(sentimentSummary.slice(0, 3))}
+        Haber Duyarlılığı: ${JSON.stringify(sentimentSummary.slice(0, 3))}
 
-        TASK: Provide a clear trading decision (AL, SAT, or BEKLE). 
-        Calculate a specific Entry Point, Take Profit (TP), and Stop Loss (SL) based on technical levels.
-        Provide a 2-sentence strategy rationale.
+        GÖREV: Varlık için net bir işlem kararı (AL, SAT veya BEKLE) ver.
+        Teknik seviyelere göre Giriş, Hedef (TP) ve Stop Loss (SL) seviyelerini belirle.
+        2 cümlelik bir strateji açıklaması yap.
 
-        Format requirement:
-        | Decision | Entry | TP | SL | Rationale |
-        | AL/SAT/BEKLE | ${price} | ... | ... | ... |
+        ÖNEMLİ: Yanıtın TAMAMEN TÜRKÇE olsun.
+        
+        Format gereksinimi (Satır satır göster, tablo yapma):
+        Karar : [AL/SAT/BEKLE]
+        Giriş : [Fiyat]
+        Hedef (TP) : [Seviye]
+        Stop (SL) : [Seviye]
+        Strateji Notu : [Açıklama]
         `;
 
         const aiResponse = await aiService.generateContent(prompt, "gemini-flash-latest");
