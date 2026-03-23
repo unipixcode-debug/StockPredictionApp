@@ -4,6 +4,10 @@ import { Search, Info, TrendingUp, TrendingDown, RefreshCw, Bot, X, Zap, Activit
 import api from './api';
 import { useLanguage } from './LanguageContext';
 import ReactMarkdown from 'react-markdown';
+import { 
+    LineChart, Line, XAxis, YAxis, CartesianGrid, 
+    Tooltip as RechartsTooltip, ReferenceLine, ResponsiveContainer 
+} from 'recharts';
 
 const AIScanner = () => {
     const { language } = useLanguage();
@@ -14,6 +18,8 @@ const AIScanner = () => {
     const [analysis, setAnalysis] = useState('');
     const [analyzing, setAnalyzing] = useState(false);
     const [activeMarket, setActiveMarket] = useState('crypto');
+    const [historyData, setHistoryData] = useState([]);
+    const [levels, setLevels] = useState({ entry: null, tp: null, sl: null });
 
     const markets = [
         { id: 'crypto', label: 'KRİPTO', icon: <Activity size={14}/> },
@@ -42,16 +48,37 @@ const AIScanner = () => {
     const handleRowClick = async (asset) => {
         setSelectedAsset(asset);
         setAnalysis('');
+        setHistoryData([]);
+        setLevels({ entry: null, tp: null, sl: null });
         setAnalyzing(true);
         try {
-            const res = await api.post('/scanner/analyze', {
-                symbol: asset.symbol,
-                rsi: asset.rsi,
-                macd: asset.macd,
-                price: asset.price,
-                market: activeMarket
+            // Fetch Analysis and History in parallel
+            const [analysisRes, historyRes] = await Promise.all([
+                api.post('/scanner/analyze', {
+                    symbol: asset.symbol,
+                    rsi: asset.rsi,
+                    macd: asset.macd,
+                    price: asset.price,
+                    market: activeMarket
+                }),
+                api.get(`/scanner/history?symbol=${asset.symbol}&market=${activeMarket}`)
+            ]);
+            
+            setAnalysis(analysisRes.analysis);
+            setHistoryData(historyRes);
+            
+            // Extract levels from analysis string
+            const extractedLevels = { entry: null, tp: null, sl: null };
+            analysisRes.analysis.split('\n').forEach(line => {
+                const val = parseFloat(line.split(':')[1]?.trim());
+                if (!isNaN(val)) {
+                    if (line.includes('Giriş')) extractedLevels.entry = val;
+                    if (line.includes('Hedef (TP)')) extractedLevels.tp = val;
+                    if (line.includes('Stop (SL)')) extractedLevels.sl = val;
+                }
             });
-            setAnalysis(res.analysis);
+            setLevels(extractedLevels);
+
         } catch (e) {
             setAnalysis("Analiz sırasında hata oluştu.");
         } finally {
@@ -246,7 +273,7 @@ const AIScanner = () => {
                                     </div>
                                 ) : (
                                     <div className="prose prose-invert max-w-none">
-                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                                             <div className="bg-secondary/30 p-4 rounded-2xl border border-border/50">
                                                 <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">RSI</p>
                                                 <p className="font-black text-base italic">{selectedAsset.rsi.toFixed(1)}</p>
@@ -264,6 +291,54 @@ const AIScanner = () => {
                                                 <p className={`font-black text-base italic`}>%{selectedAsset.volatility.toFixed(2)}</p>
                                             </div>
                                         </div>
+
+                                        {/* NEW: Price Chart with Signals */}
+                                        {historyData.length > 0 && (
+                                            <div className="h-48 w-full mb-6 bg-secondary/10 rounded-3xl border border-border/30 p-4">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={historyData}>
+                                                        <XAxis hide dataKey="time" />
+                                                        <YAxis hide domain={['auto', 'auto']} />
+                                                        <RechartsTooltip 
+                                                            contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px', fontSize: '10px' }}
+                                                            itemStyle={{ color: '#00f2fe' }}
+                                                        />
+                                                        <Line 
+                                                            type="monotone" 
+                                                            dataKey="close" 
+                                                            stroke="#00f2fe" 
+                                                            strokeWidth={2} 
+                                                            dot={false} 
+                                                            animationDuration={1000}
+                                                        />
+                                                        {levels.entry && (
+                                                            <ReferenceLine 
+                                                                y={levels.entry} 
+                                                                stroke="#3b82f6" 
+                                                                strokeDasharray="3 3" 
+                                                                label={{ position: 'right', value: 'Giriş', fill: '#3b82f6', fontSize: 10, fontWeight: 'bold' }} 
+                                                            />
+                                                        )}
+                                                        {levels.tp && (
+                                                            <ReferenceLine 
+                                                                y={levels.tp} 
+                                                                stroke="#10b981" 
+                                                                strokeDasharray="3 3" 
+                                                                label={{ position: 'right', value: 'Hedef', fill: '#10b981', fontSize: 10, fontWeight: 'bold' }} 
+                                                            />
+                                                        )}
+                                                        {levels.sl && (
+                                                            <ReferenceLine 
+                                                                y={levels.sl} 
+                                                                stroke="#ef4444" 
+                                                                strokeDasharray="3 3" 
+                                                                label={{ position: 'right', value: 'Stop', fill: '#ef4444', fontSize: 10, fontWeight: 'bold' }} 
+                                                            />
+                                                        )}
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        )}
                                         
                                         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 mb-4 space-y-3">
                                             {analysis.split('\n').filter(line => line.trim()).map((line, i) => {

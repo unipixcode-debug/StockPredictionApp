@@ -18,6 +18,18 @@ router.get('/top', async (req, res) => {
     }
 });
 
+// GET /api/scanner/history
+router.get('/history', async (req, res) => {
+    try {
+        const { symbol, market } = req.query;
+        const timeframe = (market === 'crypto') ? '1h' : '1D';
+        const data = await marketDataService.getHistoricalData(symbol, timeframe, 30);
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: 'Geçmiş veri alınamadı' });
+    }
+});
+
 // POST /api/scanner/analyze
 router.post('/analyze', async (req, res) => {
     try {
@@ -33,10 +45,10 @@ router.post('/analyze', async (req, res) => {
 
         GÖREV: Varlık için net bir işlem kararı (AL, SAT veya BEKLE) ver.
         Pozisyon yönünü (LONG veya SHORT) ve yatırım vadesini (KISA VADE veya UZUN VADE) belirle.
-        Teknik seviyelere göre Giriş, Hedef (TP) ve Stop Loss (SL) seviyelerini belirle.
+        Teknik seviyelere göre Giriş, Hedef (TP) ve Stop Loss (SL) seviyelerini rakamsal olarak belirle.
         2 cümlelik bir strateji açıklaması yap.
 
-        ÖNEMLİ: Yanıtın TAMAMEN TÜRKÇE olsun.
+        ÖNEMLİ: Yanıtın TAMAMEN TÜRKÇE olsun. Sayısal değerleri (Giriş, TP, SL) sadece rakam olarak ver (örn. Giriş : 12.50).
         
         Format gereksinimi (Satır satır göster, tablo yapma):
         Karar : [AL/SAT/BEKLE]
