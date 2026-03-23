@@ -19,6 +19,9 @@ const TRUNCGIL_ASSETS = [
     { symbol: 'TRUNC:GBP', shortname: 'İngiliz Sterlini', longname: 'İngiliz Sterlini', typeDisp: 'Currency', exchange: 'KAPALİÇARŞI' }
 ];
 
+const NASDAQ_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX', 'PYPL', 'ADBE', 'AVGO', 'COST', 'PEP', 'CSCO', 'CMCSA'];
+const BIST_SYMBOLS = ['THYAO.IS', 'EREGL.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS', 'GARAN.IS', 'KCHOL.IS', 'SAHOL.IS', 'TUPRS.IS', 'BIMAS.IS', 'SISE.IS', 'YKBNK.IS', 'PGSUS.IS', 'ENKAI.IS', 'FROTO.IS'];
+
 class MarketDataService {
     async getGlobalIndicators() {
         try {
@@ -413,49 +416,97 @@ class MarketDataService {
         };
     }
 
-    async getScannerData(limit = 50) {
+    async getScannerData(market = 'crypto', limit = 40) {
         try {
-            const tickers = await binanceClient.dailyStats();
-            const usdtTickers = tickers
-                .filter(t => t.symbol.endsWith('USDT') && !t.symbol.includes('UP') && !t.symbol.includes('DOWN'))
-                .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-                .slice(0, limit);
+            const newsService = require('./newsService'); // lazy load to avoid circular
+            const sentimentData = await newsService.getSentimentAggregation(3);
+            
+            let symbols = [];
+            let tickers = null;
+
+            if (market === 'crypto') {
+                tickers = await binanceClient.dailyStats();
+                symbols = tickers
+                    .filter(t => t.symbol.endsWith('USDT') && !t.symbol.includes('UP') && !t.symbol.includes('DOWN'))
+                    .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+                    .slice(0, limit)
+                    .map(t => ({ symbol: t.symbol, price: parseFloat(t.lastPrice), change: parseFloat(t.priceChangePercent), volume: parseFloat(t.quoteVolume) / 1000000 }));
+            } else if (market === 'nasdaq') {
+                symbols = NASDAQ_SYMBOLS.map(s => ({ symbol: s }));
+            } else if (market === 'bist') {
+                symbols = BIST_SYMBOLS.map(s => ({ symbol: s }));
+            }
 
             const results = [];
-            for (const t of usdtTickers) {
+            for (const symObj of symbols) {
                 try {
-                    const candles = await this.getHistoricalData(t.symbol, '1h', 50);
+                    const symbol = symObj.symbol;
+                    const timeframe = (market === 'crypto') ? '1h' : '1D'; 
+                    const candles = await this.getHistoricalData(symbol, timeframe, 50);
                     if (candles.length < 30) continue;
 
                     const prices = candles.map(c => c.close);
                     const rsi = this.calculateRSI(prices);
                     const macdData = this.calculateMACD(prices);
                     const ema50 = this.calculateEMA(prices, 50);
-                    const ema200 = this.calculateEMA(prices, 200);
+
+                    // Fetch current price/change if not already given (for Stocks)
+                    let currentPrice = symObj.price;
+                    let currentChange = symObj.change;
+                    let currentVolume = symObj.volume || 0;
+
+                    if (!currentPrice || isNaN(currentPrice)) {
+                        const quote = await yahooFinance.quote(symbol);
+                        currentPrice = quote.regularMarketPrice;
+                        currentChange = quote.regularMarketChangePercent;
+                        currentVolume = (quote.regularMarketVolume * currentPrice) / 1000000;
+                    }
+
+                    // --- SCORING LOGIC ---
+                    let aiScore = 50;
+                    // Technicals
+                    if (rsi < 35) aiScore += 15;
+                    else if (rsi > 65) aiScore -= 10;
+                    if (macdData.hist > 0) aiScore += 10;
+                    if (currentPrice > ema50) aiScore += 5;
+
+                    // Sentiment
+                    const cleanSym = symbol.replace('.IS', '').replace('USDT', '');
+                    const assetSent = sentimentData.find(s => s.asset === cleanSym);
+                    if (assetSent) {
+                        aiScore += (assetSent.averageScore - 50) / 2;
+                    }
+
+                    // Volatility (Approximate from daily range or 1h range)
+                    const lastCandle = candles[candles.length - 1];
+                    const volatility = ((lastCandle.high - lastCandle.low) / lastCandle.low) * 100;
+                    if (volatility > 3) aiScore += 5;
+
+                    aiScore = Math.min(100, Math.max(0, aiScore));
 
                     let signal = "NÖTR";
                     let tag = "neutral";
-                    if (rsi < 30) { signal = "AŞIRI SATIM (AL)"; tag = "buy"; }
-                    else if (rsi > 70) { signal = "AŞIRI ALIM (SAT)"; tag = "sell"; }
-                    else if (macdData.hist > 0 && prices[prices.length-1] > ema50) { signal = "POZİTİF TREND"; tag = "buy"; }
+                    if (aiScore > 70) { signal = "GÜÇLÜ AL"; tag = "buy"; }
+                    else if (aiScore > 60) { signal = "POTANSİYEL AL"; tag = "buy"; }
+                    else if (aiScore < 30) { signal = "SATIŞ BASKISI"; tag = "sell"; }
 
                     results.push({
-                        symbol: t.symbol,
-                        price: parseFloat(t.lastPrice),
-                        change: parseFloat(t.priceChangePercent),
-                        volume: parseFloat(t.quoteVolume) / 1000000,
-                        rsi: rsi,
+                        symbol,
+                        price: currentPrice,
+                        change: currentChange,
+                        volume: currentVolume,
+                        rsi,
                         macd: macdData,
-                        ema50,
-                        ema200,
+                        volatility,
+                        aiScore,
                         signal,
                         tag
                     });
                 } catch (e) {
-                    console.error(`Scanner error for ${t.symbol}:`, e.message);
+                    console.error(`Scanner individual error for ${symObj.symbol}:`, e.message);
                 }
             }
-            return results;
+            return results.sort((a, b) => b.aiScore - a.aiScore);
         } catch (error) {
             console.error('Scanner fetch error:', error);
             return [];

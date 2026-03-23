@@ -11,11 +11,14 @@ router.post('/', async (req, res) => {
         const indicators = await marketDataService.getGlobalIndicators();
         const pressure = marketDataService.calculateMarketPressure(indicators);
         const sentimentSummary = await newsService.getSentimentAggregation(3);
-        const scannerResults = await marketDataService.getScannerData(15);
         
-        const btcPrice = indicators?.btc?.price || 65000;
+        // Fetch Top 15 from each market for AI to choose
+        const cryptoScan = await marketDataService.getScannerData('crypto', 15);
+        const nasdaqScan = await marketDataService.getScannerData('nasdaq', 10);
+        const bistScan = await marketDataService.getScannerData('bist', 10);
         
-        const scannerText = scannerResults.map(s => `${s.symbol}: Fiyat=${s.price}, RSI=${s.rsi.toFixed(1)}, Sinyal=${s.signal}`).join('\n');
+        const allScannerResults = [...cryptoScan, ...nasdaqScan, ...bistScan];
+        const scannerText = allScannerResults.map(s => `${s.symbol}: RSI=${s.rsi?.toFixed(1)}, Score=${s.aiScore}, Signal=${s.signal}`).join('\n');
 
         const prompt = `Act as an elite quantitative analyst. Create a 100-unit portfolio based on the PROVIDED technical data and current news sentiment.
         
@@ -31,10 +34,9 @@ router.post('/', async (req, res) => {
         Allocate EXACTLY 100 units across 4-7 assets. 
         RULES:
         1. ONLY choose from the symbols listed in the TECHNICAL DATA section above.
-        2. DO NOT use indices like SP500, DXY, or VIX as assets.
-        3. Prioritize assets with RSI below 40 for "Buy" opportunities or strong MACD trends.
-        4. Focus on USDT pairs only.
-        5. Provide a rationale explaining why you picked these specifically based on their RSI/MACD/Sentiment.
+        2. NEVER use SP500, DXY, VIX, GOLD, or GOLD_GRAM as names of assets in the "assets" array. Use their specific tickers (e.g., TSLA, BTCUSDT, AAPL, THYAO.IS).
+        3. Prioritize assets with AI Score > 70 or RSI below 35 for "Buy" opportunities.
+        4. Provide a rationale strictly based on the provided technicals and current market pressure.
         
         Output format:
         \`\`\`json

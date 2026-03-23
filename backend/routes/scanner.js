@@ -7,8 +7,9 @@ const newsService = require('../services/newsService');
 // GET /api/scanner/top
 router.get('/top', async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 30;
-        const data = await marketDataService.getScannerData(limit);
+        const limit = parseInt(req.query.limit) || 40;
+        const market = req.query.market || 'crypto';
+        const data = await marketDataService.getScannerData(market, limit);
         res.json(data);
     } catch (error) {
         console.error('Scanner API Error:', error);

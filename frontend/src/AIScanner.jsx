@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Info, TrendingUp, TrendingDown, RefreshCw, Bot, X, Zap } from 'lucide-react';
+import { Search, Info, TrendingUp, TrendingDown, RefreshCw, Bot, X, Zap, Activity, Globe } from 'lucide-react';
 import api from './api';
 import { useLanguage } from './LanguageContext';
 import ReactMarkdown from 'react-markdown';
@@ -13,17 +13,24 @@ const AIScanner = () => {
     const [selectedAsset, setSelectedAsset] = useState(null);
     const [analysis, setAnalysis] = useState('');
     const [analyzing, setAnalyzing] = useState(false);
+    const [activeMarket, setActiveMarket] = useState('crypto');
+
+    const markets = [
+        { id: 'crypto', label: 'KRİPTO', icon: <Activity size={14}/> },
+        { id: 'nasdaq', label: 'NASDAQ', icon: <Zap size={14}/> },
+        { id: 'bist', label: 'BIST 100', icon: <Globe size={14}/> }
+    ];
 
     useEffect(() => {
         fetchScanner();
-        const interval = setInterval(fetchScanner, 60000); // Auto refresh every minute
+        const interval = setInterval(fetchScanner, 120000); // Auto refresh every 2 mins
         return () => clearInterval(interval);
-    }, []);
+    }, [activeMarket]);
 
     const fetchScanner = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/scanner/top?limit=40');
+            const res = await api.get(`/scanner/top?market=${activeMarket}&limit=40`);
             setData(res);
         } catch (e) {
             console.error(e);
@@ -41,7 +48,8 @@ const AIScanner = () => {
                 symbol: asset.symbol,
                 rsi: asset.rsi,
                 macd: asset.macd,
-                price: asset.price
+                price: asset.price,
+                market: activeMarket
             });
             setAnalysis(res.analysis);
         } catch (e) {
@@ -58,37 +66,48 @@ const AIScanner = () => {
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 pb-20">
             {/* Header */}
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
                     <h1 className="text-4xl font-black tracking-tighter uppercase italic text-foreground flex items-center">
                         <Zap className="mr-3 text-primary" fill="currentColor" />
-                        {language === 'TR' ? 'Borsa Tarayıcı' : 'Market Scanner'}
+                        {language === 'TR' ? 'Global Tarayıcı' : 'Global Scanner'}
                     </h1>
                     <p className="text-muted-foreground text-sm font-medium">
                         {language === 'TR' 
-                            ? 'Binance üzerinden en yüksek hacimli paritelerin RSI ve MACD analizleri.' 
-                            : 'RSI and MACD analysis of high-volume pairs from Binance.'}
+                            ? 'AI destekli teknik puanlama, haber duyarlılığı ve volatilite analizi.' 
+                            : 'AI-powered technical scoring, sentiment, and volatility analysis.'}
                     </p>
                 </div>
 
-                <div className="flex items-center space-x-3 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    {/* Market Selector Tabs */}
+                    <div className="flex bg-secondary/30 p-1 rounded-2xl border border-border/50">
+                        {markets.map(m => (
+                            <button
+                                key={m.id}
+                                onClick={() => setActiveMarket(m.id)}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                    activeMarket === m.id 
+                                    ? 'bg-primary text-primary-foreground shadow-lg' 
+                                    : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                {m.icon}
+                                <span>{m.label}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="relative flex-1 md:w-48">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                         <input 
                             type="text" 
-                            placeholder={language === 'TR' ? "Sembol ara..." : "Search symbol..."}
+                            placeholder={language === 'TR' ? "Sembol..." : "Symbol..."}
                             className="w-full bg-secondary/30 border border-border/50 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <button 
-                        onClick={fetchScanner} 
-                        disabled={loading}
-                        className="bg-secondary/50 p-2.5 rounded-xl border border-border/50 hover:bg-secondary transition-colors"
-                    >
-                        <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-                    </button>
                 </div>
             </header>
 
@@ -99,18 +118,19 @@ const AIScanner = () => {
                         <thead>
                             <tr className="bg-secondary/50 border-b border-border/50">
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground italic">Sembol</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground italic text-right">Fiyat</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground italic text-right">Anlık Fiyat</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground italic text-right">Değişim %</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground italic text-center">RSI (14)</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground italic text-right">Hacim (M$)</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground italic text-center">Teknik Sinyal</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground italic text-center">Volatilite</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-primary italic text-center">AI Puanı</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground italic text-center">Sinyal</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/30">
                             {loading && data.length === 0 ? (
                                 Array(10).fill(0).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan="6" className="px-6 py-4"><div className="h-4 bg-secondary/50 rounded w-full"></div></td>
+                                        <td colSpan="7" className="px-6 py-4"><div className="h-4 bg-secondary/50 rounded w-full"></div></td>
                                     </tr>
                                 ))
                             ) : filteredData.map((item) => (
@@ -120,23 +140,35 @@ const AIScanner = () => {
                                     className="hover:bg-primary/5 cursor-pointer transition-colors group"
                                 >
                                     <td className="px-6 py-4">
-                                        <span className="font-black text-sm text-foreground group-hover:text-primary transition-colors">{item.symbol}</span>
+                                        <span className="font-black text-sm text-foreground group-hover:text-primary transition-colors">{item.symbol.replace('.IS', '')}</span>
+                                        <p className="text-[8px] text-muted-foreground font-bold tracking-widest uppercase">{activeMarket === 'crypto' ? 'Binance' : 'Yahoo Finance'}</p>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <span className="font-mono font-bold text-sm tracking-tighter">${item.price > 1 ? item.price.toLocaleString() : item.price.toFixed(6)}</span>
+                                        <span className="font-mono font-bold text-sm tracking-tighter">
+                                            {activeMarket === 'bist' ? '₺' : '$'}{item.price > 1 ? item.price.toLocaleString(undefined, {minimumFractionDigits: 2}) : item.price.toFixed(6)}
+                                        </span>
                                     </td>
                                     <td className={`px-6 py-4 text-right font-bold text-xs ${item.change >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                         {item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <div className="inline-flex items-center justify-center px-3 py-1 bg-secondary/30 rounded-full border border-border/50">
-                                            <span className={`font-black text-xs ${item.rsi < 30 ? 'text-emerald-500' : item.rsi > 70 ? 'text-rose-500' : 'text-amber-500'}`}>
-                                                {item.rsi.toFixed(1)}
-                                            </span>
-                                        </div>
+                                        <span className={`font-mono text-xs font-bold ${item.rsi < 30 ? 'text-emerald-500' : item.rsi > 70 ? 'text-rose-500' : 'text-foreground'}`}>
+                                            {item.rsi.toFixed(1)}
+                                        </span>
                                     </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <span className="font-mono text-xs font-bold text-muted-foreground">${item.volume.toFixed(1)}M</span>
+                                    <td className="px-6 py-4 text-center">
+                                        <span className={`text-[10px] font-bold ${item.volatility > 4 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                                            %{item.volatility.toFixed(1)}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full border-2 font-black text-xs ${
+                                            item.aiScore > 70 ? 'border-emerald-500 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' :
+                                            item.aiScore > 50 ? 'border-primary text-primary' :
+                                            'border-muted-foreground/30 text-muted-foreground'
+                                        }`}>
+                                            {Math.round(item.aiScore)}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border ${
@@ -177,7 +209,7 @@ const AIScanner = () => {
                                         <Bot size={20} />
                                     </div>
                                     <div>
-                                        <h3 className="font-black text-xl tracking-tighter uppercase italic">{selectedAsset.symbol}</h3>
+                                        <h3 className="font-black text-xl tracking-tighter uppercase italic">{selectedAsset.symbol.replace('.IS', '')}</h3>
                                         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">AI Bot Analizi & Sinyal</p>
                                     </div>
                                 </div>
@@ -209,16 +241,16 @@ const AIScanner = () => {
                                                 <p className="font-black text-base italic">{selectedAsset.rsi.toFixed(1)}</p>
                                             </div>
                                             <div className="bg-secondary/30 p-4 rounded-2xl border border-border/50">
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">MACD Hist</p>
-                                                <p className="font-black text-base italic">{selectedAsset.macd.hist.toFixed(4)}</p>
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">AI PUANI</p>
+                                                <p className="font-black text-base italic text-primary">{Math.round(selectedAsset.aiScore)}/100</p>
                                             </div>
                                             <div className="bg-secondary/30 p-4 rounded-2xl border border-border/50">
                                                 <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Fiyat</p>
                                                 <p className="font-black text-base italic tracking-tighter">${selectedAsset.price}</p>
                                             </div>
                                             <div className="bg-secondary/30 p-4 rounded-2xl border border-border/50">
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">24s Değişim</p>
-                                                <p className={`font-black text-base italic ${selectedAsset.change >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{selectedAsset.change.toFixed(2)}%</p>
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Volatilite</p>
+                                                <p className={`font-black text-base italic`}>%{selectedAsset.volatility.toFixed(2)}</p>
                                             </div>
                                         </div>
                                         
