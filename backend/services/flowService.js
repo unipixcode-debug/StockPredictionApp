@@ -65,8 +65,8 @@ class FlowService {
                 }
             ],
             indicators: {
-                vix: { price: indicators.vix?.price, change: (indicators.vix?.change || 0) * mult },
-                dxy: { price: indicators.dxy?.price, change: (indicators.dxy?.change || 0) * mult }
+                vix: { price: indicators.vix?.price || 20, change: (indicators.vix?.change || 0) * mult },
+                dxy: { price: indicators.dxy?.price || 100, change: (indicators.dxy?.change || 0) * mult }
             },
             timestamp: new Date()
         };

@@ -6,6 +6,7 @@ const newsService = require('../services/newsService');
 
 // GET /api/scanner/top
 router.get('/top', async (req, res) => {
+    console.log('🚀 [Scanner API] GET Request received for /top');
     try {
         const limit = parseInt(req.query.limit) || 40;
         const market = req.query.market || 'crypto';

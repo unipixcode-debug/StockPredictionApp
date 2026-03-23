@@ -150,12 +150,12 @@ const News = () => {
     <motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-12 pb-20"
+        className="space-y-8 pb-20"
     >
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter uppercase italic">{t('NewsTitle')}</h1>
-          <p className="text-muted-foreground font-medium mt-1">{t('NewsDesc')}</p>
+          <h1 className="text-3xl font-black tracking-tighter uppercase italic">{t('NewsTitle')}</h1>
+          <p className="text-xs text-muted-foreground font-medium mt-1">{t('NewsDesc')}</p>
         </div>
         
         <button 
@@ -255,13 +255,13 @@ const News = () => {
                 <motion.div 
                     variants={itemVariants}
                     key={idx} 
-                    className="glass-card p-8 flex flex-col group hover:-translate-y-2 transition-all duration-500 hover:shadow-2xl hover:border-primary/30 relative overflow-hidden"
+                    className="glass-card p-6 flex flex-col group hover:-translate-y-2 transition-all duration-500 hover:shadow-xl hover:border-primary/30 relative overflow-hidden"
                 >
                   <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors" />
 
-                  <div className="flex items-center space-x-3 mb-6">
-                    <div className="w-10 h-10 bg-secondary/50 rounded-xl flex items-center justify-center border border-border group-hover:border-primary/30 transition-all text-primary/70 group-hover:text-primary">
-                        <Newspaper size={18} />
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-8 h-8 bg-secondary/50 rounded-lg flex items-center justify-center border border-border group-hover:border-primary/30 transition-all text-primary/70 group-hover:text-primary">
+                        <Newspaper size={16} />
                     </div>
                     <div className="flex flex-col">
                         <span className="text-xs font-black uppercase tracking-widest text-primary mb-1">
@@ -483,69 +483,43 @@ const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8"
     >
-      <div className="flex items-center space-x-3">
-        <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
-          <Zap size={18} className="text-primary" />
+      <div className="flex items-center space-x-2">
+        <div className="p-1.5 bg-primary/10 rounded-lg border border-primary/20">
+          <Zap size={16} className="text-primary" />
         </div>
         <h2 className="text-xl font-black uppercase italic tracking-tighter">
           {language === 'TR' ? 'Haber Duyarlılık Isı Haritası' : 'News Sentiment Heatmap'}
         </h2>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        {/* Asset Heatmap Chips */}
-        <div className="xl:col-span-5 space-y-4">
-          <div className="flex flex-wrap gap-3">
-            {data.map((item) => (
-              <button
-                key={item.asset}
-                onClick={() => {
-                   setLocalSelectedAsset(item);
-                   onSelect(item.asset);
-                }}
-                className={`
-                  px-6 py-3 rounded-2xl border transition-all duration-300 flex items-center space-x-3
-                  ${selectedSymbol === item.asset ? 'ring-2 ring-primary ring-offset-4 ring-offset-background scale-105 shadow-xl' : 'hover:scale-102'}
-                  ${getColor(item.averageScore)}
-                `}
-              >
-                <span className="font-black tracking-tighter">{item.asset}</span>
-                <span className="text-xs font-bold opacity-80">{item.averageScore > 0 ? '+' : ''}{item.averageScore}%</span>
-              </button>
-            ))}
-          </div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-40 italic">
-            {language === 'TR' ? '* Son 7 günlük haberetki analizi ortalaması' : '* Avg of last 7 days news impact analysis'}
-          </p>
-        </div>
-
-        {/* Breakdown Bar Chart */}
+      <div className="grid grid-cols-1 gap-8">
+        {/* Breakdown Bar Chart - Moved to Top & Full Width */}
         {localSelectedAsset && (
-          <div className="xl:col-span-7 glass-card p-8 relative overflow-hidden group">
+          <div className="glass-card p-6 relative overflow-hidden group border-primary/20 shadow-xl">
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-               <TrendingUp size={80} className={localSelectedAsset.averageScore >= 0 ? 'text-emerald-500' : 'text-rose-500'} />
+               <TrendingUp size={60} className={localSelectedAsset.averageScore >= 0 ? 'text-emerald-500' : 'text-rose-500'} />
             </div>
             
-            <div className="flex justify-between items-end mb-8">
+            <div className="flex justify-between items-end mb-6">
               <div>
-                <h3 className="text-2xl font-black italic tracking-tighter uppercase mb-1">{localSelectedAsset.asset} {language === 'TR' ? 'Analizi' : 'Analysis'}</h3>
-                <p className="text-xs font-bold text-muted-foreground opacity-60 uppercase tracking-widest">
+                <h3 className="text-xl font-black italic tracking-tighter uppercase mb-1">{localSelectedAsset.asset} {language === 'TR' ? 'Analizi' : 'Analysis'}</h3>
+                <p className="text-[10px] font-bold text-muted-foreground opacity-60 uppercase tracking-widest">
                   {localSelectedAsset.totalCount} {language === 'TR' ? 'Haber Kaynağı' : 'News Sources'}
                 </p>
               </div>
-              <div className={`text-4xl font-black italic tracking-tighter ${localSelectedAsset.averageScore >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+              <div className={`text-3xl font-black italic tracking-tighter ${localSelectedAsset.averageScore >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                 %{localSelectedAsset.averageScore}
               </div>
             </div>
 
-            <div className="space-y-5">
+            <div className="space-y-4">
               {/* Average Bar */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-[9px] font-black uppercase tracking-widest">
                   <span>{language === 'TR' ? 'GENEL ORTALAMA' : 'WEIGHTED AVERAGE'}</span>
                   <span className={localSelectedAsset.averageScore >= 0 ? 'text-emerald-500' : 'text-rose-500'}>{localSelectedAsset.averageScore}%</span>
                 </div>
-                <div className="h-3 bg-secondary/50 rounded-full overflow-hidden border border-white/5">
+                <div className="h-2.5 bg-secondary/50 rounded-full overflow-hidden border border-white/5">
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.min(100, Math.abs(localSelectedAsset.averageScore))}%` }}
@@ -555,15 +529,15 @@ const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
                 </div>
               </div>
 
-              {/* Source Breakdown Bars */}
-              <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+              {/* Source Breakdown Bars - More compact grid */}
+              <div className="pt-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
                 {localSelectedAsset.sources.map((src, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex justify-between text-[9px] font-black uppercase tracking-widest opacity-70">
-                      <span>{src.name}</span>
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex justify-between text-[8px] font-black uppercase tracking-widest opacity-70">
+                      <span className="truncate pr-2">{src.name}</span>
                       <span className={src.avgScore >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{src.avgScore}%</span>
                     </div>
-                    <div className="h-1.5 bg-secondary/30 rounded-full overflow-hidden">
+                    <div className="h-1 bg-secondary/30 rounded-full overflow-hidden">
                        <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${Math.min(100, Math.abs(src.avgScore))}%` }}
@@ -576,6 +550,32 @@ const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
             </div>
           </div>
         )}
+
+        {/* Asset Heatmap Chips - Full Width Flex Wrap */}
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {data.map((item) => (
+              <button
+                key={item.asset}
+                onClick={() => {
+                   setLocalSelectedAsset(item);
+                   onSelect(item.asset);
+                }}
+                className={`
+                  px-3 py-1.5 rounded-xl border transition-all duration-300 flex items-center space-x-2
+                  ${selectedSymbol === item.asset ? 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-105 shadow-lg' : 'hover:scale-102 opacity-80 hover:opacity-100'}
+                  ${getColor(item.averageScore)}
+                `}
+              >
+                <span className="text-xs font-black tracking-tighter">{item.asset}</span>
+                <span className="text-[10px] font-bold opacity-70">{item.averageScore > 0 ? '+' : ''}{item.averageScore}%</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-40 italic">
+            {language === 'TR' ? '* Son 7 günlük haber etki analizi ortalaması' : '* Avg of last 7 days news impact analysis'}
+          </p>
+        </div>
       </div>
     </motion.section>
   );

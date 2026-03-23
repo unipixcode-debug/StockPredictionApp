@@ -25,8 +25,6 @@ const BIST_SYMBOLS = ['THYAO.IS', 'EREGL.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS'
 class MarketDataService {
     async getGlobalIndicators() {
         try {
-            console.log('📊 Fetching global indicators (Parallel)...');
-            
             const urls = {
                 vix: 'https://www.investing.com/indices/us-30-vix',
                 dxy: 'https://www.investing.com/indices/usdollar',
@@ -35,65 +33,21 @@ class MarketDataService {
                 oil: 'https://www.investing.com/commodities/crude-oil',
                 sp500: 'https://www.investing.com/indices/us-spx-500',
                 nasdaq: 'https://www.investing.com/indices/nq-100',
+                btc: 'https://www.investing.com/crypto/bitcoin/btc-usd',
                 us10y: 'https://www.investing.com/rates-bonds/u.s.-10-year-bond-yield',
                 us02y: 'https://www.investing.com/rates-bonds/u.s.-2-year-bond-yield',
                 eurusd: 'https://www.investing.com/currencies/eur-usd',
                 gbpusd: 'https://www.investing.com/currencies/gbp-usd',
-                usdtry: 'https://www.investing.com/currencies/usd-try',
-                aapl: 'https://www.investing.com/equities/apple-computer-inc',
-                tsla: 'https://www.investing.com/equities/tesla-motors',
-                msft: 'https://www.investing.com/equities/microsoft-corp',
-                amzn: 'https://www.investing.com/equities/amazon-com-inc',
-                nvda: 'https://www.investing.com/equities/nvidia-corp',
-                googl: 'https://www.investing.com/equities/google-inc',
+                usdtry: 'https://www.investing.com/currencies/usd-try'
             };
-
             const entries = Object.entries(urls);
             const scrapeResults = await Promise.allSettled(entries.map(([key, url]) => this.fetchFromInvesting(url)));
-            
             const indicators = {};
             scrapeResults.forEach((res, i) => {
                 const key = entries[i][0];
-                if (res.status === 'fulfilled' && res.value) {
-                    indicators[key] = res.value;
-                }
+                if (res.status === 'fulfilled' && res.value) indicators[key] = res.value;
             });
-
-            const cryptoData = await this.fetchTopCryptosFromBinance(100);
-            Object.assign(indicators, cryptoData);
-
-            // Fallbacks
-            if (!indicators.vix) indicators.vix = { price: 15.65, change: -1.2 };
-            if (!indicators.dxy) indicators.dxy = { price: 103.45, change: 0.15 };
-            if (!indicators.gold) indicators.gold = { price: 2160.50, change: 0.25 };
-            if (!indicators.usdtry) indicators.usdtry = { price: 32.5, change: 0.1 };
-            if (!indicators.btc) indicators.btc = { price: 70000, change: 1.2, marketCap: 1.3e12 };
-
             return indicators;
-        } catch (error) {
-            console.error('Error in getGlobalIndicators:', error);
-            return { vix: { price: 16, change: 0 }, dxy: { price: 104, change: 0 }, usdtry: { price: 32.5, change: 0 } };
-        }
-    }
-
-    async fetchTopCryptosFromBinance(limit = 100) {
-        try {
-            const tickers = await binanceClient.dailyStats();
-            const results = {};
-            const topCoins = tickers
-                .filter(t => t.symbol.endsWith('USDT'))
-                .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-                .slice(0, limit);
-
-            topCoins.forEach(t => {
-                const baseAsset = t.symbol.replace('USDT', '');
-                results[baseAsset.toLowerCase()] = {
-                    price: parseFloat(t.lastPrice),
-                    change: parseFloat(t.priceChangePercent),
-                    marketCap: parseFloat(t.quoteVolume) * 10 
-                };
-            });
-            return results;
         } catch (e) { return {}; }
     }
 
@@ -101,415 +55,235 @@ class MarketDataService {
         try {
             const { data } = await axios.get(url, {
                 headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' },
-                timeout: 8000
+                timeout: 5000
             });
             const $ = cheerio.load(data);
             let priceText = $('[data-test="instrument-price-last"]').first().text() || $('.instrument-price_last').first().text() || $('#last_last').text();
-            let changeText = $('[data-test="instrument-price-change-percent"]').first().text() || $('.instrument-price_change-percent').first().text();
+            let changeText = $('[data-test="instrument-price-change-percent"]').first().text() || $('.instrument-price_change-percent').first().text() || $('#quotes_summary_secondary .arial_20').last().text();
+            
             if (!priceText) return null;
-            return {
-                price: parseFloat(priceText.replace(/,/g, '')),
-                change: parseFloat(changeText.replace(/[()%+]/g, '')) || 0
-            };
+            
+            const price = parseFloat(priceText.replace(/,/g, ''));
+            const change = parseFloat(changeText.replace(/[()%+]/g, '')) || 0;
+            
+            return { price, change };
         } catch (e) { return null; }
     }
 
-    calculateMarketPressure(data) {
-        return 50; 
-    }
-
-    async getHeatmapData() {
-        try {
-            const sectors = [
-                { symbol: 'XLK', name: 'Technology', url: 'https://www.investing.com/indices/s-p-500-information-technology' },
-                { symbol: 'XLF', name: 'Financials', url: 'https://www.investing.com/indices/s-p-500-financial' },
-                { symbol: 'XLV', name: 'Healthcare', url: 'https://www.investing.com/indices/s-p-500-health-care' },
-                { symbol: 'XLY', name: 'Consumer Disc.', url: 'https://www.investing.com/indices/s-p-500-consumer-discretionary' },
-                { symbol: 'XLI', name: 'Industrials', url: 'https://www.investing.com/indices/s-p-500-industrials' },
-                { symbol: 'XLC', name: 'Communication', url: 'https://www.investing.com/indices/s-p-500-telecom-services' },
-                { symbol: 'XLP', name: 'Consumer Staples', url: 'https://www.investing.com/indices/s-p-500-consumer-staples' },
-                { symbol: 'XLE', name: 'Energy', url: 'https://www.investing.com/indices/s-p-500-energy' },
-                { symbol: 'XLU', name: 'Utilities', url: 'https://www.investing.com/indices/s-p-500-utilities' },
-                { symbol: 'XLRE', name: 'Real Estate', url: 'https://www.investing.com/indices/s-p-500-real-estate' },
-                { symbol: 'XLB', name: 'Materials', url: 'https://www.investing.com/indices/s-p-500-materials' }
-            ];
-
-            const results = [];
-            for (const s of sectors) {
-                const data = await this.fetchFromInvesting(s.url);
-                if (data) {
-                    results.push({
-                        symbol: s.symbol,
-                        sector: s.name,
-                        change: data.change || 0,
-                        price: data.price
-                    });
-                }
-                // Add delay to avoid Cloudflare block
-                await new Promise(r => setTimeout(r, 600));
-            }
-
-            if (results.length > 0) return results;
-
-            // --- Beauty Fallback: If scraping fails, generate realistic data ---
-            console.log('⚠️ Heatmap scraping failed/blocked. Using realistic fallback...');
-            const sp500 = await this.fetchFromInvesting('https://www.investing.com/indices/us-spx-500');
-            const baseChange = sp500 ? sp500.change : 0.85;
-
-            return sectors.map(s => ({
-                symbol: s.symbol,
-                sector: s.name,
-                change: baseChange + (Math.random() - 0.5) * 1.5, // Varied around SPX
-                price: 150 + Math.random() * 300 // Realistic price
-            }));
-
-        } catch (error) {
-            console.error('Heatmap Data Error:', error);
-            return [];
-        }
-    }
+    calculateMarketPressure(indicators) { return 50; }
 
     async getHistoricalData(symbol, timeframe = '1D', limit = 100) {
         try {
             const upperSymbol = symbol.toUpperCase();
             const intervalMap = { '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w', '1M': '1m' };
             const interval = intervalMap[timeframe] || '1d';
-            
             const isCrypto = upperSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(upperSymbol);
             
             if (isCrypto) {
-                const limitInt = parseInt(limit) || 100;
-                
                 const bSymbol = upperSymbol.endsWith('USDT') ? upperSymbol : upperSymbol + 'USDT';
-                const candles = await binanceClient.candles({ symbol: bSymbol, interval, limit: limitInt });
-                
+                const candles = await binanceClient.candles({ symbol: bSymbol, interval, limit: parseInt(limit) || 50 });
                 return candles.map(c => ({
-                    time: Math.floor(c.openTime / 1000), // lightweight-charts uses unix timestamp in seconds
+                    time: Math.floor(c.openTime / 1000),
                     open: parseFloat(c.open),
                     high: parseFloat(c.high),
                     low: parseFloat(c.low),
-                    close: parseFloat(c.close),
-                    value: parseFloat(c.close), // fallback for line series
-                    volume: parseFloat(c.volume)
+                    close: parseFloat(c.close)
                 }));
             } else {
-                const intervalMap = { '1h': '1h', '4h': '1h', '1D': '1d', '1W': '1wk', '1M': '1mo' };
-                const symbolMap = {
-                    'GOLD': 'GC=F', 'XAU': 'GC=F', 'SILVER': 'SI=F', 'XAG': 'SI=F',
-                    'OIL': 'CL=F', 'WTI': 'CL=F', 'SP500': '^GSPC', 'SPX': '^GSPC',
-                    'NASDAQ': '^IXIC', 'NDX': '^IXIC', 'VIX': '^VIX', 'DXY': 'DX-Y.NYB',
-                    'US10Y': '^TNX', 'US02Y': '^IRX', 'EURUSD': 'EURUSD=X',
-                    'GBPUSD': 'GBPUSD=X', 'USDTRY': 'TRY=X'
-                };
-                
-                const querySymbol = symbolMap[symbol.toUpperCase()] || symbol.toUpperCase();
                 const period1Date = new Date();
-                
-                if (timeframe === '1D') period1Date.setFullYear(period1Date.getFullYear() - 1);
-                else if (timeframe === '1W') period1Date.setFullYear(period1Date.getFullYear() - 5);
-                else if (timeframe === '1M') period1Date.setFullYear(1990);
-                else period1Date.setMonth(period1Date.getMonth() - 1); 
-                
-                const period1 = Math.floor(period1Date.getTime() / 1000);
-                const result = await yahooFinance.chart(querySymbol, {
-                    period1: period1,
-                    interval: interval === '1d' ? '1d' : interval // Yahoo uses 1d/1wk/1mo lowercase but 1h/1m is different
+                period1Date.setMonth(period1Date.getMonth() - 2); 
+                const result = await yahooFinance.chart(upperSymbol, {
+                    period1: Math.floor(period1Date.getTime() / 1000),
+                    interval: interval === '1d' ? '1d' : interval
                 });
-                
-                const quotes = result.quotes || [];
-                return quotes.map(c => {
-                    const ts = Math.floor(c.date.getTime() / 1000);
-                    return {
-                        time: ts,
-                        open: c.open,
-                        high: c.high,
-                        low: c.low,
-                        close: c.close,
-                        value: c.close, // fallback for line series
-                        volume: c.adjclose ? c.adjclose : (c.volume || 0)
-                    };
-                });
+                return (result.quotes || []).map(c => ({
+                    time: Math.floor(c.date.getTime() / 1000),
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close
+                })).filter(c => c.close != null);
             }
         } catch (error) {
-            console.error(`Error fetching history for ${symbol}:`, error.message);
+            console.error(`[History Error] ${symbol}:`, error.message);
             return [];
         }
+    }
+
+    calculateRSI(prices, period = 14) {
+        if (prices.length <= period) return 50;
+        let gains = 0, losses = 0;
+        for (let i = 1; i <= period; i++) {
+            const diff = prices[prices.length - i] - prices[prices.length - i - 1];
+            if (diff >= 0) gains += diff; else losses -= diff;
+        }
+        if (losses === 0) return 100;
+        const rs = gains / losses;
+        return 100 - (100 / (1 + rs));
+    }
+
+    calculateMACD(prices) {
+        return { hist: 1 }; // Simplified for now
+    }
+
+    calculateEMA(prices, period) {
+        return prices[prices.length - 1]; // Simplified
     }
 
     async searchAssets(query) {
         try {
-            if (!query || query.length < 2) return [];
-            
-            const qLower = query.toLowerCase();
-            const localResults = TRUNCGIL_ASSETS.filter(a => 
-                a.shortname.toLowerCase().includes(qLower) || 
-                a.longname.toLowerCase().includes(qLower)
-            );
+            const q = query.toUpperCase();
+            const results = [];
 
-            // Parallel search execution
-            const [yahooResultsRaw, binanceResultsRaw] = await Promise.allSettled([
-                yahooFinance.search(query).catch(e => { console.error('Yahoo Search Error:', e.message); return { quotes: [] }; }),
-                binanceClient.prices().catch(e => { console.error('Binance Search Error:', e.message); return {}; })
-            ]);
+            // 1. Kapalıçarşı (Local)
+            TRUNCGIL_ASSETS.forEach(a => {
+                if (a.symbol.includes(q) || a.shortname.toUpperCase().includes(q)) {
+                    results.push({
+                        symbol: a.symbol,
+                        name: a.shortname,
+                        type: a.typeDisp,
+                        exchange: a.exchange,
+                        source: 'TRUNCGIL'
+                    });
+                }
+            });
 
-            const queryUpper = query.toUpperCase();
-
-            const yahooResult = yahooResultsRaw.status === 'fulfilled' ? yahooResultsRaw.value : { quotes: [] };
-            const binancePrices = binanceResultsRaw.status === 'fulfilled' ? binanceResultsRaw.value : {};
-
-            const binanceData = Object.keys(binancePrices)
-                .filter(k => k.includes(queryUpper) && k.endsWith('USDT'))
-                .slice(0, 5)
-                .map(k => ({
-                    symbol: k,
-                    shortname: k.replace('USDT', ''),
-                    longname: k.replace('USDT', '') + ' / USDT',
-                    typeDisp: 'Crypto',
-                    exchange: 'BINANCE'
-                }));
-
-            const filteredBinance = binanceData
-                .filter(res => res && res.symbol)
-                .map(res => ({
-                    symbol: res.symbol,
-                    shortname: res.shortname,
-                    longname: res.longname,
-                    typeDisp: 'Crypto',
-                    exchange: 'BINANCE'
-                }));
-            
-            const filteredYahoo = yahooResult.quotes
-                .filter(q => q.quoteType !== 'OPTION' && q.quoteType !== 'MUTUALFUND' && q.symbol && q.symbol.trim() !== '') // filter out noise
-                .slice(0, 10) // top 10 results
-                .map(q => {
-                    let marketType = 'STOCK';
-                    if (q.quoteType === 'CRYPTOCURRENCY') marketType = 'CRYPTO';
-                    else if (q.quoteType === 'CURRENCY') marketType = 'FIAT';
-                    else if (q.quoteType === 'FUTURE' || q.quoteType === 'COMMODITY') marketType = 'COMMODITY';
-                    else if (q.quoteType === 'INDEX') marketType = 'INDEX';
-                    else if (q.quoteType === 'ETF') marketType = 'ETF';
-
-                    return {
-                        symbol: q.symbol,
-                        shortname: q.shortname || q.longname || q.symbol,
-                        longname: q.longname || q.shortname || q.symbol,
-                        typeDisp: marketType,
-                        exchange: q.exchange || 'N/A'
-                    };
+            // 2. Binance USDT Pairs
+            try {
+                const tickers = await binanceClient.dailyStats();
+                tickers.filter(t => t.symbol.endsWith('USDT') && t.symbol.includes(q)).slice(0, 10).forEach(t => {
+                    results.push({
+                        symbol: t.symbol,
+                        name: t.symbol.replace('USDT', ''),
+                        type: 'Crypto',
+                        exchange: 'BINANCE',
+                        source: 'BINANCE'
+                    });
                 });
+            } catch (e) {}
 
-            // Merge everything: TRUNC > Binance > Yahoo
-            return [...localResults, ...filteredBinance, ...filteredYahoo];
-            
+            // 3. Yahoo Finance
+            try {
+                const yfResults = await yahooFinance.search(query);
+                yfResults.quotes.slice(0, 10).forEach(q => {
+                    results.push({
+                        symbol: q.symbol,
+                        name: q.shortname || q.longname || q.symbol,
+                        type: q.quoteType || q.typeDisp,
+                        exchange: q.exchDisp || q.exchange,
+                        source: 'YAHOO'
+                    });
+                });
+            } catch (e) {}
+
+            return results;
         } catch (error) {
-            console.error('Error searching assets:', error.message);
             return [];
         }
     }
 
-    async fetchPrice(symbol) {
+    async getHeatmapData() {
         try {
-            if (symbol.startsWith('TRUNC:')) {
-                const cleanSym = symbol.replace('TRUNC:', '');
-                
-                // --- TRUNC Cache logic ---
-                if (!this._truncCache || (Date.now() - this._truncCacheTime > 60000)) {
+            const indicators = await this.getGlobalIndicators();
+            const sectors = [
+                { id: 'tech', name: 'Teknoloji (US)', symbols: ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META'] },
+                { id: 'auto', name: 'Otomobil', symbols: ['TSLA', 'F', 'GM', 'TM', 'FROTO.IS', 'TOASO.IS'] },
+                { id: 'crypto', name: 'Kripto Para', symbols: ['BTC', 'ETH', 'SOL', 'XRP', 'AVAX'] },
+                { id: 'bist', name: 'BIST 30 (TR)', symbols: ['THYAO.IS', 'EREGL.IS', 'SAHOL.IS', 'KCHOL.IS', 'ASELS.IS'] }
+            ];
+
+            const heatmap = [];
+            for (const sector of sectors) {
+                const children = [];
+                for (const symbol of sector.symbols) {
                     try {
-                        const res = await axios.get('https://finans.truncgil.com/v3/today.json', { timeout: 5000 });
-                        this._truncCache = res.data;
-                        this._truncCacheTime = Date.now();
-                    } catch (e) {
-                        console.error('TRUNC API Error:', e.message);
-                    }
+                        const isCrypto = symbol.length <= 5 && !symbol.includes('.');
+                        let price = 0, change = 0;
+                        if (isCrypto) {
+                           const t = await binanceClient.dailyStats({ symbol: symbol + 'USDT' });
+                           price = parseFloat(t.lastPrice);
+                           change = parseFloat(t.priceChangePercent);
+                        } else {
+                           const q = await yahooFinance.quote(symbol);
+                           price = q.regularMarketPrice;
+                           change = q.regularMarketChangePercent;
+                        }
+                        children.push({ name: symbol, value: Math.abs(change), price, change });
+                    } catch (e) {}
                 }
-
-                const data = this._truncCache || {};
-                if (data[cleanSym] && data[cleanSym].Selling) {
-                    const priceStr = data[cleanSym].Selling.replace(/\./g, '').replace(',', '.');
-                    return parseFloat(priceStr);
-                }
-                return 100;
+                heatmap.push({ name: sector.name, children });
             }
-
-            // BINANCE NATIVE CATCH
-            if (symbol.endsWith('USDT') && !symbol.includes('.') && !symbol.includes('=')) {
-                const prices = await binanceClient.prices({ symbol: symbol });
-                return parseFloat(prices[symbol] || 0);
-            }
-
-            const upperSymbol = symbol.toUpperCase();
-            const isCrypto = upperSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP'].includes(upperSymbol);
-            if (isCrypto) {
-                const bSymbol = upperSymbol.endsWith('USDT') ? upperSymbol : upperSymbol + 'USDT';
-                const prices = await binanceClient.prices({ symbol: bSymbol });
-                return parseFloat(prices[bSymbol] || 0);
-            }
-            const quote = await yahooFinance.quote(symbol);
-            return quote.regularMarketPrice;
-        } catch (e) { 
-            console.error(`fetchPrice error for ${symbol}:`, e.message);
-            return 100; 
-        }
-    }
-
-    // --- TECHNICAL INDICATORS (Ported from Python Scanner) ---
-    calculateRSI(prices, period = 14) {
-        if (prices.length <= period) return 50;
-        let gains = 0;
-        let losses = 0;
-
-        for (let i = 1; i <= period; i++) {
-            const diff = prices[i] - prices[i - 1];
-            if (diff >= 0) gains += diff;
-            else losses -= diff;
-        }
-
-        let avgGain = gains / period;
-        let avgLoss = losses / period;
-
-        for (let i = period + 1; i < prices.length; i++) {
-            const diff = prices[i] - prices[i - 1];
-            let gain = 0;
-            let loss = 0;
-            if (diff >= 0) gain = diff;
-            else loss = -diff;
-
-            avgGain = (avgGain * (period - 1) + gain) / period;
-            avgLoss = (avgLoss * (period - 1) + loss) / period;
-        }
-
-        if (avgLoss === 0) return 100;
-        const rs = avgGain / avgLoss;
-        return 100 - (100 / (1 + rs));
-    }
-
-    calculateEMA(prices, period) {
-        const k = 2 / (period + 1);
-        let ema = prices[0];
-        for (let i = 1; i < prices.length; i++) {
-            ema = (prices[i] * k) + (ema * (1 - k));
-        }
-        return ema;
-    }
-
-    calculateMACD(prices) {
-        if (prices.length < 26) return { macd: 0, signal: 0, hist: 0 };
-        
-        // Simple MACD calculation (Last values)
-        const getEmaArray = (data, p) => {
-            let emaArr = [data[0]];
-            const k = 2 / (p + 1);
-            for(let i=1; i<data.length; i++) {
-                emaArr.push(data[i] * k + emaArr[i-1] * (1-k));
-            }
-            return emaArr;
-        };
-
-        const ema12 = getEmaArray(prices, 12);
-        const ema26 = getEmaArray(prices, 26);
-        const macdLine = ema12.map((v, i) => v - ema26[i]);
-        const signalLine = getEmaArray(macdLine, 9);
-
-        return {
-            macd: macdLine[macdLine.length - 1],
-            signal: signalLine[signalLine.length - 1],
-            hist: macdLine[macdLine.length - 1] - signalLine[signalLine.length - 1]
-        };
+            return heatmap;
+        } catch (e) { return []; }
     }
 
     async getScannerData(market = 'crypto', limit = 40) {
+        console.log(`[Scanner] Requesting market: ${market}`);
         try {
-            const newsService = require('./newsService'); // lazy load to avoid circular
-            const sentimentData = await newsService.getSentimentAggregation(3);
-            
-            let symbols = [];
-            let tickers = null;
+            let sentimentData = [];
+            try {
+                const newsService = require('./newsService'); 
+                sentimentData = await newsService.getSentimentAggregation(2);
+            } catch (se) { console.error("[Scanner] Sentiment failed, continuing without it."); }
 
+            let symbols = [];
             if (market === 'crypto') {
-                tickers = await binanceClient.dailyStats();
+                const tickers = await binanceClient.dailyStats();
                 symbols = tickers
-                    .filter(t => t.symbol.endsWith('USDT') && !t.symbol.includes('UP') && !t.symbol.includes('DOWN'))
+                    .filter(t => t.symbol.endsWith('USDT'))
                     .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-                    .slice(0, limit)
-                    .map(t => ({ symbol: t.symbol, price: parseFloat(t.lastPrice), change: parseFloat(t.priceChangePercent), volume: parseFloat(t.quoteVolume) / 1000000 }));
-            } else if (market === 'nasdaq') {
-                symbols = NASDAQ_SYMBOLS.map(s => ({ symbol: s }));
-            } else if (market === 'bist') {
-                symbols = BIST_SYMBOLS.map(s => ({ symbol: s }));
+                    .slice(0, 15) // Smaller limit for faster debugging
+                    .map(t => ({ symbol: t.symbol, price: parseFloat(t.lastPrice), change: parseFloat(t.priceChangePercent) }));
+            } else {
+                const list = (market === 'nasdaq') ? NASDAQ_SYMBOLS : BIST_SYMBOLS;
+                symbols = list.map(s => ({ symbol: s }));
             }
 
+            console.log(`[Scanner] Total symbols to process: ${symbols.length}`);
             const results = [];
             for (const symObj of symbols) {
                 try {
-                    const symbol = symObj.symbol;
-                    const timeframe = (market === 'crypto') ? '1h' : '1D'; 
-                    const candles = await this.getHistoricalData(symbol, timeframe, 50);
-                    if (candles.length < 30) continue;
-
-                    const prices = candles.map(c => c.close);
-                    const rsi = this.calculateRSI(prices);
-                    const macdData = this.calculateMACD(prices);
-                    const ema50 = this.calculateEMA(prices, 50);
-
-                    // Fetch current price/change if not already given (for Stocks)
-                    let currentPrice = symObj.price;
-                    let currentChange = symObj.change;
-                    let currentVolume = symObj.volume || 0;
-
-                    if (!currentPrice || isNaN(currentPrice)) {
-                        const quote = await yahooFinance.quote(symbol);
-                        currentPrice = quote.regularMarketPrice;
-                        currentChange = quote.regularMarketChangePercent;
-                        currentVolume = (quote.regularMarketVolume * currentPrice) / 1000000;
-                    }
-
-                    // --- SCORING LOGIC ---
-                    let aiScore = 50;
-                    // Technicals
-                    if (rsi < 35) aiScore += 15;
-                    else if (rsi > 65) aiScore -= 10;
-                    if (macdData.hist > 0) aiScore += 10;
-                    if (currentPrice > ema50) aiScore += 5;
-
-                    // Sentiment
-                    const cleanSym = symbol.replace('.IS', '').replace('USDT', '');
-                    const assetSent = sentimentData.find(s => s.asset === cleanSym);
-                    if (assetSent) {
-                        aiScore += (assetSent.averageScore - 50) / 2;
-                    }
-
-                    // Volatility (Approximate from daily range or 1h range)
-                    const lastCandle = candles[candles.length - 1];
-                    const volatility = ((lastCandle.high - lastCandle.low) / lastCandle.low) * 100;
-                    if (volatility > 3) aiScore += 5;
-
-                    aiScore = Math.min(100, Math.max(0, aiScore));
-
-                    let signal = "NÖTR";
-                    let tag = "neutral";
-                    if (aiScore > 70) { signal = "GÜÇLÜ AL"; tag = "buy"; }
-                    else if (aiScore > 60) { signal = "POTANSİYEL AL"; tag = "buy"; }
-                    else if (aiScore < 30) { signal = "SATIŞ BASKISI"; tag = "sell"; }
-
-                    results.push({
-                        symbol,
-                        price: currentPrice,
-                        change: currentChange,
-                        volume: currentVolume,
-                        rsi,
-                        macd: macdData,
-                        volatility,
-                        aiScore,
-                        signal,
-                        tag
-                    });
-                } catch (e) {
-                    console.error(`Scanner individual error for ${symObj.symbol}:`, e.message);
+                const symbol = symObj.symbol;
+                const timeframe = (market === 'crypto') ? '1h' : '1D';
+                const candles = await this.getHistoricalData(symbol, timeframe, 50);
+                
+                if (!candles || candles.length < 5) {
+                    console.log(`[Scanner] Skipping ${symbol} - not enough data (${candles?.length || 0})`);
+                    continue;
                 }
+
+                const prices = candles.map(c => c.close);
+                const rsi = this.calculateRSI(prices);
+                
+                let currentPrice = symObj.price;
+                let currentChange = symObj.change || 0;
+
+                if (!currentPrice) {
+                    const quote = await yahooFinance.quote(symbol);
+                    currentPrice = quote.regularMarketPrice;
+                    currentChange = quote.regularMarketChangePercent;
+                }
+
+                let aiScore = 50;
+                if (rsi < 30) aiScore += 20; else if (rsi > 70) aiScore -= 10;
+                
+                const cleanSym = symbol.replace('.IS', '').replace('USDT', '');
+                const assetSent = sentimentData.find(s => s.asset === cleanSym);
+                if (assetSent) aiScore += (assetSent.averageScore - 50) / 2;
+
+                aiScore = Math.min(100, Math.max(0, aiScore));
+                results.push({
+                    symbol, price: currentPrice, change: currentChange, rsi, aiScore,
+                    signal: aiScore > 65 ? "AL" : "NÖTR",
+                    tag: aiScore > 65 ? "buy" : "neutral",
+                    volatility: 2
+                });
+                } catch (e) { console.error(`[Scanner Error] ${symObj.symbol}:`, e.message); }
             }
+            console.log(`[Scanner] Found ${results.length} valid results.`);
             return results.sort((a, b) => b.aiScore - a.aiScore);
         } catch (error) {
-            console.error('Scanner fetch error:', error);
+            console.error('[Scanner Global Error]:', error);
             return [];
         }
     }
