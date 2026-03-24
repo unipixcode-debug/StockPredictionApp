@@ -302,7 +302,7 @@ const Dashboard = () => {
           label={t('VIX_Fear')}
           value={stats?.vix?.price != null ? stats.vix?.price?.toFixed(1) : '–'}
           trend={fmtChange(stats?.raw?.vix?.change)}
-          trendUp={(stats?.raw?.vix?.change ?? 0) < 0}
+          trendUp={(stats?.raw?.vix?.change ?? 0) >= 0}
           icon={<Activity className="text-primary" />}
           loading={loading}
         />
