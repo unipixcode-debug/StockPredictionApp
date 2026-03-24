@@ -118,7 +118,21 @@ const PortfolioOverview = () => {
 
     const ds = displayCurrency === 'TRY' ? '₺' : '$';
 
-    const PREMIUM_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
+    const PREMIUM_COLORS = [
+        '#00f2fe', // Cyan
+        '#f43f5e', // Rose
+        '#10b981', // Emerald
+        '#8b5cf6', // Violet
+        '#f59e0b', // Amber
+        '#3b82f6', // Blue
+        '#ec4899', // Pink
+        '#06b6d4', // Cyan (Darker)
+        '#f97316', // Orange
+        '#22c55e', // Green
+        '#6366f1', // Indigo
+        '#ef4444', // Red
+        '#eab308'  // Yellow
+    ];
     const chartData = (holdings || []).map((h, i) => ({
         name: h.symbol,
         value: getVal(h.valueInNC, h.naturalCurrency, h),
