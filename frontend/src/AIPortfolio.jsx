@@ -375,7 +375,7 @@ const AIPortfolio = () => {
                               </div>
                               <div className="mt-4 flex items-center justify-between text-[8px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
                                   <span>Miktar: {Number(asset.quantity || 0).toFixed(6)}</span>
-                                  <ChevronRight size={12} className={`transition-transform ${isTargeted ? 'rotate-90' : ''}`} />
+                                   <ChevronRight size={12} className={`transition-transform ${selectedAssets.includes(asset.symbol) ? 'rotate-90' : ''}`} />
                               </div>
                           </motion.div>
                       );
