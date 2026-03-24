@@ -70,6 +70,33 @@ class MarketDataService {
         } catch (e) { return null; }
     }
 
+    async fetchPrice(symbol) {
+        try {
+            const upperSymbol = (symbol || '').toUpperCase();
+            if (!upperSymbol) return 0;
+            
+            const isCrypto = upperSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(upperSymbol);
+            if (isCrypto) {
+                const bSymbol = upperSymbol.endsWith('USDT') ? upperSymbol : upperSymbol + 'USDT';
+                try {
+                    const ticker = await binanceClient.dailyStats({ symbol: bSymbol });
+                    if (ticker && ticker.lastPrice) return parseFloat(ticker.lastPrice);
+                } catch (e) {}
+            }
+
+            try {
+                const quote = await yahooFinance.quote(upperSymbol);
+                if (quote && quote.regularMarketPrice) return quote.regularMarketPrice;
+            } catch (e) {}
+
+            return 0;
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    async fetchStockPrice(symbol) { return this.fetchPrice(symbol); }
+
     calculateMarketPressure(indicators) { return 50; }
 
     async getHistoricalData(symbol, timeframe = '1D', limit = 100) {
