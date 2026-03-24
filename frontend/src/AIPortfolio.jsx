@@ -108,7 +108,7 @@ const AIPortfolio = () => {
   const isProfit = profit >= 0;
 
   return (
-    <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="space-y-8 pb-20 max-w-7xl mx-auto">
+    <motion.div initial={{opacity: 0}} animate={{opacity: 1, x: 0.2}} className="space-y-8 pb-20 max-w-7xl mx-auto">
       {/* Premium Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
          <div>
@@ -181,7 +181,7 @@ const AIPortfolio = () => {
           <div className="space-y-8">
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                   <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass-card p-8 group hover:border-primary/50 transition-colors">
+                   <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, x: 0.2, opacity: 1 }} className="glass-card p-8 group hover:border-primary/50 transition-colors">
                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">Mevcut Değer (Portfolio Value)</p>
                        <div className="flex items-baseline space-x-2">
                            <h2 className="text-4xl font-black tracking-tighter italic">${latestValue.toFixed(2)}</h2>
@@ -189,7 +189,7 @@ const AIPortfolio = () => {
                        </div>
                    </motion.div>
 
-                   <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className={`glass-card p-8 border-l-4 ${isProfit ? 'border-l-emerald-500 shadow-[inset_10px_0_20px_rgba(16,185,129,0.05)]' : 'border-l-rose-500 shadow-[inset_10px_0_20px_rgba(244,63,94,0.05)]'}`}>
+                   <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, x: 0.2, opacity: 1 }} transition={{ delay: 0.1 }} className={`glass-card p-8 border-l-4 ${isProfit ? 'border-l-emerald-500 shadow-[inset_10px_0_20px_rgba(16,185,129,0.05)]' : 'border-l-rose-500 shadow-[inset_10px_0_20px_rgba(244,63,94,0.05)]'}`}>
                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4">Net PNL (%)</p>
                        <div className="flex items-baseline space-x-3">
                            <h2 className={`text-4xl font-black tracking-tighter italic ${isProfit ? 'text-emerald-500' : 'text-rose-500'}`}>
@@ -201,7 +201,7 @@ const AIPortfolio = () => {
                        </div>
                    </motion.div>
 
-                   <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="glass-card p-8 relative overflow-hidden group">
+                   <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, x: 0.2, opacity: 1 }} transition={{ delay: 0.2 }} className="glass-card p-8 relative overflow-hidden group">
                        <div className="flex justify-between items-start mb-3">
                            <p className="text-[10px] font-black uppercase tracking-widest text-primary italic flex items-center">
                                <RefreshCw size={10} className="mr-1"/> AI Analiz Özeti
