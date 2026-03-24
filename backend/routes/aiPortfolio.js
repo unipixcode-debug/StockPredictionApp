@@ -194,6 +194,7 @@ router.get('/:id/history', async (req, res) => {
                 }
                 const currentAssetValue = (asset.quantity || (asset.allocation / asset.entryPrice)) * lastPrice;
                 historyData[date][asset.symbol] = currentAssetValue;
+                historyData[date][asset.symbol + "_raw"] = lastPrice; // Add raw unit price
             }
         }
 

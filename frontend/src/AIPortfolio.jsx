@@ -89,14 +89,20 @@ const AIPortfolio = () => {
           <p className="font-black mb-3 text-primary uppercase tracking-widest border-b border-border/50 pb-2 italic text-[10px]">
             {new Date(label).toLocaleString()}
           </p>
-          {payload.map((entry, index) => (
-            <div key={index} className="flex items-center justify-between space-x-6 mb-1.5">
-              <span style={{ color: entry.color }} className="font-black italic uppercase tracking-tighter text-[9px]">{entry.name}</span>
-              <span className="font-mono font-bold text-foreground text-[10px]">
-                {entry.name === 'Toplam Değer' ? '$' : ''}{Number(entry.value).toFixed(2)}
-              </span>
-            </div>
-          ))}
+          {payload.map((entry, index) => {
+            const isRawPrice = entry.dataKey && entry.dataKey.endsWith('_raw');
+            return (
+              <div key={index} className="flex items-center justify-between space-x-6 mb-1.5">
+                <span style={{ color: entry.color }} className="font-black italic uppercase tracking-tighter text-[9px]">
+                    {isRawPrice ? entry.name.replace('_raw', '') : entry.name}
+                </span>
+                <span className="font-mono font-bold text-foreground text-[10px]">
+                  {entry.name === 'Toplam Değer' ? '$' : ''}{Number(entry.value).toFixed(isRawPrice ? 2 : 2)}
+                  {isRawPrice ? ' (Birim Fiyat)' : ''}
+                </span>
+              </div>
+            );
+          })}
         </div>
       );
     }
@@ -294,21 +300,24 @@ const AIPortfolio = () => {
                                 />
                                )}
  
-                               {activePortfolio.assets.map((asset, i) => (
-                                   selectedAssets.includes(asset.symbol) && (
+                               {activePortfolio.assets.map((asset, i) => {
+                                   const isSingleSelected = selectedAssets.length === 1 && selectedAssets[0] === asset.symbol;
+                                   const dataKey = isSingleSelected ? `${asset.symbol}_raw` : asset.symbol;
+                                   
+                                   return selectedAssets.includes(asset.symbol) && (
                                      <Line 
                                          key={asset.symbol}
                                          type="monotone" 
-                                         dataKey={asset.symbol} 
-                                         name={asset.symbol}
+                                         dataKey={dataKey} 
+                                         name={isSingleSelected ? `${asset.symbol} (Fiyat)` : asset.symbol}
                                          stroke={colors[i % colors.length]} 
                                          strokeWidth={selectedAssets.length === 1 ? 4 : 2}
                                          strokeOpacity={selectedAssets.length === 1 ? 1 : 0.8}
                                          dot={false}
                                          animationDuration={1500}
                                      />
-                                   )
-                               ))}
+                                   );
+                                })}
                               
                               <Legend wrapperStyle={{ fontSize: '9px', fontWeight: '900', paddingTop: '30px', textTransform: 'uppercase', fontStyle: 'italic' }} iconType="circle" />
                           </LineChart>
