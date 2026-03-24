@@ -26,7 +26,7 @@ class MarketDataService {
     async getGlobalIndicators() {
         try {
             const urls = {
-                vix: 'https://www.investing.com/indices/us-30-vix',
+                vix: 'https://www.investing.com/indices/volatility-s-p-500',
                 dxy: 'https://www.investing.com/indices/usdollar',
                 gold: 'https://www.investing.com/currencies/xau-usd',
                 silver: 'https://www.investing.com/currencies/xag-usd',
