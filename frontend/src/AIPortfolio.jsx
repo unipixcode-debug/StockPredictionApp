@@ -108,7 +108,7 @@ const AIPortfolio = () => {
   const isProfit = profit >= 0;
 
   return (
-    <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="space-y-8 pb-20">
+    <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="space-y-8 pb-20 max-w-7xl mx-auto">
       {/* Premium Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
          <div>
