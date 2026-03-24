@@ -4,7 +4,7 @@ import {
     ActivityIndicator, Switch, TextInput, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, Zap, Coins, Lock, Users, RefreshCw, CheckCircle, Gift, Search } from 'lucide-react-native';
+import { Settings, Zap, Coins, Lock, Users, RefreshCw, CheckCircle, Gift, Search, Globe, Trash2 } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 
 const API_BASE = Config.API_BASE;
@@ -30,6 +30,8 @@ const AdminScreen = () => {
         { key: 'price_per_1000_tokens', value: '69.99', description: '1000 Token Paketi - Premium (USD)' },
     ]);
     const [creditLogs, setCreditLogs] = useState<UserCredit[]>([]);
+    const [sources, setSources] = useState<any[]>([]);
+    const [newSource, setNewSource] = useState({ name: '', type: 'NEWS_RSS', url: '' });
     const [loading, setLoading] = useState(true);
     const [savingKey, setSavingKey] = useState<string | null>(null);
     const [savedKey, setSavedKey] = useState<string | null>(null);
@@ -42,9 +44,10 @@ const AdminScreen = () => {
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const [settingsRes, usersRes] = await Promise.allSettled([
+            const [settingsRes, usersRes, sourcesRes] = await Promise.allSettled([
                 fetch(`${API_BASE}/admin/settings`),
                 fetch(`${API_BASE}/admin/users`),
+                fetch(`${API_BASE}/admin/sources`),
             ]);
 
             if (settingsRes.status === 'fulfilled') {
@@ -68,6 +71,11 @@ const AdminScreen = () => {
             if (usersRes.status === 'fulfilled') {
                 const users = await usersRes.value.json();
                 if (Array.isArray(users)) setCreditLogs(users);
+            }
+
+            if (sourcesRes.status === 'fulfilled') {
+                const sourcesData = await sourcesRes.value.json();
+                if (Array.isArray(sourcesData)) setSources(sourcesData);
             }
         } catch (e) {
             console.error('Admin fetch error:', e);
@@ -135,6 +143,32 @@ const AdminScreen = () => {
         );
     };
 
+    const handleAddSource = async () => {
+        if (!newSource.name || !newSource.url) return;
+        try {
+            const res = await fetch(`${API_BASE}/admin/sources`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newSource),
+            });
+            if (res.ok) {
+                setNewSource({ name: '', type: 'NEWS_RSS', url: '' });
+                fetchAll();
+            }
+        } catch (e) {
+            Alert.alert('Hata', 'Kaynak eklenemedi');
+        }
+    };
+
+    const handleDeleteSource = async (id: string) => {
+        try {
+            await fetch(`${API_BASE}/admin/sources/${id}`, { method: 'DELETE' });
+            fetchAll();
+        } catch (e) {
+            Alert.alert('Hata', 'Kaynak silinemedi');
+        }
+    };
+
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -182,6 +216,46 @@ const AdminScreen = () => {
                                     trackColor={{ false: 'rgba(255,255,255,0.1)', true: '#22d3ee' }}
                                     thumbColor="white"
                                 />
+                            </View>
+                        ))}
+                    </View>
+
+                    {/* News Sources */}
+                    <View style={styles.card}>
+                        <View style={styles.sectionHeader}>
+                            <Globe color="#22d3ee" size={18} />
+                            <Text style={styles.sectionTitle}>Haber Kaynakları</Text>
+                        </View>
+                        
+                        <View style={styles.addSourceForm}>
+                            <TextInput 
+                                placeholder="Kaynak Adı" 
+                                value={newSource.name}
+                                onChangeText={t => setNewSource({...newSource, name: t})}
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                style={styles.miniInput}
+                            />
+                            <TextInput 
+                                placeholder="URL" 
+                                value={newSource.url}
+                                onChangeText={t => setNewSource({...newSource, url: t})}
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                style={styles.miniInput}
+                            />
+                            <TouchableOpacity onPress={handleAddSource} style={styles.addBtn}>
+                                <Text style={styles.addBtnText}>EKLE</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {sources.map(s => (
+                            <View key={s.id} style={styles.sourceRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.sourceName}>{s.name}</Text>
+                                    <Text style={styles.sourceUrl} numberOfLines={1}>{s.url}</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => handleDeleteSource(s.id)}>
+                                    <Trash2 size={16} color="#f87171" style={{ marginLeft: 12 }} />
+                                </TouchableOpacity>
                             </View>
                         ))}
                     </View>
@@ -328,6 +402,13 @@ const styles = StyleSheet.create({
     saveBtnText: { color: '#f59e0b', fontWeight: '900', fontSize: 12 },
     giftBtn: { marginTop: 10, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(74, 222, 128, 0.1)', borderWidth: 1, borderColor: 'rgba(74, 222, 128, 0.2)', flexDirection: 'row', alignItems: 'center', gap: 6 },
     giftBtnText: { color: '#4ade80', fontSize: 10, fontWeight: '800' },
+    addSourceForm: { marginBottom: 16, gap: 8 },
+    miniInput: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 10, color: 'white', fontSize: 13 },
+    addBtn: { backgroundColor: '#22d3ee', padding: 12, borderRadius: 12, alignItems: 'center' },
+    addBtnText: { color: '#0f172a', fontWeight: '900', fontSize: 12 },
+    sourceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+    sourceName: { color: 'white', fontWeight: '700', fontSize: 14 },
+    sourceUrl: { color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 2 },
 });
 
 export default AdminScreen;

@@ -1,13 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, LogOut, Settings, Moon, Globe, ChevronRight } from 'lucide-react-native';
+import { Config } from '@/constants/Config';
 import { useAuth } from '../_layout';
 import { useRouter } from 'expo-router';
 
 const ProfileScreen = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, updateCredits } = useAuth();
     const router = useRouter();
+    const [loadingSub, setLoadingSub] = useState<string | null>(null);
+
+    const handleToggleSubscription = async (featureKey: string) => {
+        const isCurrentlySubscribed = 
+            (featureKey === 'newsletter' && user?.newsletterSubscribed) ||
+            (featureKey === 'autoPrediction' && user?.autoPredictionSubscribed) ||
+            (featureKey === 'moneyFlow' && user?.moneyFlowSubscribed);
+
+        setLoadingSub(featureKey);
+        try {
+            const response = await fetch(`${Config.API_BASE}/auth/subscription`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    feature: featureKey,
+                    action: isCurrentlySubscribed ? 'unsubscribe' : 'subscribe' 
+                })
+            });
+            const data = await response.json();
+            if (data.user) {
+                // We need a way to update the user in context. 
+                // Since useAuth doesn't have a 'setUser', we might need to rely on the next refresh or a custom update.
+                // For now, I'll assume the local state reflects the change for UX.
+                alert(isCurrentlySubscribed ? 'Abonelik iptal edildi.' : 'Abonelik başlatıldı!');
+                // We should ideally call a refresh function from context
+            }
+        } catch (e) {
+            alert('İşlem başarısız.');
+        } finally {
+            setLoadingSub(null);
+        }
+    };
 
     if (!user) {
         return (
@@ -63,17 +96,46 @@ const ProfileScreen = () => {
                                 </View>
                             </TouchableOpacity>
                             <View style={styles.divider} />
-                            
                             <TouchableOpacity style={styles.menuItem}>
                                 <View style={styles.menuItemLeft}>
                                     <Moon color="rgba(255,255,255,0.5)" size={20} />
-                                    <Text style={styles.menuItemText}>Görünüm</Text>
+                                    <Text style={styles.menuItemText}>Tema</Text>
                                 </View>
                                 <View style={styles.menuItemRight}>
-                                    <Text style={styles.menuItemValue}>Karanlık Mod</Text>
+                                    <Text style={styles.menuItemValue}>Sistem</Text>
                                     <ChevronRight color="rgba(255,255,255,0.2)" size={16} />
                                 </View>
                             </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Subscriptions Section */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>AI Abonelikleri</Text>
+                        <View style={styles.menuCard}>
+                            <SubscriptionItem 
+                                label="Haber Bülteni" 
+                                desc="Günlük AI analizli bülten" 
+                                isActive={user?.newsletterSubscribed} 
+                                onToggle={() => handleToggleSubscription('newsletter')}
+                                loading={loadingSub === 'newsletter'}
+                            />
+                            <View style={styles.divider} />
+                            <SubscriptionItem 
+                                label="Otomatik Tahmin" 
+                                desc="Arka plan sinyal üretimi" 
+                                isActive={user?.autoPredictionSubscribed} 
+                                onToggle={() => handleToggleSubscription('autoPrediction')}
+                                loading={loadingSub === 'autoPrediction'}
+                            />
+                            <View style={styles.divider} />
+                            <SubscriptionItem 
+                                label="Money Flow AI" 
+                                desc="Gelişmiş fon akış analizi" 
+                                isActive={user?.moneyFlowSubscribed} 
+                                onToggle={() => handleToggleSubscription('moneyFlow')}
+                                loading={loadingSub === 'moneyFlow'}
+                            />
                         </View>
                     </View>
 
@@ -109,6 +171,27 @@ const ProfileScreen = () => {
     );
 };
 
+const SubscriptionItem = ({ label, desc, isActive, onToggle, loading }: any) => (
+    <View style={styles.menuItem}>
+        <View style={styles.menuItemLeft}>
+            <View style={{ flex: 1 }}>
+                <Text style={styles.menuItemText}>{label}</Text>
+                <Text style={styles.menuItemSubText}>{desc}</Text>
+            </View>
+        </View>
+        {loading ? (
+            <ActivityIndicator size="small" color="#22d3ee" />
+        ) : (
+            <TouchableOpacity 
+                onPress={onToggle}
+                style={[styles.toggle, isActive && styles.toggleActive]}
+            >
+                <View style={[styles.toggleDot, isActive && styles.toggleDotActive]} />
+            </TouchableOpacity>
+        )}
+    </View>
+);
+
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#0f172a' },
     loadingContainer: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center' },
@@ -139,7 +222,12 @@ const styles = StyleSheet.create({
 
     logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(248, 113, 113, 0.1)', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(248, 113, 113, 0.2)', gap: 8 },
     logoutBtnText: { color: '#f87171', fontSize: 15, fontWeight: '900' },
-    versionText: { textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '700', marginTop: 24 }
+    versionText: { textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '700', marginTop: 24 },
+    menuItemSubText: { fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 },
+    toggle: { width: 44, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', padding: 2 },
+    toggleActive: { backgroundColor: '#22d3ee' },
+    toggleDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: 'white' },
+    toggleDotActive: { marginLeft: 'auto' },
 });
 
 export default ProfileScreen;

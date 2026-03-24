@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, FlatList, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Wallet, Plus, X, Trash2, ArrowUpRight, ArrowDownLeft, Activity, Search } from 'lucide-react-native';
+import { Wallet, Plus, X, Trash2, ArrowUpRight, ArrowDownLeft, Activity, Search, Bot } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 
 const PortfolioScreen = () => {
@@ -21,6 +21,8 @@ const PortfolioScreen = () => {
     const [avgPrice, setAvgPrice] = useState('');
     const [purchaseCurrency, setPurchaseCurrency] = useState('USD');
     const [isSaving, setIsSaving] = useState(false);
+    const [analysis, setAnalysis] = useState<any>(null);
+    const [analysisLoading, setAnalysisLoading] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -32,10 +34,26 @@ const PortfolioScreen = () => {
             const response = await fetch(`${Config.API_BASE}/portfolio`);
             const data = await response.json();
             setHoldings(Array.isArray(data) ? data : []);
+            
+            // Trigger AI analysis
+            fetchAnalysis();
         } catch (error) {
             console.error('Error fetching portfolio:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchAnalysis = async () => {
+        setAnalysisLoading(true);
+        try {
+            const res = await fetch(`${Config.API_BASE}/portfolio/analysis`);
+            const data = await res.json();
+            setAnalysis(data);
+        } catch (e) {
+            console.warn('AI Analysis failed');
+        } finally {
+            setAnalysisLoading(false);
         }
     };
 
@@ -245,6 +263,21 @@ const PortfolioScreen = () => {
 
                     {/* Stats Overview */}
                     <View style={styles.statsCard}>
+                        {/* AI ANALYSIS SECTION */}
+                        { (analysis || analysisLoading) && (
+                            <View style={styles.aiAnalysisCard}>
+                                <View style={styles.aiHeader}>
+                                    <Bot size={16} color="#8b5cf6" />
+                                    <Text style={styles.aiTitle}>AI PORTFÖY ANALİZİ</Text>
+                                </View>
+                                {analysisLoading ? (
+                                    <ActivityIndicator size="small" color="#8b5cf6" style={{ marginVertical: 10 }} />
+                                ) : (
+                                    <Text style={styles.aiSummary}>{analysis?.aiSummary}</Text>
+                                )}
+                            </View>
+                        )}
+
                         <Text style={styles.statsLabel}>Toplam Değer</Text>
                         <Text style={styles.statsMainValue}>
                             {displayCurrency === 'USD' ? '$' : '₺'}
@@ -494,6 +527,12 @@ const styles = StyleSheet.create({
     saveButton: { backgroundColor: '#22d3ee', padding: 16, borderRadius: 16, alignItems: 'center', marginTop: 10 },
     saveButtonDisabled: { opacity: 0.5 },
     saveButtonText: { color: '#0f172a', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
+    
+    // AI Analysis Styles
+    aiAnalysisCard: { backgroundColor: 'rgba(139,92,246,0.1)', borderRadius: 18, padding: 16, borderLeftWidth: 4, borderLeftColor: '#8b5cf6', marginBottom: 20 },
+    aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+    aiTitle: { fontSize: 10, fontWeight: '900', color: '#8b5cf6', letterSpacing: 1 },
+    aiSummary: { fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 18, fontStyle: 'italic' },
 });
 
 export default PortfolioScreen;

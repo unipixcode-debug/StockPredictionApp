@@ -24,9 +24,25 @@ const Market360Screen = () => {
                 let hData = await heatmapRes.json();
                 let iData = await insightsRes.json();
                 
+                // Flatten hierarchical data if necessary
+                let flatData = [];
                 if (Array.isArray(hData)) {
-                    setHeatmapData(hData);
+                    if (hData.length > 0 && hData[0].children) {
+                        hData.forEach((sector: any) => {
+                            (sector.children || []).forEach((stock: any) => {
+                                flatData.push({
+                                    symbol: stock.symbol || stock.name,
+                                    sector: sector.name,
+                                    change: parseFloat(stock.change || stock.value || 0)
+                                });
+                            });
+                        });
+                    } else {
+                        flatData = hData;
+                    }
                 }
+                
+                setHeatmapData(flatData);
                 if (Array.isArray(iData)) {
                     setInsights(iData);
                 }

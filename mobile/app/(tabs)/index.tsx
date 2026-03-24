@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, StyleSheet, Modal, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Activity, TrendingUp, TrendingDown, Clock, Search, ChevronRight, BrainCircuit, Trash2, Play, RefreshCw, X, LogOut, Globe, BarChart3 } from 'lucide-react-native';
+import { Activity, TrendingUp, TrendingDown, Clock, Search, ChevronRight, BrainCircuit, Trash2, Play, RefreshCw, X, LogOut, Globe, BarChart3, Zap, Bot } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Config } from '@/constants/Config';
 import { TextInput } from 'react-native';
@@ -23,6 +23,7 @@ interface Prediction {
 
 const DashboardScreen = () => {
     const [predictions, setPredictions] = useState<any[]>([]);
+    const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
@@ -31,14 +32,8 @@ const DashboardScreen = () => {
     const [filter, setFilter] = useState('HEPSİ');
     const [showDisclaimer, setShowDisclaimer] = useState(!disclaimerShown);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [liveSuggestions, setLiveSuggestions] = useState<any[]>([]);
     const router = useRouter();
-
-    const symbolSuggestions = [
-        { name: 'BTC-USD', market: 'Crypto' }, { name: 'ETH-USD', market: 'Crypto' }, { name: 'SOL-USD', market: 'Crypto' }, { name: 'XRPUSD', market: 'Crypto' },
-        { name: 'AAPL', market: 'US Stock' }, { name: 'NVDA', market: 'US Stock' }, { name: 'TSLA', market: 'US Stock' }, { name: 'MSFT', market: 'US Stock' },
-        { name: 'THYAO.IS', market: 'BIST' }, { name: 'ASELS.IS', market: 'BIST' }, { name: 'EREGL.IS', market: 'BIST' }, { name: 'KCHOL.IS', market: 'BIST' },
-        { name: 'XAUUSD', market: 'Commodity' }, { name: 'GC=F', market: 'Commodity' }, { name: 'SI=F', market: 'Commodity' }, { name: 'BRENT', market: 'Commodity' }, { name: 'EURUSD', market: 'FX' }
-    ];
 
     const acceptDisclaimer = () => {
         disclaimerShown = true;
@@ -51,9 +46,16 @@ const DashboardScreen = () => {
 
     const fetchData = async () => {
         try {
-            const response = await fetch(API_BASE);
-            const data = await response.json();
-            setPredictions(Array.isArray(data) ? data : []);
+            const [predsRes, statsRes] = await Promise.all([
+                fetch(API_BASE),
+                fetch(`${Config.API_BASE}${Config.ENDPOINTS.MARKET_STATS}`)
+            ]);
+            
+            const predsData = await predsRes.json();
+            const statsData = await statsRes.json();
+            
+            setPredictions(Array.isArray(predsData) ? predsData : []);
+            setStats(statsData);
         } catch (error) {
             console.error('Fetch error:', error);
             // Fallback mock predictions if API fails
@@ -67,17 +69,37 @@ const DashboardScreen = () => {
         }
     };
 
-    const handleAnalyze = async () => {
-        if (!searchSymbol.trim()) return;
+    const handleSearch = async (text: string) => {
+        setSearchSymbol(text);
+        if (text.length > 1) {
+            try {
+                const res = await fetch(`${Config.API_BASE}/market/search?q=${text}`);
+                const data = await res.json();
+                setLiveSuggestions(data || []);
+                setShowSuggestions(true);
+            } catch (e) {
+                console.error(e);
+            }
+        } else {
+            setLiveSuggestions([]);
+            setShowSuggestions(false);
+        }
+    };
+
+    const handleAnalyze = async (symbolToAnalyze?: string) => {
+        const symbol = (symbolToAnalyze || searchSymbol).toUpperCase().trim();
+        if (!symbol) return;
+        
         setLoadingAnalysis(true);
         setShowNotification(true);
+        setShowSuggestions(false);
         setTimeout(() => setShowNotification(false), 5000);
 
         try {
             const response = await fetch(`${Config.API_BASE}/predictions/analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbol: searchSymbol.toUpperCase().trim() })
+                body: JSON.stringify({ symbol })
             });
             const result = await response.json();
             if (result.id) {
@@ -116,6 +138,8 @@ const DashboardScreen = () => {
             </View>
         );
     }
+
+    const fmtChange = (v: any) => v != null ? `${v >= 0 ? '+' : ''}${parseFloat(v).toFixed(2)}%` : '–';
 
     return (
         <View style={styles.container}>
@@ -175,10 +199,7 @@ const DashboardScreen = () => {
                                 placeholder="Sembol ör: XRPUSD, BTC-USD"
                                 placeholderTextColor="rgba(255,255,255,0.3)"
                                 value={searchSymbol}
-                                onChangeText={(val) => {
-                                    setSearchSymbol(val);
-                                    setShowSuggestions(val.length > 0);
-                                }}
+                                onChangeText={handleSearch}
                                 onFocus={() => {
                                     if (searchSymbol.length > 0) setShowSuggestions(true);
                                 }}
@@ -192,7 +213,7 @@ const DashboardScreen = () => {
                             )}
                         </View>
                         <TouchableOpacity 
-                            onPress={handleAnalyze} 
+                            onPress={() => handleAnalyze()} 
                             disabled={loadingAnalysis || !searchSymbol.trim()}
                             style={[styles.analyzeButton, (loadingAnalysis || !searchSymbol.trim()) && { opacity: 0.5 }]}
                         >
@@ -204,23 +225,39 @@ const DashboardScreen = () => {
                         </TouchableOpacity>
                     </View>
 
+                    {/* Quick Actions */}
+                    <View style={styles.quickActionsRow}>
+                        <QuickAction 
+                            icon={<Zap size={20} color="#22d3ee" />} 
+                            title="Tarayıcı" 
+                            color="rgba(34,211,238,0.1)" 
+                            onPress={() => router.push('/aiscanner' as any)} 
+                        />
+                        <QuickAction 
+                            icon={<Bot size={20} color="#8b5cf6" />} 
+                            title="AI Chat" 
+                            color="rgba(139,92,246,0.1)" 
+                            onPress={() => router.push('/(tabs)/chatbot' as any)} 
+                        />
+                    </View>
+
                     {/* Symbol Suggestions Dropdown */}
                     {showSuggestions && (
                         <View style={styles.suggestionsContainer}>
-                            {symbolSuggestions
-                                .filter(s => s.name.toLowerCase().includes(searchSymbol.toLowerCase()))
+                            {liveSuggestions
                                 .slice(0, 6)
                                 .map((s) => (
                                     <TouchableOpacity 
-                                        key={s.name} 
+                                        key={s.symbol} 
                                         onPress={() => {
-                                            setSearchSymbol(s.name);
+                                            setSearchSymbol(s.symbol);
                                             setShowSuggestions(false);
+                                            handleAnalyze(s.symbol);
                                         }}
                                         style={styles.suggestionItem}
                                     >
-                                        <Text style={styles.suggestionName}>{s.name}</Text>
-                                        <Text style={styles.suggestionMarket}>{s.market}</Text>
+                                        <Text style={styles.suggestionName}>{s.symbol}</Text>
+                                        <Text style={styles.suggestionMarket}>{s.typeDisp || s.market}</Text>
                                     </TouchableOpacity>
                                 ))
                             }
@@ -229,9 +266,34 @@ const DashboardScreen = () => {
 
                     {/* Market Summary Cards */}
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsRow}>
-                        <MarketStatCard label="Global Sent." value="Pozitif" score={72} color="green" />
-                        <MarketStatCard label="Piyasa Korkusu" value="Düşük" score={15} color="cyan" />
-                        <MarketStatCard label="İşlem Hacmi" value="Yüksek" score={88} color="indigo" />
+                        <MarketStatCard 
+                            label="BTC Corr." 
+                            value={stats?.btcCorrelation?.label || '–'} 
+                            trend={stats?.btcCorrelation?.trend || '…'} 
+                            trendUp={(stats?.raw?.btc?.change ?? 0) >= 0}
+                            color="green" 
+                        />
+                        <MarketStatCard 
+                            label="VIX Korku" 
+                            value={stats?.vix?.price != null ? stats.vix.price.toFixed(1) : '–'} 
+                            trend={fmtChange(stats?.raw?.vix?.change)} 
+                            trendUp={(stats?.raw?.vix?.change ?? 0) >= 0}
+                            color="cyan" 
+                        />
+                        <MarketStatCard 
+                            label="DXY Değeri" 
+                            value={stats?.dxy?.price != null ? stats.dxy.price.toFixed(1) : '–'} 
+                            trend={fmtChange(stats?.raw?.dxy?.change)} 
+                            trendUp={(stats?.raw?.dxy?.change ?? 0) >= 0}
+                            color="indigo" 
+                        />
+                        <MarketStatCard 
+                            label="Duyarlılık" 
+                            value={stats?.sentiment?.label || '–'} 
+                            trend={stats?.sentiment?.trend || '…'} 
+                            trendUp={stats?.sentiment?.pressureScore != null && stats?.sentiment?.pressureScore < 50}
+                            color="green" 
+                        />
                     </ScrollView>
 
                     <View style={styles.sectionHeader}>
@@ -316,14 +378,26 @@ const DashboardScreen = () => {
     );
 };
 
-const MarketStatCard = ({ label, value, score, color }: { label: string, value: string, score: number, color: string }) => {
+const QuickAction = ({ icon, title, color, onPress }: { icon: any, title: string, color: string, onPress: () => void }) => (
+    <TouchableOpacity style={[styles.quickActionCard, { backgroundColor: color }]} onPress={onPress}>
+        <View style={styles.quickActionIcon}>{icon}</View>
+        <Text style={styles.quickActionTitle}>{title}</Text>
+    </TouchableOpacity>
+);
+
+const MarketStatCard = ({ label, value, trend, trendUp, color }: { label: string, value: string, trend: string, trendUp: boolean, color: string }) => {
     const barColor = color === 'green' ? '#4ade80' : color === 'cyan' ? '#22d3ee' : '#6366f1';
     return (
         <View style={styles.statCard}>
-            <Text style={styles.statLabel}>{label}</Text>
+            <View style={styles.statHeader}>
+                <Text style={styles.statLabel}>{label}</Text>
+                <View style={[styles.trendBadgeMini, { backgroundColor: trendUp ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)' }]}>
+                    <Text style={[styles.trendTextMini, { color: trendUp ? '#4ade80' : '#f87171' }]}>{trend}</Text>
+                </View>
+            </View>
             <Text style={styles.statValue}>{value}</Text>
             <View style={styles.statBarBg}>
-                <View style={[styles.statBarFill, { width: `${score}%`, backgroundColor: barColor }]} />
+                <View style={[styles.statBarFill, { width: '100%', backgroundColor: barColor, opacity: 0.3 }]} />
             </View>
         </View>
     );
@@ -341,10 +415,13 @@ const styles = StyleSheet.create({
     headerActions: { flexDirection: 'row', alignItems: 'center' },
     iconButton: { padding: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 99 },
     statsRow: { marginBottom: 32 },
-    statCard: { width: 140, padding: 20, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginRight: 16 },
-    statLabel: { fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
-    statValue: { fontSize: 16, fontWeight: '800', color: 'white', marginBottom: 12 },
-    statBarBg: { height: 4, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 },
+    statCard: { width: 150, padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginRight: 16 },
+    statHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    statLabel: { fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: '700', textTransform: 'uppercase' },
+    trendBadgeMini: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+    trendTextMini: { fontSize: 8, fontWeight: '900' },
+    statValue: { fontSize: 20, fontWeight: '900', color: 'white', marginBottom: 12, fontStyle: 'italic' },
+    statBarBg: { height: 3, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 },
     statBarFill: { height: '100%', borderRadius: 2 },
     sectionHeader: { flexDirection: 'column', alignItems: 'flex-start', marginBottom: 20 },
     sectionTitle: { fontSize: 20, fontWeight: '900', color: 'white', marginBottom: 12, textTransform: 'uppercase', fontStyle: 'italic' },
@@ -392,6 +469,11 @@ const styles = StyleSheet.create({
     disclaimerText: { fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 22 },
     disclaimerButton: { backgroundColor: '#22d3ee', padding: 18, borderRadius: 20, marginTop: 20, alignItems: 'center' },
     disclaimerButtonText: { color: '#0f172a', fontWeight: '900', fontSize: 14 },
+    // Quick Actions
+    quickActionsRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+    quickActionCard: { flex: 1, height: 80, borderRadius: 24, padding: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+    quickActionIcon: { marginBottom: 4 },
+    quickActionTitle: { fontSize: 10, fontWeight: '900', color: 'white', textTransform: 'uppercase', letterSpacing: 0.5 },
 });
 
 export default DashboardScreen;

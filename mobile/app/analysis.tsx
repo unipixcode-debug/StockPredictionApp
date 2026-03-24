@@ -1,156 +1,314 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+    View, Text, ScrollView, TouchableOpacity, StyleSheet,
+    ActivityIndicator, Dimensions, RefreshControl, Alert,
+    Linking
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Activity, ShieldCheck, Zap, ArrowLeft, BarChart3, ChevronRight } from 'lucide-react-native';
+import {
+    TrendingUp, TrendingDown, Activity, BarChart3, Globe,
+    Bitcoin, RefreshCw, Zap, ArrowLeft, ShieldCheck,
+    AlertTriangle, LineChart, Cpu, DollarSign, Flame,
+    ArrowUpRight, ChevronRight
+} from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 import { useRouter } from 'expo-router';
+import { useAuth } from './_layout';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const AnalysisScreen = () => {
-    const [insights, setInsights] = useState<any[]>([]);
+    const { user } = useAuth(); // Assume it returns toggling info as well or we fetch it
+    const [predictions, setPredictions] = useState<any[]>([]);
+    const [stats, setStats] = useState<any>(null);
+    const [tradeIdeas, setTradeIdeas] = useState<any[]>([]);
+    const [marketAnalysis, setMarketAnalysis] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const router = useRouter();
 
-    useEffect(() => {
-        const fetchInsights = async () => {
-            setLoading(true);
-            try {
-                const res = await fetch(`${Config.API_BASE}/market/insights`);
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    setInsights(data);
-                }
-            } catch (error) {
-                console.error('Analysis fetch error:', error);
-            } finally {
-                setLoading(false);
+    const fetchAll = async () => {
+        setLoading(true);
+        try {
+            const [predsRes, statsRes, ideasRes, analysisRes] = await Promise.allSettled([
+                fetch(`${Config.API_BASE}${Config.ENDPOINTS.PREDICTIONS}`),
+                fetch(`${Config.API_BASE}${Config.ENDPOINTS.MARKET_STATS}`),
+                fetch(`${Config.API_BASE}${Config.ENDPOINTS.MARKET_IDEAS}`),
+                fetch(`${Config.API_BASE}${Config.ENDPOINTS.MARKET_ANALYSIS}`)
+            ]);
+
+            if (predsRes.status === 'fulfilled') {
+                const data = await predsRes.value.json();
+                setPredictions(Array.isArray(data) ? data : []);
             }
-        };
-
-        fetchInsights();
-    }, []);
-
-    const renderInsight = (insight: any, i: number) => {
-        const isTradeIdea = insight.type === 'TRADE_IDEA';
-        const badgeColor = isTradeIdea ? styles.badgeGreen : styles.badgeBlue;
-        const textColor = isTradeIdea ? styles.textGreen : styles.textBlue;
-        const icon = isTradeIdea ? <Zap size={14} color="#4ade80" /> : <Activity size={14} color="#60a5fa" />;
-
-        return (
-            <View key={i} style={styles.insightCard}>
-                <View style={styles.insightHeader}>
-                    <View style={styles.insightHeaderLeft}>
-                        <View style={[styles.typeBadge, badgeColor]}>
-                            {icon}
-                            <Text style={[styles.typeText, textColor]}>{insight.type}</Text>
-                        </View>
-                        <Text style={styles.timeText}>
-                            {new Date(insight.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                    </View>
-                    <View style={styles.sourceBadge}>
-                        <ShieldCheck size={12} color="#22d3ee" />
-                        <Text style={styles.sourceText}>{insight.source} AI</Text>
-                    </View>
-                </View>
-
-                <Text style={styles.titleText}>{insight.title}</Text>
-
-                <View style={styles.insightFooter}>
-                    <TouchableOpacity style={styles.readMoreBtn}>
-                        <Text style={styles.readMoreText}>Detayları Görüntüle</Text>
-                        <ChevronRight size={14} color="#22d3ee" />
-                    </TouchableOpacity>
-                </View>
-            </View>
-        );
+            if (statsRes.status === 'fulfilled') {
+                const data = await statsRes.value.json();
+                setStats(data);
+            }
+            if (ideasRes.status === 'fulfilled') {
+                const data = await ideasRes.value.json();
+                setTradeIdeas(Array.isArray(data) ? data : []);
+            }
+            if (analysisRes.status === 'fulfilled') {
+                const data = await analysisRes.value.json();
+                setMarketAnalysis(Array.isArray(data) ? data : []);
+            }
+        } catch (error) {
+            console.error('Analysis fetch error:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     };
 
-    if (loading) {
+    useEffect(() => {
+        fetchAll();
+    }, []);
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchAll();
+    };
+
+    const getAIRec = () => {
+        if (!stats) return null;
+        const { vix, dxy } = stats.raw || {};
+        const vixPrice = vix?.price ?? 18;
+        const dxyChange = dxy?.change ?? 0;
+        if (dxyChange > 0 && vixPrice > 20) return { title: 'Güvenli Liman', color: '#f59e0b', icon: <ShieldCheck size={24} color="#f59e0b" />, text: 'Altın ve kısa vadeli tahvil önceliklendir.' };
+        if (dxyChange < 0 && vixPrice < 20) return { title: 'Agresif Risk Alımı', color: '#4ade80', icon: <Flame size={24} color="#4ade80" />, text: 'BTC ve Nasdaq\'ta pozisyon arttır.' };
+        if (dxyChange > 0) return { title: 'Defansif', color: '#22d3ee', icon: <ShieldCheck size={24} color="#22d3ee" />, text: 'Nakit ve sabit getiri odaklı kal.' };
+        return { title: 'Seçici Büyüme', color: '#a78bfa', icon: <LineChart size={24} color="#a78bfa" />, text: 'Majör hisseler ve küçük kripto ekleme dengeli.' };
+    };
+
+    const rec = getAIRec();
+
+    const fmtChange = (v: any) => v != null ? `${v >= 0 ? '+' : ''}${parseFloat(v).toFixed(2)}%` : '–';
+    const fmtPrice = (v: any) => v != null ? parseFloat(v).toFixed(2) : '–';
+
+    if (loading && !refreshing) {
         return (
-            <View style={styles.loadingContainer}>
+            <View style={s.loadingContainer}>
                 <ActivityIndicator size="large" color="#22d3ee" />
+                <Text style={s.loadingText}>PİYASA ANALİZ EDİLİYOR...</Text>
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
-            <SafeAreaView style={styles.safeArea}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <View style={s.container}>
+            <SafeAreaView style={s.safeArea} edges={['top']}>
+                <View style={s.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
                         <ArrowLeft size={24} color="white" />
                     </TouchableOpacity>
-                    <View style={styles.headerTitleContainer}>
-                        <Text style={styles.headerSubtitle}>Tüm Raporlar</Text>
-                        <Text style={styles.headerTitle}>Genel Analiz</Text>
+                    <View style={s.headerTitleContainer}>
+                        <Text style={s.headerTitle}>PİYASA ANALİZİ</Text>
+                        <Text style={s.headerSubtitle}>Gerçek Zamanlı AI Verileri</Text>
                     </View>
-                    <View style={styles.iconWrap}>
-                        <BarChart3 size={24} color="#22d3ee" />
-                    </View>
+                    <TouchableOpacity onPress={onRefresh} style={s.refreshBtn}>
+                        <RefreshCw size={20} color="#22d3ee" className={refreshing ? 'animate-spin' : ''} />
+                    </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                    <View style={styles.listHeader}>
-                        <Text style={styles.listTitle}>Son AI Sinyalleri</Text>
-                        <Text style={styles.listSubtitle}>{insights.length} aktif analiz</Text>
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={s.scrollContent}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22d3ee" />}
+                >
+                    {/* Indicators Grid */}
+                    <View style={s.grid}>
+                        <IndicatorCard
+                            label="VIX KORKU"
+                            value={fmtPrice(stats?.raw?.vix?.price)}
+                            change={fmtChange(stats?.raw?.vix?.change)}
+                            up={(stats?.raw?.vix?.change ?? 0) >= 0}
+                            icon={<Activity size={20} color="#22d3ee" />}
+                        />
+                        <IndicatorCard
+                            label="DXY DOLAR"
+                            value={fmtPrice(stats?.raw?.dxy?.price)}
+                            change={fmtChange(stats?.raw?.dxy?.change)}
+                            up={(stats?.raw?.dxy?.change ?? 0) >= 0}
+                            icon={<Globe size={20} color="#60a5fa" />}
+                        />
+                        <IndicatorCard
+                            label="BITCOIN"
+                            value={stats?.raw?.btc?.price != null ? `$${stats.raw.btc.price.toLocaleString()}` : '–'}
+                            change={fmtChange(stats?.raw?.btc?.change)}
+                            up={(stats?.raw?.btc?.change ?? 0) >= 0}
+                            icon={<Bitcoin size={20} color="#f59e0b" />}
+                        />
+                        <IndicatorCard
+                            label="S&P 500"
+                            value={fmtPrice(stats?.raw?.sp500?.price)}
+                            change={fmtChange(stats?.raw?.sp500?.change)}
+                            up={(stats?.raw?.sp500?.change ?? 0) >= 0}
+                            icon={<BarChart3 size={20} color="#34d399" />}
+                        />
                     </View>
 
-                    {insights.length > 0 ? (
-                        <View style={styles.listContainer}>
-                            {insights.map((insight, i) => renderInsight(insight, i))}
-                        </View>
-                    ) : (
-                        <View style={styles.emptyState}>
-                            <Activity size={48} color="rgba(255,255,255,0.1)" />
-                            <Text style={styles.emptyTitle}>Yeni Sinyal Yok</Text>
-                            <Text style={styles.emptyDesc}>AI modelleri piyasayı analiz etmeye devam ediyor. Önemli bir hareketliliktesinyaller buraya düşecektir.</Text>
-                        </View>
+                    {/* AI Recommendation */}
+                    {rec && (
+                        <Animated.View entering={FadeInDown.delay(100)} style={s.recCard}>
+                            <View style={s.recHeader}>
+                                <View style={[s.recIconWrap, { backgroundColor: `${rec.color}20`, borderColor: `${rec.color}40` }]}>
+                                    {rec.icon}
+                                </View>
+                                <View style={s.recTitleWrap}>
+                                    <Text style={s.recLabel}>AI STRATEJİSİ</Text>
+                                    <Text style={s.recTitle}>{rec.title}</Text>
+                                </View>
+                                <View style={[s.recBadge, { backgroundColor: `${rec.color}15`, borderColor: `${rec.color}40` }]}>
+                                    <Text style={[s.recBadgeText, { color: rec.color }]}>{stats?.sentiment?.trend || 'STABİL'}</Text>
+                                </View>
+                            </View>
+                            <Text style={s.recText}>"{rec.text}"</Text>
+                        </Animated.View>
                     )}
+
+                    {/* Trade Ideas */}
+                    <View style={s.sectionHeader}>
+                        <Cpu size={18} color="#f59e0b" />
+                        <Text style={s.sectionTitle}>AI TRADE IDEAS</Text>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.ideasScroll}>
+                        {tradeIdeas.length > 0 ? tradeIdeas.map((idea, i) => (
+                            <TradeIdeaCard key={i} data={idea} />
+                        )) : (
+                            <View style={s.emptyBox}>
+                                <Text style={s.emptyText}>Henüz fikir üretilmedi.</Text>
+                            </View>
+                        )}
+                    </ScrollView>
+
+                    {/* Market Analysis / News */}
+                    <View style={s.sectionHeader}>
+                        <Globe size={18} color="#60a5fa" />
+                        <Text style={s.sectionTitle}>KÜRESEL ANALİZLER</Text>
+                    </View>
+                    <View style={s.analysisList}>
+                        {marketAnalysis.map((item, i) => (
+                            <TouchableOpacity
+                                key={i}
+                                style={s.analysisCard}
+                                onPress={() => item.link && Linking.openURL(item.link)}
+                            >
+                                <View style={s.analysisTop}>
+                                    <Text style={s.analysisSource}>{item.source}</Text>
+                                    <ArrowUpRight size={14} color="#60a5fa" />
+                                </View>
+                                <Text style={{ color: 'white', fontSize: 16, fontWeight: '700', marginBottom: 12 }}>{item.title}</Text>
+                                <View style={s.analysisBottom}>
+                                    <Text style={s.analysisAuthor}>By {item.author}</Text>
+                                    <View style={s.analysisTag}>
+                                        <Text style={s.analysisTagText}>RAPOR</Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    <View style={{ height: 40 }} />
                 </ScrollView>
             </SafeAreaView>
         </View>
     );
 };
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#0f172a' },
-    loadingContainer: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center' },
-    safeArea: { flex: 1 },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-    backBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-    headerTitleContainer: { flex: 1 },
-    headerSubtitle: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1 },
-    headerTitle: { fontSize: 24, fontWeight: '900', color: 'white', letterSpacing: -0.5 },
-    iconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(34,211,238,0.1)', alignItems: 'center', justifyContent: 'center' },
-    
-    scrollContent: { padding: 20, paddingBottom: 40 },
-    listHeader: { marginBottom: 20 },
-    listTitle: { fontSize: 18, fontWeight: '900', color: 'white', marginBottom: 4 },
-    listSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '600' },
-    
-    listContainer: { gap: 16 },
-    insightCard: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-    insightHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    insightHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    typeBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, gap: 4 },
-    badgeGreen: { backgroundColor: 'rgba(74, 222, 128, 0.1)' },
-    badgeBlue: { backgroundColor: 'rgba(59, 130, 246, 0.1)' },
-    typeText: { fontSize: 10, fontWeight: '900', textTransform: 'uppercase' },
-    textGreen: { color: '#4ade80' },
-    textBlue: { color: '#60a5fa' },
-    timeText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
-    sourceBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(34,211,238,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    sourceText: { fontSize: 10, fontWeight: '900', color: '#22d3ee', textTransform: 'uppercase' },
-    
-    titleText: { fontSize: 16, fontWeight: '700', color: 'white', lineHeight: 24, marginBottom: 16 },
-    
-    insightFooter: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
-    readMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    readMoreText: { fontSize: 12, fontWeight: '800', color: '#22d3ee', textTransform: 'uppercase' },
+const IndicatorCard = ({ label, value, change, up, icon }: any) => (
+    <View style={s.indicatorCard}>
+        <View style={s.indicatorTop}>
+            <View style={s.indicatorIcon}>{icon}</View>
+            <View style={[s.trendBadge, { backgroundColor: up ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)' }]}>
+                <Text style={[s.trendText, { color: up ? '#34d399' : '#f87171' }]}>{change}</Text>
+            </View>
+        </View>
+        <Text style={s.indicatorLabel}>{label}</Text>
+        <Text style={s.indicatorValue}>{value}</Text>
+    </View>
+);
 
-    emptyState: { padding: 40, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-    emptyTitle: { fontSize: 18, fontWeight: '900', color: 'white', marginTop: 16, marginBottom: 8 },
-    emptyDesc: { fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 20 }
+const TradeIdeaCard = ({ data }: any) => {
+    const isBull = data.sentiment !== 'Bearish';
+    return (
+        <View style={s.ideaCard}>
+            <View style={s.ideaHead}>
+                <Text style={s.ideaSymbol}>{data.symbol}</Text>
+                <View style={[s.ideaBadge, { backgroundColor: isBull ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)' }]}>
+                    <Text style={[s.ideaBadgeText, { color: isBull ? '#34d399' : '#f87171' }]}>{isBull ? 'AL' : 'SAT'}</Text>
+                </View>
+            </View>
+            <Text style={s.ideaReturn}>{data.return >= 0 ? '+' : ''}{data.return}% Beklenti</Text>
+            <View style={s.ideaPrices}>
+                <View>
+                    <Text style={s.priceLabel}>GİRİŞ</Text>
+                    <Text style={s.priceVal}>${data.entry}</Text>
+                </View>
+                <View>
+                    <Text style={s.priceLabel}>HEDEF</Text>
+                    <Text style={s.priceVal}>${data.exitPrice}</Text>
+                </View>
+            </View>
+        </View>
+    );
+};
+
+const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#060d1a' },
+    loadingContainer: { flex: 1, backgroundColor: '#060d1a', justifyContent: 'center', alignItems: 'center' },
+    loadingText: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900', marginTop: 16, letterSpacing: 2 },
+    safeArea: { flex: 1 },
+    header: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+    backBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+    headerTitleContainer: { flex: 1 },
+    headerTitle: { fontSize: 24, fontWeight: '900', color: 'white', letterSpacing: -1, fontStyle: 'italic' },
+    headerSubtitle: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' },
+    refreshBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(34,211,238,0.1)', alignItems: 'center', justifyContent: 'center' },
+
+    scrollContent: { padding: 20 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
+    indicatorCard: { width: '48%', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 24, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+    indicatorTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    indicatorIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' },
+    trendBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+    trendText: { fontSize: 10, fontWeight: '900' },
+    indicatorLabel: { fontSize: 9, fontWeight: '800', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' },
+    indicatorValue: { fontSize: 18, fontWeight: '900', color: 'white', marginTop: 2 },
+
+    recCard: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 28, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', marginBottom: 32 },
+    recHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+    recIconWrap: { width: 48, height: 48, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+    recTitleWrap: { flex: 1 },
+    recLabel: { fontSize: 8, fontWeight: '900', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 2 },
+    recTitle: { fontSize: 20, fontWeight: '900', color: 'white', fontStyle: 'italic' },
+    recBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
+    recBadgeText: { fontSize: 9, fontWeight: '900' },
+    recText: { fontSize: 14, color: 'rgba(255,255,255,0.5)', lineHeight: 22, fontStyle: 'italic' },
+
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+    sectionTitle: { fontSize: 14, fontWeight: '900', color: 'white', opacity: 0.3, letterSpacing: 2 },
+    ideasScroll: { marginBottom: 32, marginHorizontal: -20, paddingHorizontal: 20 },
+    ideaCard: { width: 180, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 24, padding: 16, borderLeftWidth: 3, borderLeftColor: '#f59e0b', marginRight: 16 },
+    ideaHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    ideaSymbol: { fontSize: 16, fontWeight: '900', color: 'white' },
+    ideaBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+    ideaBadgeText: { fontSize: 10, fontWeight: '900' },
+    ideaReturn: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.5)', marginBottom: 12 },
+    ideaPrices: { flexDirection: 'row', justifyContent: 'space-between' },
+    priceLabel: { fontSize: 8, fontWeight: '800', color: 'rgba(255,255,255,0.3)' },
+    priceVal: { fontSize: 11, fontWeight: '700', color: 'white' },
+
+    analysisList: { gap: 16 },
+    analysisCard: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+    analysisTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+    analysisSource: { fontSize: 10, fontWeight: '900', color: '#60a5fa', textTransform: 'uppercase' },
+    analysisBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    analysisAuthor: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)' },
+    analysisTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    analysisTagText: { fontSize: 8, fontWeight: '900', color: 'rgba(255,255,255,0.3)' },
+
+    emptyBox: { width: 200, padding: 20, alignItems: 'center' },
+    emptyText: { color: 'rgba(255,255,255,0.2)', fontSize: 12, fontStyle: 'italic' }
 });
 
 export default AnalysisScreen;
