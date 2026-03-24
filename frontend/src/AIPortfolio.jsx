@@ -40,11 +40,16 @@ const AIPortfolio = () => {
       const res = await api.get(`/ai-portfolio/${id}/history`);
       if (res.history) {
         setHistoryData(res.history);
+        console.log("History Data Received:", res.history[0]); // Debug first point
       }
     } catch (e) {
       console.error(e);
     }
   };
+
+  useEffect(() => {
+    console.log("Selected Assets Changed:", selectedAssets);
+  }, [selectedAssets]);
 
   const handleGenerate = async () => {
     setGenerating(true);

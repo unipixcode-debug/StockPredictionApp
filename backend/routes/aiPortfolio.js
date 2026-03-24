@@ -206,6 +206,10 @@ router.get('/:id/history', async (req, res) => {
             historyData[date].totalValue = sum || 100;
         }
 
+        if (Object.values(historyData).length > 0) {
+            console.log(`[History Debug] First point for ${req.params.id}:`, Object.values(historyData)[0]);
+        }
+
         res.json({
             portfolio: port,
             history: Object.values(historyData)
