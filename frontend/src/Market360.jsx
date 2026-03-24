@@ -28,7 +28,26 @@ const Market360 = () => {
                 api.get('/market/heatmap'),
                 api.get('/market/insights')
             ]);
-            setHeatmapData(heatmapRes);
+            
+            // Auto-flatten hierarchical data to restore grid view
+            let flatData = [];
+            if (Array.isArray(heatmapRes)) {
+                if (heatmapRes.length > 0 && heatmapRes[0].children) {
+                    heatmapRes.forEach(sector => {
+                        (sector.children || []).forEach(stock => {
+                            flatData.push({
+                                symbol: stock.symbol || stock.name,
+                                sector: sector.name,
+                                change: parseFloat(stock.change || stock.value || 0)
+                            });
+                        });
+                    });
+                } else {
+                    flatData = heatmapRes;
+                }
+            }
+
+            setHeatmapData(flatData);
             setInsights(insightsRes || []);
         } catch (error) {
             console.error('Market 360 fetch error:', error);
