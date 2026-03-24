@@ -24,7 +24,15 @@ const AIPortfolio = () => {
       const res = await api.get('/ai-portfolio');
       setPortfolios(res);
       if (res.length > 0) {
-        const active = res[0]; // newest is active
+        let active = res[0]; // newest is active
+        try {
+          if (typeof active.assets === 'string') {
+            active.assets = JSON.parse(active.assets);
+          }
+        } catch (e) {
+          console.error("Asset parse error:", e);
+          active.assets = [];
+        }
         setActivePortfolio(active);
         fetchHistory(active.id);
       }
@@ -77,9 +85,26 @@ const AIPortfolio = () => {
 
   const toggleAsset = (symbol) => {
     setSelectedAssets(prev => {
+      // 1. If 'TOTAL' is clicked
+      if (symbol === 'TOTAL') {
+        if (prev.includes('TOTAL')) {
+          if (prev.length === 1) return prev; // Keep at least one
+          return prev.filter(s => s !== 'TOTAL');
+        }
+        return ['TOTAL']; // Switch to ONLY TOTAL view
+      }
+
+      // 2. If 'ALL' (not a symbol, just a helper logic might be added next)
+      
+      // 3. If a specific asset is clicked
       if (prev.includes(symbol)) {
+        if (prev.length === 1) return prev; // Keep at least one
         return prev.filter(s => s !== symbol);
       } else {
+        // If only 'TOTAL' was selected, replace it with the specific asset for "Real Price Mode"
+        if (prev.length === 1 && prev[0] === 'TOTAL') {
+          return [symbol];
+        }
         return [...prev, symbol];
       }
     });
@@ -242,7 +267,7 @@ const AIPortfolio = () => {
                       
                       <div className="flex flex-wrap gap-2">
                          <button 
-                            onClick={() => setSelectedAssets(['TOTAL', ...activePortfolio.assets.map(a => a.symbol)])}
+                            onClick={() => setSelectedAssets(['TOTAL', ...(activePortfolio?.assets || []).map(a => a.symbol)])}
                             className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${(selectedAssets.length === activePortfolio.assets.length + 1) ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary/50 border-border text-muted-foreground hover:bg-secondary'}`}
                          >
                              {language === 'TR' ? 'Hepsi' : 'All'}
@@ -255,7 +280,7 @@ const AIPortfolio = () => {
                              {language === 'TR' ? 'Toplam' : 'Total'}
                          </button>
 
-                         {activePortfolio.assets.map((asset, i) => (
+                         {(activePortfolio?.assets || []).map((asset, i) => (
                              <button 
                                 key={asset.symbol}
                                 onClick={() => toggleAsset(asset.symbol)}
@@ -305,7 +330,7 @@ const AIPortfolio = () => {
                                 />
                                )}
  
-                               {activePortfolio.assets.map((asset, i) => {
+                               {(activePortfolio?.assets || []).map((asset, i) => {
                                    const isSingleSelected = selectedAssets.length === 1 && selectedAssets[0] === asset.symbol;
                                    const dataKey = isSingleSelected ? `${asset.symbol}_raw` : asset.symbol;
                                    
