@@ -112,6 +112,16 @@ class MarketDataService {
                     }
                 }
 
+                // Tier 3: Local Baseline (Last Resort Injection)
+                if (!success || indicators[key]?.price <= 0) {
+                    console.log(`📡 MarketDataService: Using Injected Baseline for ${key}...`);
+                    const baseline = this.loadInjectedBaseline(key);
+                    if (baseline) {
+                        indicators[key] = baseline;
+                        success = true;
+                    }
+                }
+
                 // Update persistent cache if success
                 if (success) {
                     this.lastIndicators[key] = indicators[key];
@@ -127,6 +137,21 @@ class MarketDataService {
             console.error('Global indicators fetch error:', e.message);
             this.isUpdating = false;
             return this.lastIndicators; 
+        }
+    }
+
+    loadInjectedBaseline(key) {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const dataPath = path.join(__dirname, '../fallback_indicators.json');
+            if (fs.existsSync(dataPath)) {
+                const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+                return data[key] || null;
+            }
+            return null;
+        } catch (e) {
+            return null;
         }
     }
 

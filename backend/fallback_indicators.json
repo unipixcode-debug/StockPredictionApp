@@ -1,0 +1,11 @@
+{
+  "vix": { "price": 13.56, "change": -1.24, "label": "Düzelme" },
+  "dxy": { "price": 104.22, "change": 0.15, "label": "Güçlü" },
+  "gold": { "price": 2341.2, "change": 0.45, "label": "Pozitif" },
+  "silver": { "price": 27.8, "change": 0.3, "label": "Pozitif" },
+  "sp500": { "price": 5200, "change": 0.2, "label": "Pozitif" },
+  "nasdaq": { "price": 16300, "change": 0.15, "label": "Pozitif" },
+  "usdtry": { "price": 32.42, "change": 0.1, "label": "Stabil" },
+  "eurusd": { "price": 1.082, "change": -0.05, "label": "Zayıf" },
+  "us10y": { "price": 4.35, "change": 0.02, "label": "Yatay" }
+}
