@@ -23,10 +23,26 @@ const NASDAQ_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
 const BIST_SYMBOLS = ['THYAO.IS', 'EREGL.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS', 'GARAN.IS', 'KCHOL.IS', 'SAHOL.IS', 'TUPRS.IS', 'BIMAS.IS', 'SISE.IS', 'YKBNK.IS', 'PGSUS.IS', 'ENKAI.IS', 'FROTO.IS'];
 
 class MarketDataService {
+    constructor() {
+        this.lastIndicators = {}; // Persistent cache for resilience
+        this.isUpdating = false;
+        
+        // Initial values for key indicators to avoid 0s on first load if fetch fails
+        this.lastIndicators = {
+            vix: { price: 15.0, change: 0, label: 'Orta' },
+            dxy: { price: 103.5, change: 0, label: 'Orta' },
+            gold: { price: 2350, change: 0 },
+            btc: { price: 65000, change: 0, marketCap: 1.2e12 }
+        };
+    }
+
     async getGlobalIndicators() {
+        if (this.isUpdating) return this.lastIndicators;
+        this.isUpdating = true;
+        
         try {
             const topCaps = { btc: 1.45e12, eth: 0.4e12, bnb: 0.08e12, sol: 0.08e12, xrp: 0.04e12, ada: 0.02e12, avax: 0.015e12, dot: 0.01e12, doge: 0.02e12, link: 0.01e12, trx: 0.01e12, shib: 0.01e12 };
-            const indicators = {};
+            const indicators = { ...this.lastIndicators }; // Start with last known values
 
             const yfSymbols = {
                 vix: '^VIX',
@@ -43,58 +59,16 @@ class MarketDataService {
                 usdtry: 'USDTRY=X'
             };
 
-            const entries = Object.entries(yfSymbols);
-            const results = await Promise.allSettled(entries.map(([key, sym]) => yahooFinance.quote(sym)));
-
-            for (let i = 0; i < entries.length; i++) {
-                const key = entries[i][0];
-                const res = results[i];
-                if (res.status === 'fulfilled' && res.value) {
-                    indicators[key] = {
-                        price: res.value.regularMarketPrice || res.value.price || 0,
-                        change: res.value.regularMarketChangePercent || res.value.priceChangePercent || 0
-                    };
-                } else {
-                    console.error(`❌ MarketDataService: Failed to fetch ${key} (^${yfSymbols[key]}):`, res.reason?.message);
-                    indicators[key] = { price: 0, change: 0 };
-                }
-            }
-
-            // BTC specific fallback from Yahoo if Binance fails later
-            let btcFallback = null;
-            try { btcFallback = await yahooFinance.quote('BTC-USD'); } catch(e){}
-
-            // Try Binance for BTC
-            try {
-                const ticker = await binanceClient.dailyStats({ symbol: 'BTCUSDT' });
-                indicators['btc'] = { 
-                    price: parseFloat(ticker.lastPrice), 
-                    change: parseFloat(ticker.priceChangePercent),
-                    marketCap: topCaps['btc']
-                };
-            } catch (be) {
-                if (btcFallback) {
-                    indicators['btc'] = {
-                        price: btcFallback.regularMarketPrice || 0,
-                        change: btcFallback.regularMarketChangePercent || 0,
-                        marketCap: topCaps['btc']
-                    };
-                } else {
-                    indicators['btc'] = { price: 0, change: 0, marketCap: topCaps['btc'] };
-                }
-            }
-
-            // Enhanced Crypto Data from Binance (Top 100 by Volume)
+            // 1. Fetch Crypto from Binance (High Reliability)
             try {
                 const allStats = await binanceClient.dailyStats();
                 const usdtPairs = allStats
                     .filter(t => t.symbol.endsWith('USDT'))
                     .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-                    .slice(0, 100);
+                    .slice(0, 150);
 
                 usdtPairs.forEach((t, index) => {
                     const key = t.symbol.replace('USDT', '').toLowerCase();
-                    // Update or add: always prefer Binance data for crypto
                     const estimatedCap = topCaps[key] || (0.01e12 / (1 + (index / 10)));
                     indicators[key] = {
                         price: parseFloat(t.lastPrice),
@@ -102,10 +76,82 @@ class MarketDataService {
                         marketCap: estimatedCap
                     };
                 });
-            } catch (ce) { console.error('Binance Top 100 fetch failed:', ce.message); }
+                // Ensure 'btc' is specifically mapped if it was named 'btcusdt' internally
+                if (indicators['btc']) this.lastIndicators['btc'] = indicators['btc'];
+            } catch (ce) { 
+                console.error('⚠️ Binance fetch failed, using last known crypto data:', ce.message); 
+            }
 
+            // 2. Fetch Macro from Yahoo Finance (Tiered Fallback)
+            const entries = Object.entries(yfSymbols);
+            const yfResults = await Promise.allSettled(entries.map(([key, sym]) => yahooFinance.quote(sym)));
+
+            for (let i = 0; i < entries.length; i++) {
+                const key = entries[i][0];
+                const res = yfResults[i];
+                
+                let success = false;
+                if (res.status === 'fulfilled' && res.value && (res.value.regularMarketPrice || res.value.price)) {
+                    indicators[key] = {
+                        price: res.value.regularMarketPrice || res.value.price,
+                        change: res.value.regularMarketChangePercent || res.value.priceChangePercent || 0
+                    };
+                    success = true;
+                }
+
+                // Tier 2: Yahoo Scraper Fallback if API fails or returns 0/null
+                if (!success || indicators[key].price === 0) {
+                    console.log(`🔍 Try scraping for ${key}...`);
+                    const scraped = await this.scrapeYahooFinance(yfSymbols[key]);
+                    if (scraped && scraped.price > 0) {
+                        indicators[key] = scraped;
+                        success = true;
+                    }
+                }
+
+                // Update persistent cache if success
+                if (success) {
+                    this.lastIndicators[key] = indicators[key];
+                } else {
+                    console.warn(`⚠️ All sources failed for ${key}, using last good value.`);
+                    indicators[key] = this.lastIndicators[key] || { price: 0, change: 0 };
+                }
+            }
+
+            this.isUpdating = false;
             return indicators;
-        } catch (e) { return {}; }
+        } catch (e) { 
+            console.error('Global indicators fetch error:', e.message);
+            this.isUpdating = false;
+            return this.lastIndicators; 
+        }
+    }
+
+    async scrapeYahooFinance(symbol) {
+        try {
+            const url = `https://finance.yahoo.com/quote/${symbol}`;
+            const { data } = await axios.get(url, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
+                timeout: 5000
+            });
+            const $ = cheerio.load(data);
+            
+            // Modern Yahoo Finance selectors
+            const priceText = $('fin-streamer[data-field="regularMarketPrice"]').first().attr('value') || 
+                             $('fin-streamer[data-test="qsp-price"]').first().text();
+            
+            const changeText = $('fin-streamer[data-field="regularMarketChangePercent"]').first().attr('value') || 
+                              $('fin-streamer[data-test="qsp-price-change-percent"]').first().text();
+            
+            if (!priceText) return null;
+            
+            return {
+                price: parseFloat(priceText.toString().replace(/,/g, '')),
+                change: parseFloat(changeText?.toString().replace(/[()%+]/g, '')) || 0
+            };
+        } catch (e) {
+            return null;
+        }
     }
 
     async fetchFromInvesting(url) {
