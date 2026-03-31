@@ -132,6 +132,11 @@ class MarketDataService {
 
     async scrapeYahooFinance(symbol) {
         try {
+            // Tier 1: Try RSS Fallback (Most robust for Cloud IPs)
+            const rssData = await this.fetchFromRSS(symbol);
+            if (rssData) return rssData;
+
+            // Tier 2: Regular Scraper
             const url = `https://finance.yahoo.com/quote/${symbol}`;
             const { data } = await axios.get(url, {
                 headers: { 
@@ -142,41 +147,49 @@ class MarketDataService {
             });
             const $ = cheerio.load(data);
             
-            // Multiple fallback selectors for Price
             const priceText = $('fin-streamer[data-field="regularMarketPrice"]').first().attr('value') || 
-                             $('[data-test="qsp-price"]').first().text() ||
-                             $('[data-test="instrument-price-last"]').first().text();
+                             $('[data-test="qsp-price"]').first().text();
             
-            // Multiple fallback selectors for Change Percent
             const changePctText = $('fin-streamer[data-field="regularMarketChangePercent"]').first().attr('value') || 
                                  $('[data-test="qsp-price-change-percent"]').first().text();
 
-            // Multiple fallback selectors for Absolute Change
-            const changeAbsText = $('fin-streamer[data-field="regularMarketChange"]').first().attr('value') || 
-                                 $('[data-test="qsp-price-change"]').first().text();
-            
             if (!priceText) return null;
             
             const price = parseFloat(priceText.toString().replace(/,/g, ''));
-            let change = parseFloat(changePctText?.toString().replace(/[()%+]/g, ''));
+            let change = parseFloat(changePctText?.toString().replace(/[()%+]/g, '')) || 0;
 
-            // Safety calculation: if percent is missing or invalid, try to calculate from absolute change
-            if (isNaN(change) || change === 0) {
-                const absChange = parseFloat(changeAbsText?.toString().replace(/[()%+]/g, ''));
-                if (!isNaN(absChange) && absChange !== 0 && price > 0) {
-                    const prevPrice = price - absChange;
-                    change = (absChange / prevPrice) * 100;
-                }
-            }
-            
-            // Final fallback: If everything failed but we have a price, give it a tiny realistic drift
-            // to avoid the "frozen" 0% look, or use the previous valid change if available.
-            return {
-                price: price,
-                change: isNaN(change) ? 0.01 : change
-            };
+            return { price, change };
         } catch (e) {
-            console.error(`[Scraper Error] ${symbol}:`, e.message);
+            return null;
+        }
+    }
+
+    async fetchFromRSS(symbol) {
+        try {
+            // Map symbols to Investing.com RSS IDs
+            const rssMap = {
+                '^VIX': 'http://rss.investing.com/indices/us-30-vix',
+                'DX-Y.NYB': 'http://rss.investing.com/indices/us-dollar-index',
+                'GC=F': 'http://rss.investing.com/currencies/xau-usd'
+            };
+            
+            const url = rssMap[symbol];
+            if (!url) return null;
+
+            const { data } = await axios.get(url, { timeout: 4000 });
+            const $ = cheerio.load(data, { xmlMode: true });
+            const title = $('item').first().find('title').text();
+            
+            // Example title: "VIX Index - 13.56 (-1.24%)"
+            const match = title.match(/([0-9,.]+)\s+\(([-+0-9,.]+)%\)/);
+            if (match) {
+                return {
+                    price: parseFloat(match[1].replace(/,/g, '')),
+                    change: parseFloat(match[2].replace(/,/g, ''))
+                };
+            }
+            return null;
+        } catch (e) {
             return null;
         }
     }
