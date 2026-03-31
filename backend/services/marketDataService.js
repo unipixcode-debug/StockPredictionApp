@@ -91,19 +91,22 @@ class MarketDataService {
                 const res = yfResults[i];
                 
                 let success = false;
-                if (res.status === 'fulfilled' && res.value && (res.value.regularMarketPrice || res.value.price)) {
-                    indicators[key] = {
-                        price: res.value.regularMarketPrice || res.value.price,
-                        change: res.value.regularMarketChangePercent || res.value.priceChangePercent || 0
-                    };
-                    success = true;
+                if (res.status === 'fulfilled' && res.value) {
+                    const price = parseFloat(res.value.regularMarketPrice || res.value.price);
+                    const change = parseFloat(res.value.regularMarketChangePercent || res.value.priceChangePercent);
+                    
+                    if (!isNaN(price) && price > 0) {
+                        indicators[key] = { price, change: isNaN(change) ? 0 : change };
+                        success = true;
+                    }
                 }
 
-                // Tier 2: Yahoo Scraper Fallback if API fails or returns 0/null
-                if (!success || indicators[key].price === 0) {
-                    console.log(`🔍 Try scraping for ${key}...`);
+                // Tier 2: Yahoo Scraper Fallback if API fails or returns invalid data
+                if (!success || indicators[key]?.price <= 0) {
+                    console.log(`🔍 MarketDataService: Attempting Scraper for ${key}...`);
                     const scraped = await this.scrapeYahooFinance(yfSymbols[key]);
                     if (scraped && scraped.price > 0) {
+                        console.log(`✅ MarketDataService: Scraper success for ${key}: ${scraped.price}`);
                         indicators[key] = scraped;
                         success = true;
                     }
@@ -113,7 +116,7 @@ class MarketDataService {
                 if (success) {
                     this.lastIndicators[key] = indicators[key];
                 } else {
-                    console.warn(`⚠️ All sources failed for ${key}, using last good value.`);
+                    console.warn(`⚠️ MarketDataService: All sources failed for ${key}, using last good value.`);
                     indicators[key] = this.lastIndicators[key] || { price: 0, change: 0 };
                 }
             }
