@@ -139,20 +139,38 @@ class MarketDataService {
             });
             const $ = cheerio.load(data);
             
-            // Modern Yahoo Finance selectors
+            // Multiple fallback selectors for Price
             const priceText = $('fin-streamer[data-field="regularMarketPrice"]').first().attr('value') || 
-                             $('fin-streamer[data-test="qsp-price"]').first().text();
+                             $('fin-streamer[data-test="qsp-price"]').first().text() ||
+                             $('[data-test="instrument-price-last"]').first().text();
             
-            const changeText = $('fin-streamer[data-field="regularMarketChangePercent"]').first().attr('value') || 
-                              $('fin-streamer[data-test="qsp-price-change-percent"]').first().text();
+            // Multiple fallback selectors for Change Percent
+            const changePctText = $('fin-streamer[data-field="regularMarketChangePercent"]').first().attr('value') || 
+                                 $('fin-streamer[data-test="qsp-price-change-percent"]').first().text();
+
+            // Multiple fallback selectors for Absolute Change (if Percent is missing)
+            const changeAbsText = $('fin-streamer[data-field="regularMarketChange"]').first().attr('value') || 
+                                 $('fin-streamer[data-test="qsp-price-change"]').first().text();
             
             if (!priceText) return null;
             
+            const price = parseFloat(priceText.toString().replace(/,/g, ''));
+            let change = parseFloat(changePctText?.toString().replace(/[()%+]/g, ''));
+
+            // Safety calculation: if percent is missing or invalid, try to calculate from absolute change
+            if (isNaN(change) || change === 0) {
+                const absChange = parseFloat(changeAbsText?.toString().replace(/[()%+]/g, ''));
+                if (!isNaN(absChange) && absChange !== 0 && price > 0) {
+                    change = (absChange / (price - absChange)) * 100;
+                }
+            }
+            
             return {
-                price: parseFloat(priceText.toString().replace(/,/g, '')),
-                change: parseFloat(changeText?.toString().replace(/[()%+]/g, '')) || 0
+                price: price,
+                change: isNaN(change) ? 0 : change
             };
         } catch (e) {
+            console.error(`[Scraper Error] ${symbol}:`, e.message);
             return null;
         }
     }
