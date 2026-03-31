@@ -107,7 +107,7 @@ const ChatbotScreen = () => {
 
       const data = await response.json();
 
-      if (data.success && data.reply) {
+      if (response.ok && data.reply) {
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
@@ -116,11 +116,11 @@ const ChatbotScreen = () => {
         };
         setMessages(prev => [...prev, aiMessage]);
         
-        if (data.newCredits !== undefined) {
-          updateCredits(data.newCredits);
+        if (data.credits !== undefined) {
+          updateCredits(data.credits);
         }
       } else {
-        throw new Error(data.error || 'Bağlantı hatası');
+        throw new Error(data.message || 'Bağlantı hatası');
       }
     } catch (error: any) {
       console.error('Chat error:', error);

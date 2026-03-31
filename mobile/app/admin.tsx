@@ -18,6 +18,14 @@ interface UserCredit {
     role: string;
 }
 
+interface DataSource {
+    id: string;
+    name: string;
+    type: string;
+    url: string;
+    isActive: boolean;
+}
+
 const AdminScreen = () => {
     const [featureToggles, setFeatureToggles] = useState({
         news_enabled: true,
@@ -30,7 +38,7 @@ const AdminScreen = () => {
         { key: 'price_per_1000_tokens', value: '69.99', description: '1000 Token Paketi - Premium (USD)' },
     ]);
     const [creditLogs, setCreditLogs] = useState<UserCredit[]>([]);
-    const [sources, setSources] = useState<any[]>([]);
+    const [sources, setSources] = useState<DataSource[]>([]);
     const [newSource, setNewSource] = useState({ name: '', type: 'NEWS_RSS', url: '' });
     const [loading, setLoading] = useState(true);
     const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -117,16 +125,16 @@ const AdminScreen = () => {
 
     const grantCredits = async (userId: string, userName: string) => {
         Alert.prompt(
-            'Kredi Ver',
-            `${userName} kullanıcısına kaç kredi vermek istersiniz?`,
+            'Kredi İşlemleri',
+            `${userName} için yapılacak işlem:`,
             [
                 { text: 'İptal', style: 'cancel' },
                 {
-                    text: 'Ver',
+                    text: 'Kredi Ver',
                     onPress: async (amount: string | undefined) => {
                         if (!amount || isNaN(Number(amount))) return;
                         try {
-                            await fetch(`${API_BASE}/admin/users/${userId}`, {
+                            await fetch(`${API_BASE}/admin/users/${userId}/credits`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ credits: Number(amount) }),
@@ -136,11 +144,47 @@ const AdminScreen = () => {
                             Alert.alert('Hata', 'Kredi verilemedi');
                         }
                     }
+                },
+                {
+                    text: 'Rol Değiştir',
+                    onPress: () => {
+                        Alert.alert('Rol Seçin', 'Kullanıcıya atanacak rol:', [
+                            { text: 'User', onPress: () => updateRole(userId, 'user') },
+                            { text: 'Admin', onPress: () => updateRole(userId, 'admin') },
+                            { text: 'Dev', onPress: () => updateRole(userId, 'developer') },
+                        ]);
+                    }
                 }
             ],
             'plain-text',
             '100'
         );
+    };
+
+    const updateRole = async (userId: string, role: string) => {
+        try {
+            await fetch(`${API_BASE}/admin/users/${userId}/role`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role }),
+            });
+            fetchAll();
+        } catch (e) {
+            Alert.alert('Hata', 'Rol güncellenemedi');
+        }
+    };
+
+    const toggleSourceActive = async (id: string, current: boolean) => {
+        try {
+            await fetch(`${API_BASE}/admin/sources/${id}/active`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active: !current }),
+            });
+            fetchAll();
+        } catch (e) {
+            Alert.alert('Hata', 'Kaynak durumu güncellenemedi');
+        }
     };
 
     const handleAddSource = async () => {
@@ -250,12 +294,28 @@ const AdminScreen = () => {
                         {sources.map(s => (
                             <View key={s.id} style={styles.sourceRow}>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.sourceName}>{s.name}</Text>
+                                    <View style={styles.sourceTop}>
+                                        <Text style={styles.sourceName}>{s.name}</Text>
+                                        <View style={[styles.activeStatus, { backgroundColor: s.isActive ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)' }]}>
+                                            <Text style={[styles.activeStatusText, { color: s.isActive ? '#4ade80' : '#f87171' }]}>
+                                                {s.isActive ? 'AKTİF' : 'PASİF'}
+                                            </Text>
+                                        </View>
+                                    </View>
                                     <Text style={styles.sourceUrl} numberOfLines={1}>{s.url}</Text>
                                 </View>
-                                <TouchableOpacity onPress={() => handleDeleteSource(s.id)}>
-                                    <Trash2 size={16} color="#f87171" style={{ marginLeft: 12 }} />
-                                </TouchableOpacity>
+                                <View style={styles.sourceActions}>
+                                    <Switch
+                                        value={s.isActive}
+                                        onValueChange={() => toggleSourceActive(s.id, s.isActive)}
+                                        trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(74, 222, 128, 0.3)' }}
+                                        thumbColor={s.isActive ? '#4ade80' : 'white'}
+                                        style={{ transform: [{ scaleX: .8 }, { scaleY: .8 }] }}
+                                    />
+                                    <TouchableOpacity onPress={() => handleDeleteSource(s.id)}>
+                                        <Trash2 size={16} color="#f87171" style={{ marginLeft: 8 }} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         ))}
                     </View>
@@ -354,6 +414,26 @@ const AdminScreen = () => {
                         ))}
                     </View>
 
+                    {/* Theme Color (Developer Only) */}
+                    <View style={[styles.card, styles.devCard]}>
+                        <View style={styles.sectionHeader}>
+                            <Zap color="#f59e0b" size={18} />
+                            <Text style={[styles.sectionTitle, { color: '#f59e0b' }]}>Sistem Teması (HSL)</Text>
+                        </View>
+                        <Text style={styles.priceLabel}>Primary Color (Web/Görsel)</Text>
+                        <View style={styles.priceInputRow}>
+                            <TextInput
+                                placeholder="Örn: 210 100% 50%"
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                style={styles.priceInput}
+                                onSubmitEditing={(e) => savePrice('primary_color', e.nativeEvent.text)}
+                            />
+                            <TouchableOpacity onPress={() => Alert.alert('İpucu', 'Web panelindeki ana renk temasını HSL formatında günceller.')} style={styles.saveBtn}>
+                                <Text style={styles.saveBtnText}>?</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
                     <View style={{ height: 40 }} />
                 </ScrollView>
             </SafeAreaView>
@@ -407,8 +487,12 @@ const styles = StyleSheet.create({
     addBtn: { backgroundColor: '#22d3ee', padding: 12, borderRadius: 12, alignItems: 'center' },
     addBtnText: { color: '#0f172a', fontWeight: '900', fontSize: 12 },
     sourceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
-    sourceName: { color: 'white', fontWeight: '700', fontSize: 14 },
-    sourceUrl: { color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 2 },
+    sourceTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    sourceName: { color: 'white', fontWeight: '700', fontSize: 13 },
+    sourceUrl: { color: 'rgba(255,255,255,0.3)', fontSize: 9, marginTop: 2 },
+    activeStatus: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+    activeStatusText: { fontSize: 8, fontWeight: '900' },
+    sourceActions: { flexDirection: 'row', alignItems: 'center' },
 });
 
 export default AdminScreen;

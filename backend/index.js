@@ -94,20 +94,24 @@ console.log('🔄 Synchronizing database...');
 sequelize.sync({ alter: false })
     .then(() => {
         console.log('✅ Database synchronized (Alter skipped)');
-        
-        // Start Background Tasks ONLY after DB is ready
-        cacheService.startBackgroundUpdates();
-        creditService.startBackgroundTasks();
-        scraperService.startBackgroundTasks();
-        newsService.startBackgroundTasks();
-
-        const PORT = process.env.PORT || 5000;
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`✅ Server running on port ${PORT}`);
-        });
+        startServices();
     })
     .catch(err => {
-        console.error('❌ Database sync failed. Server cannot start:', err.message);
-        process.exit(1);
+        console.error('⚠️ Database sync failed, but server will continue:', err.message);
+        // Start services anyway so market stats/news can function
+        startServices();
     });
+
+function startServices() {
+    // Start Background Tasks
+    cacheService.startBackgroundUpdates();
+    creditService.startBackgroundTasks();
+    scraperService.startBackgroundTasks();
+    newsService.startBackgroundTasks();
+
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`✅ Server running on port ${PORT}`);
+    });
+}
 

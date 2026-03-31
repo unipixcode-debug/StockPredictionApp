@@ -25,28 +25,85 @@ const BIST_SYMBOLS = ['THYAO.IS', 'EREGL.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS'
 class MarketDataService {
     async getGlobalIndicators() {
         try {
-            const urls = {
-                vix: 'https://www.investing.com/indices/volatility-s-p-500',
-                dxy: 'https://www.investing.com/indices/usdollar',
-                gold: 'https://www.investing.com/currencies/xau-usd',
-                silver: 'https://www.investing.com/currencies/xag-usd',
-                oil: 'https://www.investing.com/commodities/crude-oil',
-                sp500: 'https://www.investing.com/indices/us-spx-500',
-                nasdaq: 'https://www.investing.com/indices/nq-100',
-                btc: 'https://www.investing.com/crypto/bitcoin/btc-usd',
-                us10y: 'https://www.investing.com/rates-bonds/u.s.-10-year-bond-yield',
-                us02y: 'https://www.investing.com/rates-bonds/u.s.-2-year-bond-yield',
-                eurusd: 'https://www.investing.com/currencies/eur-usd',
-                gbpusd: 'https://www.investing.com/currencies/gbp-usd',
-                usdtry: 'https://www.investing.com/currencies/usd-try'
-            };
-            const entries = Object.entries(urls);
-            const scrapeResults = await Promise.allSettled(entries.map(([key, url]) => this.fetchFromInvesting(url)));
+            const topCaps = { btc: 1.45e12, eth: 0.4e12, bnb: 0.08e12, sol: 0.08e12, xrp: 0.04e12, ada: 0.02e12, avax: 0.015e12, dot: 0.01e12, doge: 0.02e12, link: 0.01e12, trx: 0.01e12, shib: 0.01e12 };
             const indicators = {};
-            scrapeResults.forEach((res, i) => {
+
+            const yfSymbols = {
+                vix: '^VIX',
+                dxy: 'DX-Y.NYB',
+                gold: 'GC=F',
+                silver: 'SI=F',
+                oil: 'CL=F',
+                sp500: '^GSPC',
+                nasdaq: '^IXIC',
+                us10y: '^TNX',
+                us02y: '^IRX',
+                eurusd: 'EURUSD=X',
+                gbpusd: 'GBPUSD=X',
+                usdtry: 'USDTRY=X'
+            };
+
+            const entries = Object.entries(yfSymbols);
+            const results = await Promise.allSettled(entries.map(([key, sym]) => yahooFinance.quote(sym)));
+
+            for (let i = 0; i < entries.length; i++) {
                 const key = entries[i][0];
-                if (res.status === 'fulfilled' && res.value) indicators[key] = res.value;
-            });
+                const res = results[i];
+                if (res.status === 'fulfilled' && res.value) {
+                    indicators[key] = {
+                        price: res.value.regularMarketPrice || res.value.price || 0,
+                        change: res.value.regularMarketChangePercent || res.value.priceChangePercent || 0
+                    };
+                } else {
+                    console.error(`❌ MarketDataService: Failed to fetch ${key} (^${yfSymbols[key]}):`, res.reason?.message);
+                    indicators[key] = { price: 0, change: 0 };
+                }
+            }
+
+            // BTC specific fallback from Yahoo if Binance fails later
+            let btcFallback = null;
+            try { btcFallback = await yahooFinance.quote('BTC-USD'); } catch(e){}
+
+            // Try Binance for BTC
+            try {
+                const ticker = await binanceClient.dailyStats({ symbol: 'BTCUSDT' });
+                indicators['btc'] = { 
+                    price: parseFloat(ticker.lastPrice), 
+                    change: parseFloat(ticker.priceChangePercent),
+                    marketCap: topCaps['btc']
+                };
+            } catch (be) {
+                if (btcFallback) {
+                    indicators['btc'] = {
+                        price: btcFallback.regularMarketPrice || 0,
+                        change: btcFallback.regularMarketChangePercent || 0,
+                        marketCap: topCaps['btc']
+                    };
+                } else {
+                    indicators['btc'] = { price: 0, change: 0, marketCap: topCaps['btc'] };
+                }
+            }
+
+            // Enhanced Crypto Data from Binance (Top 100 by Volume)
+            try {
+                const allStats = await binanceClient.dailyStats();
+                const usdtPairs = allStats
+                    .filter(t => t.symbol.endsWith('USDT'))
+                    .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+                    .slice(0, 100);
+
+                usdtPairs.forEach((t, index) => {
+                    const key = t.symbol.replace('USDT', '').toLowerCase();
+                    // Update or add: always prefer Binance data for crypto
+                    const estimatedCap = topCaps[key] || (0.01e12 / (1 + (index / 10)));
+                    indicators[key] = {
+                        price: parseFloat(t.lastPrice),
+                        change: parseFloat(t.priceChangePercent),
+                        marketCap: estimatedCap
+                    };
+                });
+            } catch (ce) { console.error('Binance Top 100 fetch failed:', ce.message); }
+
             return indicators;
         } catch (e) { return {}; }
     }
@@ -54,12 +111,19 @@ class MarketDataService {
     async fetchFromInvesting(url) {
         try {
             const { data } = await axios.get(url, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' },
-                timeout: 5000
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
+                timeout: 8000
             });
             const $ = cheerio.load(data);
-            let priceText = $('[data-test="instrument-price-last"]').first().text() || $('.instrument-price_last').first().text() || $('#last_last').text();
-            let changeText = $('[data-test="instrument-price-change-percent"]').first().text() || $('.instrument-price_change-percent').first().text() || $('#quotes_summary_secondary .arial_20').last().text();
+            
+            // Priority selectors based on latest research
+            let priceText = $('[data-test="instrument-price-last"]').first().text() || 
+                           $('.instrument-price_last').first().text() || 
+                           $('#last_last').text();
+                           
+            let changeText = $('[data-test="instrument-price-change-percent"]').first().text() || 
+                             $('.instrument-price_change-percent').first().text() || 
+                             $('#quotes_summary_secondary .arial_20').last().text();
             
             if (!priceText) return null;
             
@@ -259,7 +323,7 @@ class MarketDataService {
                 symbols = tickers
                     .filter(t => t.symbol.endsWith('USDT'))
                     .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-                    .slice(0, 15) // Smaller limit for faster debugging
+                    .slice(0, limit || 40) 
                     .map(t => ({ symbol: t.symbol, price: parseFloat(t.lastPrice), change: parseFloat(t.priceChangePercent) }));
             } else {
                 const list = (market === 'nasdaq') ? NASDAQ_SYMBOLS : BIST_SYMBOLS;

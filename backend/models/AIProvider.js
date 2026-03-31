@@ -16,7 +16,7 @@ const AIProvider = sequelize.define('AIProvider', {
         type: DataTypes.ENUM(
             'GEMINI', 'DEEPSEEK', 'OPENAI', 'OPENROUTER', 
             'OLLAMA', 'OLLAMA_CLOUD', 'ANTHROPIC', 'GROQ', 
-            'MISTRAL', 'PERPLEXITY', 'COHERE', 'XAI'
+            'MISTRAL', 'PERPLEXITY', 'COHERE', 'XAI', 'KIMI'
         ),
         allowNull: false
     },

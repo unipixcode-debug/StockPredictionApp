@@ -308,7 +308,8 @@ class AIService {
                     'MISTRAL': 'https://api.mistral.ai/v1',
                     'PERPLEXITY': 'https://api.perplexity.ai',
                     'COHERE': 'https://api.cohere.ai/v1',
-                    'XAI': 'https://api.x.ai/v1'
+                    'XAI': 'https://api.x.ai/v1',
+                    'KIMI': 'https://api.moonshot.cn/v1'
                 };
 
                 if (openAiCompatible[provider.type] && provider.type !== 'OLLAMA_CLOUD') {

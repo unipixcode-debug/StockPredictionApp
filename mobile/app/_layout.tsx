@@ -5,9 +5,15 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState, createContext, useContext } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import 'react-native-reanimated';
+import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Sparkles } from 'lucide-react-native';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* reloading the app might cause this to error */
+});
 
 // Simple Auth Context
 const AuthContext = createContext<any>(null);
@@ -17,21 +23,32 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [appIsReady, setAppIsReady] = useState(false);
 
   // Check initial login status
   useEffect(() => {
-    const checkLoginStatus = async () => {
+    async function prepare() {
       try {
         const userData = await AsyncStorage.getItem('user_data');
         if (userData) {
           setUser(JSON.parse(userData));
         }
+        // Tell the application to render
+        setAppIsReady(true);
       } catch (e) {
         console.error('Failed to load user data', e);
+        setAppIsReady(true); // Still proceed
       }
-    };
-    checkLoginStatus();
+    }
+    prepare();
   }, []);
+
+  // Hide splash screen when app is ready
+  useEffect(() => {
+    if (appIsReady) {
+      SplashScreen.hideAsync().catch(console.error);
+    }
+  }, [appIsReady]);
 
   // Auth Redirect Logic
   useEffect(() => {

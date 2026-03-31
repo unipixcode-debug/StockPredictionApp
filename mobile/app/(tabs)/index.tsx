@@ -275,16 +275,16 @@ const DashboardScreen = () => {
                         />
                         <MarketStatCard 
                             label="VIX Korku" 
-                            value={stats?.vix?.price != null ? stats.vix.price.toFixed(1) : '–'} 
-                            trend={fmtChange(stats?.raw?.vix?.change)} 
-                            trendUp={(stats?.raw?.vix?.change ?? 0) >= 0}
+                            value={stats?.vix?.price != null ? stats.vix.price.toFixed(1) : (stats?.raw?.vix?.price != null ? stats.raw.vix.price.toFixed(1) : (stats?.raw?.vix != null && typeof stats.raw.vix === 'number' ? stats.raw.vix.toFixed(1) : '–'))} 
+                            trend={fmtChange(stats?.raw?.vix?.change || stats?.vix?.change)} 
+                            trendUp={(stats?.raw?.vix?.change ?? stats?.vix?.change ?? 0) >= 0}
                             color="cyan" 
                         />
                         <MarketStatCard 
                             label="DXY Değeri" 
-                            value={stats?.dxy?.price != null ? stats.dxy.price.toFixed(1) : '–'} 
-                            trend={fmtChange(stats?.raw?.dxy?.change)} 
-                            trendUp={(stats?.raw?.dxy?.change ?? 0) >= 0}
+                            value={stats?.dxy?.price != null ? stats.dxy.price.toFixed(1) : (stats?.raw?.dxy?.price != null ? stats.raw.dxy.price.toFixed(1) : (stats?.raw?.dxy != null && typeof stats.raw.dxy === 'number' ? stats.raw.dxy.toFixed(1) : '–'))} 
+                            trend={fmtChange(stats?.raw?.dxy?.change || stats?.dxy?.change)} 
+                            trendUp={(stats?.raw?.dxy?.change ?? stats?.dxy?.change ?? 0) >= 0}
                             color="indigo" 
                         />
                         <MarketStatCard 

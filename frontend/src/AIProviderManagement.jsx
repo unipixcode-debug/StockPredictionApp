@@ -230,10 +230,24 @@ const AIProviderManagement = () => {
                                         <option value="COHERE">COHERE</option>
                                         <option value="XAI">XAI (GROK)</option>
                                         <option value="OPENROUTER">OPENROUTER</option>
+                                        <option value="KIMI">MOONSHOT / KIMI</option>
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">API Key / URL</label>
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">API Key / URL</label>
+                                        {(editingProvider?.type === 'KIMI' || newProvider.type === 'KIMI') && (
+                                            <a 
+                                                href="https://platform.moonshot.ai/console/api-keys" 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-[10px] font-black text-primary hover:underline uppercase tracking-widest flex items-center space-x-1"
+                                            >
+                                                <span>API Key Al (Kimi)</span>
+                                                <Bot size={10} />
+                                            </a>
+                                        )}
+                                    </div>
                                     <input 
                                         type="password" 
                                         required

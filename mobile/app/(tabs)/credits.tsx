@@ -29,11 +29,11 @@ const CreditsScreen = () => {
             setApiPackages(data);
         } catch (error) {
             console.error('Error fetching packages:', error);
-            // Fallback list
+            // Fallback list to match backend/routes/admin.js initialPackages
             setApiPackages([
-                { id: 'starter', name: 'Başlangıç', tokens: 100, price: '₺49.99' },
-                { id: 'pro', name: 'Profesyonel', tokens: 500, price: '₺199.99', popular: true },
-                { id: 'whale', name: 'Balina', tokens: 2000, price: '₺699.99' }
+                { id: 'starter', name: 'Starter', tokens: 100, price: '₺29.99', popular: false, features: ['100 AI Analizi', 'Hızlı Tahmin', 'Haber Bülteni'] },
+                { id: 'pro', name: 'Pro', tokens: 500, price: '₺99.99', popular: true, features: ['500 AI Analizi', 'Detaylı Grafik', 'Öncelikli İşlem'] },
+                { id: 'whale', name: 'Whale', tokens: 2000, price: '₺399.99', popular: false, features: ['2000 AI Analizi', 'Sınırsız Tahmin', '7/24 Destek'] }
             ]);
         } finally {
             setRefreshing(false);

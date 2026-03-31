@@ -174,9 +174,27 @@ const MarketChart = () => {
             if(s.includes('GBP')) return 'FX_IDC:GBPTRY';
             return 'TVC:GOLD';
         }
+
+        // BIST abbreviations or symbol ending in .IS
+        if (s && (s.endsWith('.IS') || (s.length >= 4 && !s.includes(':') && !s.includes('-') && /^[A-Z]+$/.test(s) && !mapping[s]))) {
+             const clean = s.replace('.IS', '');
+             // If it's a known crypto but not in mapping, handle below. 
+             // If it's 4+ chars and likely BIST (e.g. THYAO, EREGL)
+             if (s.length >= 5 && !['BTC','ETH','SOL','XRP','AVAX','DOGE','LINK','MATIC'].includes(clean)) {
+                return `BIST:${clean}`;
+             }
+        }
+
         if (s && s.endsWith && s.endsWith('.IS')) {
             return `BIST:${s.replace('.IS', '')}`;
         }
+        
+        // Crypto robustness: If 3-5 chars, uppercase, no dots/dashes, and not in mapping
+        const isLikelyCrypto = s && /^[A-Z0-9]{3,10}$/.test(s) && !s.includes('.') && !s.includes('-') && !s.includes(':');
+        if (isLikelyCrypto && !mapping[s]) {
+            return `BINANCE:${s}${cur === 'USD' ? 'USDT' : 'TRY'}`;
+        }
+
         if (s && s.endsWith && s.endsWith('USDT') && !s.includes(':')) {
             return `BINANCE:${s}`;
         }

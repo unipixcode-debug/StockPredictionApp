@@ -1,8 +1,23 @@
-const sequelize = require('./config/database');
-const DataSource = require('./models/DataSource');
-const NewsSummary = require('./models/NewsSummary');
-const DailyMarketInsight = require('./models/DailyMarketInsight');
-const marketDataService = require('./services/marketDataService');
+const { Sequelize, Op } = require('sequelize');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../backend/.env') });
+
+const sequelize = new Sequelize(
+    process.env.DB_NAME || 'prediction_db',
+    process.env.DB_USER || 'erdem',
+    process.env.DB_PASS || 'password',
+    {
+        host: process.env.DB_HOST || '127.0.0.1',
+        port: process.env.DB_PORT || 5432,
+        dialect: 'postgres',
+        logging: false, 
+    }
+);
+
+const DataSource = require('../backend/models/DataSource');
+const NewsSummary = require('../backend/models/NewsSummary');
+const DailyMarketInsight = require('../backend/models/DailyMarketInsight');
+const marketDataService = require('../backend/services/marketDataService');
 
 async function diagnostic() {
     try {
@@ -17,7 +32,7 @@ async function diagnostic() {
         const latestNews = await NewsSummary.findOne({ order: [['createdAt', 'DESC']] });
         console.log(`Total news: ${newsCount}`);
         if (latestNews) {
-            console.log(`Latest news: ${latestNews.titleEN || latestNews.titleTR} (${latestNews.createdAt})`);
+            console.log(`Latest news: ${latestNews.titleEN} (${latestNews.createdAt})`);
         } else {
             console.log('No news found in DB.');
         }
@@ -39,14 +54,15 @@ async function diagnostic() {
             console.log('❌ BTC Data MISSING from Investing scrape.');
         }
         
+        // Check if ANY crypto data exists in indicators (keys that are not in the main list)
         const mainKeys = ['vix','dxy','gold','silver','oil','sp500','nasdaq','us10y','us02y','eurusd','gbpusd','usdtry'];
         const cryptoKeys = Object.keys(indicators).filter(k => !mainKeys.includes(k));
-        console.log('Crypto keys in indicators (subassets):', cryptoKeys);
+        console.log('Crypto keys in indicators:', cryptoKeys);
 
-        process.exit(0);
     } catch (error) {
         console.error('Diagnostic error:', error);
-        process.exit(1);
+    } finally {
+        await sequelize.close();
     }
 }
 

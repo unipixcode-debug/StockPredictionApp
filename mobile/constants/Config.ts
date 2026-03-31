@@ -1,5 +1,5 @@
 export const Config = {
-  API_BASE: 'http://80.225.246.21/api',
+  API_BASE: 'https://unipixcode.xyz/api',
   ENDPOINTS: {
     PREDICTIONS: '/predictions',
     MARKET_FLOW: '/market/flow',

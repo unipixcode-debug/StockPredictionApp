@@ -136,6 +136,25 @@ const MoneyFlow = () => {
         </div>
     );
 
+    const isSubscribed = user?.moneyFlowSubscribed || user?.role === 'admin' || user?.role === 'developer';
+    if (!isSubscribed) return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 text-center px-4">
+            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20">
+                <Shield className="text-primary w-12 h-12" />
+            </div>
+            <div>
+                <h2 className="text-3xl font-black italic uppercase tracking-tighter text-foreground mb-2">Erişim Kapalı</h2>
+                <p className="text-muted-foreground font-medium max-w-md mx-auto">Para Akışı (Makro Likidite) özelliklerini kullanabilmek için aboneliğinizi aktif etmeniz gerekmektedir.</p>
+            </div>
+            <button 
+                onClick={() => navigate('/settings')}
+                className="mt-4 px-8 py-3 bg-primary text-primary-foreground rounded-2xl font-black uppercase tracking-widest text-sm shadow-[0_0_20px_rgba(0,242,254,0.3)] hover:shadow-[0_0_30px_rgba(0,242,254,0.5)] transition-all"
+            >
+                Abonelik Ayarlarına Git
+            </button>
+        </div>
+    );
+
     const pieData = data?.assets?.map(a => ({ name: a.name, value: a.value })) || [];
 
     return (
@@ -297,13 +316,13 @@ const MoneyFlow = () => {
                         <p className="text-xl font-medium italic leading-relaxed text-foreground/80">
                             "Mevcut dairesel akış incelendiğinde, likiditenin en güçlü olduğu sınıf 
                             <span className="text-emerald-500 font-black mx-2 italic uppercase">
-                                {data?.assets?.length > 0 ? data.assets.slice().sort((a,b) => b.change - a.change)[0].name : '...'}
+                                {(data?.assets || []).length > 0 ? [...data.assets].sort((a,b) => b.change - a.change)[0].name : '...'}
                             </span> 
                             olarak öne çıkıyor. Beşgen üzerindeki akış yönleri, sermayenin güvenli limanlardan getiri odaklı varlıklara kaydığını teyit ediyor."
                         </p>
                         <div className="inline-flex items-center space-x-3 px-6 py-3 bg-primary/10 border border-primary/20 rounded-2xl text-xs font-black uppercase tracking-widest text-primary italic">
                             <Activity size={16} />
-                            <span>Sinyal: {data?.assets?.length > 0 ? (data.assets.slice().sort((a,b) => b.change - a.change)[0].name === 'Crypto' ? 'Agresif Risk-On' : 'Temkinli Bekleyiş') : 'Analiz Ediliyor...'}</span>
+                            <span>Sinyal: {(data?.assets || []).length > 0 ? ([...data.assets].sort((a,b) => b.change - a.change)[0].name === 'KRİPTO' ? 'Agresif Risk-On' : 'Temkinli Bekleyiş') : 'Analiz Ediliyor...'}</span>
                         </div>
                     </div>
                 </div>
@@ -322,13 +341,13 @@ const MoneyFlow = () => {
                             <div className="p-12 md:p-16 h-full flex flex-col">
                                 <div className="mb-12">
                                     <h2 className="text-6xl font-black italic uppercase tracking-tighter mb-4 text-primary">
-                                        {data.assets.find(a => a.id === expandedAsset).name}
+                                        {(data?.assets || []).find(a => a.id === expandedAsset)?.name || ''}
                                     </h2>
                                     <p className="text-muted-foreground font-bold tracking-widest uppercase text-xs opacity-50">Sınıfın İçindeki En Büyük 100 Varlık ve Likidite Dağılımı</p>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-y-auto pr-6 custom-scrollbar flex-1 pb-10" style={{ maxHeight: '60vh' }}>
-                                    {data.assets.find(a => a.id === expandedAsset).subAssets.map((sub, idx) => (
+                                    {((data?.assets || []).find(a => a.id === expandedAsset)?.subAssets || []).map((sub, idx) => (
                                         <div key={idx} className={`p-6 rounded-3xl border border-white/5 bg-white/5 flex justify-between items-center group transition-colors hover:bg-white/10 ${sub.isOther ? 'bg-primary/5 border-primary/20' : ''}`}>
                                             <div className="flex flex-col">
                                                 <span className="text-sm font-black italic uppercase tracking-tight group-hover:text-primary transition-colors">{sub.name}</span>
