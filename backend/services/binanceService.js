@@ -32,21 +32,16 @@ class BinanceService {
         });
 
         if (config.isTestnet) {
+            // Standard sandbox mode for both Spot and Futures
+            exchange.setSandboxMode(true);
+            
             if (marketType === 'FUTURES') {
-                // Broad manual URL override for Binance Futures Mock Trading (Handles all subtypes)
-                const mockUrl = 'https://testnet.binancefuture.com';
-                exchange.urls['api'] = {
-                    ...exchange.urls['api'],
-                    'fapiPublic': `${mockUrl}/fapi/v1`, // Some still use fapi/v1 prefix
-                    'fapiPrivate': `${mockUrl}/fapi/v1`,
-                    'fapiPublicV2': `${mockUrl}/fapi/v2`,
-                    'fapiPrivateV2': `${mockUrl}/fapi/v2`,
-                    'public': `${mockUrl}/fapi/v1`, // Fallback for various methods
-                    'private': `${mockUrl}/fapi/v1`,
-                };
-            } else {
-                // Std sandbox mode works fine for Spot and handles all sapi/v3 mapping automatically
-                exchange.setSandboxMode(true);
+                // Force Futures URL specifically to Mock Trading if setSandboxMode didn't align it
+                exchange.urls['api']['fapiPublic'] = 'https://testnet.binancefuture.com/fapi/v1';
+                exchange.urls['api']['fapiPrivate'] = 'https://testnet.binancefuture.com/fapi/v1';
+                // Also some CCXT versions use these:
+                if (exchange.urls['api']['fapiPublicV2']) exchange.urls['api']['fapiPublicV2'] = 'https://testnet.binancefuture.com/fapi/v2';
+                if (exchange.urls['api']['fapiPrivateV2']) exchange.urls['api']['fapiPrivateV2'] = 'https://testnet.binancefuture.com/fapi/v2';
             }
         }
 
