@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const authorize = require('../middleware/authorize');
+const { authCheck } = require('../middleware/auth');
 const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
 const binanceService = require('../services/binanceService');
 
 // Get Bot Config
-router.get('/config', authorize(['user', 'admin', 'developer']), async (req, res) => {
+router.get('/config', authCheck, async (req, res) => {
     try {
         let config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
         if (!config) {
@@ -19,7 +19,7 @@ router.get('/config', authorize(['user', 'admin', 'developer']), async (req, res
 });
 
 // Update Bot Config
-router.post('/config', authorize(['user', 'admin', 'developer']), async (req, res) => {
+router.post('/config', authCheck, async (req, res) => {
     try {
         const { 
             apiKey, apiSecret, isActive, budgetMode, budgetAmount, 
@@ -53,7 +53,7 @@ router.post('/config', authorize(['user', 'admin', 'developer']), async (req, re
 });
 
 // Test API Connection
-router.post('/test-connection', authorize(['user', 'admin', 'developer']), async (req, res) => {
+router.post('/test-connection', authCheck, async (req, res) => {
     try {
         // We will test using current DB config
         const result = await binanceService.testConnection(req.user.id);
@@ -64,7 +64,7 @@ router.post('/test-connection', authorize(['user', 'admin', 'developer']), async
 });
 
 // Get Trades (History and Open)
-router.get('/trades', authorize(['user', 'admin', 'developer']), async (req, res) => {
+router.get('/trades', authCheck, async (req, res) => {
     try {
         const trades = await ExecutedTrade.findAll({
             where: { userId: req.user.id },
@@ -91,7 +91,7 @@ router.get('/trades', authorize(['user', 'admin', 'developer']), async (req, res
 });
 
 // Optional: Manual Trade Close (for frontend testing)
-router.post('/trade/:tradeId/close', authorize(['user', 'admin', 'developer']), async (req, res) => {
+router.post('/trade/:tradeId/close', authCheck, async (req, res) => {
     try {
         const trade = await ExecutedTrade.findOne({ 
             where: { id: req.params.tradeId, userId: req.user.id, status: 'OPEN' }
