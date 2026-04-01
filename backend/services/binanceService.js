@@ -36,17 +36,23 @@ class BinanceService {
                 // IMPORTANT: Binance modern Demo Trading (v2) configuration
                 const demoUrl = 'https://demo-fapi.binance.com';
                 
-                // Explicitly set all potential fapi endpoints to demo domain
-                exchange.urls['api']['fapiPublic'] = `${demoUrl}/fapi/v1`;
-                exchange.urls['api']['fapiPrivate'] = `${demoUrl}/fapi/v1`;
-                exchange.urls['api']['fapiPublicV2'] = `${demoUrl}/fapi/v2`;
-                exchange.urls['api']['fapiPrivateV2'] = `${demoUrl}/fapi/v2`;
+                // Comprehensive manual URL map for Demo Trading (to avoid CCXT internal errors)
+                exchange.urls['api'] = {
+                    ...exchange.urls['api'],
+                    'fapiPublic': `${demoUrl}/fapi/v1`,
+                    'fapiPrivate': `${demoUrl}/fapi/v1`,
+                    'fapiPublicV2': `${demoUrl}/fapi/v2`,
+                    'fapiPrivateV2': `${demoUrl}/fapi/v2`,
+                    'fapiUser': `${demoUrl}/fapi/v1`,
+                    'public': `${demoUrl}/fapi/v1`,
+                    'private': `${demoUrl}/fapi/v1`
+                };
                 
-                // Add time sync options which are critical for Demo Trading
+                // Critical options for Demo Trading authentication
                 exchange.options['adjustForTimeDifference'] = true;
                 exchange.options['recvWindow'] = 10000;
             } else {
-                // Standard sandbox mode for Spot
+                // Standard sandbox mode still works fine for Spot
                 exchange.setSandboxMode(true);
             }
         }
@@ -75,11 +81,14 @@ class BinanceService {
                 totalUSDT = balance['USDT']?.total || 0;
             }
 
+            const currentUrl = exchange.urls.api.fapiPublic || exchange.urls.api.public;
+            const isTestnetEnv = currentUrl.includes('testnet') || currentUrl.includes('demo-fapi');
+
             return {
                 success: true,
                 freeUSDT,
                 totalUSDT,
-                testnet: exchange.urls.api.public.includes('testnet') || (exchange.urls.api.fapiPublic && exchange.urls.api.fapiPublic.includes('testnet')),
+                testnet: isTestnetEnv,
                 marketType
             };
         } catch (error) {
