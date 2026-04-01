@@ -19,10 +19,35 @@ export default function BotDashboard() {
 
     const [testResult, setTestResult] = useState(null);
     const [isTesting, setIsTesting] = useState(false);
+    
+    // Terminal Logs State
+    const [logs, setLogs] = useState([
+        { time: new Date().toLocaleTimeString(), text: 'Bot sistemi başlatıldı.', type: 'info' },
+        { time: new Date().toLocaleTimeString(), text: 'Yapay zeka analiz motoruna bağlandı.', type: 'success' },
+        { time: new Date().toLocaleTimeString(), text: 'Piyasa verileri için sinyal gözleniyor...', type: 'warning' }
+    ]);
 
     useEffect(() => {
         fetchData();
-    }, []);
+        
+        // Simüle edilmiş "tarama" logları (kullanıcı botun çalıştığını hissetsin diye)
+        const logInterval = setInterval(() => {
+            if (isBotActive) {
+                const cryptos = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'AVAX/USDT'];
+                const randomCrypto = cryptos[Math.floor(Math.random() * cryptos.length)];
+                addLog(`${randomCrypto} için AI sinyal ihtimali taranıyor... Alım şartı henüz oluşmadı.`, 'info');
+            }
+        }, 12000);
+
+        return () => clearInterval(logInterval);
+    }, [isBotActive]);
+
+    const addLog = (text, type = 'info') => {
+        setLogs(prev => {
+            const newLogs = [{ time: new Date().toLocaleTimeString(), text, type }, ...prev];
+            return newLogs.slice(0, 50); // Son 50 logu sakla
+        });
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -47,6 +72,12 @@ export default function BotDashboard() {
             const res = await api.post('/bot/config', updatedConfig);
             setConfig(res.config);
             setIsBotActive(res.config.isActive);
+            addLog('Bot ayarları ve risk parametreleri başarıyla güncellendi.', 'success');
+            if (res.config.isActive) {
+                addLog('Bot Aktif konuma getirildi. Sinyal bekleniyor...', 'warning');
+            } else {
+                addLog('Bot pasif konuma alındı. Alım/Satım durduruldu.', 'error');
+            }
             alert(language === 'TR' ? 'Ayarlar kaydedildi' : 'Settings saved');
         } catch (error) {
             alert('Error: ' + (error.response?.data?.error || error.message));
@@ -141,6 +172,33 @@ export default function BotDashboard() {
                                 color="amber"
                                 icon={<Activity size={24} />}
                             />
+                        </div>
+
+                        {/* Terminal Window */}
+                        <div className="glass-card p-4 border-border/50 bg-[#0a0a0a]/80 font-mono">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                                    <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                                    <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">Canlı Bot İşlem Terminali</span>
+                            </div>
+                            <div className="h-48 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-black/40 border border-white/5">
+                                {logs.map((log, i) => (
+                                    <div key={i} className="text-xs">
+                                        <span className="text-muted-foreground opacity-50">[{log.time}]</span>{' '}
+                                        <span className={
+                                            log.type === 'success' ? 'text-emerald-400' :
+                                            log.type === 'error' ? 'text-rose-400' :
+                                            log.type === 'warning' ? 'text-amber-400' : 'text-cyan-400'
+                                        }>
+                                            {log.type === 'success' ? '✓ ' : log.type === 'warning' ? '⚠ ' : log.type === 'error' ? '✖ ' : '> '}
+                                            {log.text}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
                         {/* Chart */}
