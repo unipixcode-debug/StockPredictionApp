@@ -61,11 +61,28 @@ class BinanceService {
     async testConnection(userId, marketType = 'SPOT') {
         try {
             const { exchange } = await this.getExchangeInstance(userId, marketType);
-            const balance = await exchange.fetchBalance();
+            
+            let freeUSDT = 0;
+            let totalUSDT = 0;
+
+            if (marketType === 'FUTURES') {
+                // Use a more direct futures-only balance call to avoid SAPI capital/config/getall errors
+                const balances = await exchange.fapiPrivateGetBalance();
+                const usdtBalance = balances.find(b => b.asset === 'USDT');
+                if (usdtBalance) {
+                    freeUSDT = parseFloat(usdtBalance.withdrawAvailable || usdtBalance.balance);
+                    totalUSDT = parseFloat(usdtBalance.balance);
+                }
+            } else {
+                const balance = await exchange.fetchBalance();
+                freeUSDT = balance['USDT']?.free || 0;
+                totalUSDT = balance['USDT']?.total || 0;
+            }
+
             return {
                 success: true,
-                freeUSDT: balance['USDT']?.free || 0,
-                totalUSDT: balance['USDT']?.total || 0,
+                freeUSDT,
+                totalUSDT,
                 testnet: exchange.urls.api.public.includes('testnet'),
                 marketType
             };
