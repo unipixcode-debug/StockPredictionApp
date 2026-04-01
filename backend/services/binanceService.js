@@ -60,7 +60,11 @@ class BinanceService {
                 marketType
             };
         } catch (error) {
-            return { success: false, error: error.message, marketType };
+            let errorMsg = error.message;
+            if (errorMsg.includes('-2008') || errorMsg.includes('Invalid API-key ID')) {
+                errorMsg = 'Hata (-2008): API Anahtarı geçersiz. Lütfen girdiğiniz anahtarların doğruluğunu ve "Testnet Modu" şalterinin anahtarlarla uyumlu (Spot Testnet -> Açık, Mock Trading/Mainnet/Real -> Kapalı) olduğunu kontrol edin.';
+            }
+            return { success: false, error: errorMsg, marketType };
         }
     }
 
