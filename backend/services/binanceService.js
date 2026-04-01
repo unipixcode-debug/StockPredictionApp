@@ -33,9 +33,11 @@ class BinanceService {
 
         if (config.isTestnet) {
             if (marketType === 'FUTURES') {
-                // Manual URL override for Binance Futures Mock Trading (Sandbox mode is BUGGY in CCXT for futures)
-                exchange.urls['api']['fapiPublic'] = 'https://testnet.binancefuture.com/fapi/v1';
-                exchange.urls['api']['fapiPrivate'] = 'https://testnet.binancefuture.com/fapi/v1';
+                // Manual URL override for Binance Futures Mock Trading (Base domain only, so CCXT can append /fapi/v1 or /fapi/v2)
+                exchange.urls['api']['fapiPublic'] = 'https://testnet.binancefuture.com';
+                exchange.urls['api']['fapiPrivate'] = 'https://testnet.binancefuture.com';
+                exchange.urls['api']['fapiPublicV2'] = 'https://testnet.binancefuture.com';
+                exchange.urls['api']['fapiPrivateV2'] = 'https://testnet.binancefuture.com';
             } else {
                 // Std sandbox mode works fine for Spot and handles all sapi/v3 mapping automatically
                 exchange.setSandboxMode(true);
