@@ -92,7 +92,7 @@ router.get('/trades', authCheck, async (req, res) => {
         
         // Compute simple stats
         const config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
-        const isBotActive = config?.isActive || false;
+        const isBotActive = config ? (config.isSpotActive || config.isFuturesActive) : false;
 
         const totalPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
         const winCount = trades.filter(t => t.pnl > 0).length;

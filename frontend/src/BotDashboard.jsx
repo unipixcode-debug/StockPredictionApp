@@ -87,11 +87,11 @@ export default function BotDashboard() {
         }
     };
 
-    const handleTestConnection = async () => {
+    const handleTestConnection = async (testData) => {
         setIsTesting(true);
         setTestResult(null);
         try {
-            const res = await api.post('/bot/test-connection');
+            const res = await api.post('/bot/test-connection', testData || { marketType: 'SPOT' });
             setTestResult(res);
         } catch (error) {
             setTestResult({ success: false, error: error.message });
