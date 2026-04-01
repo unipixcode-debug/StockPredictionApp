@@ -3,6 +3,7 @@ const router = express.Router();
 const predictionEngine = require('../services/predictionEngine');
 const Prediction = require('../models/Prediction');
 const User = require('../models/User');
+const binanceService = require('../services/binanceService');
 const { isAdmin, authCheck } = require('../middleware/auth');
 const GlobalSetting = require('../models/GlobalSetting');
 
@@ -83,6 +84,18 @@ router.post('/analyze', authCheck, creditCheck, async (req, res) => {
         
         // Deduct credits ONLY after successful DB persistence
         await deductCredits(req);
+
+        // --- BOT INTEGRATION ---
+        // Fire-and-forget: Trigger the bot if the prediction is actionable
+        if (prediction && (prediction.direction === 'BUY' || prediction.direction === 'SELL')) {
+            binanceService.executeTrade(req.user.id, {
+                symbol: finalSymbol,
+                direction: prediction.direction,
+                market: resolvedMarket
+            }).catch(botError => {
+                console.error(`[Bot] Execution failed for ${req.user.id}:`, botError.message);
+            });
+        }
 
         res.json(prediction);
 

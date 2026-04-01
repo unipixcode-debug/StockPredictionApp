@@ -21,6 +21,7 @@ import Credits from './Credits';
 import Profile from './Profile';
 import AIScanner from './AIScanner';
 import AIProviderManagement from './AIProviderManagement';
+import BotDashboard from './BotDashboard';
 import { AuthProvider, useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 
@@ -80,6 +81,7 @@ function AppLayout() {
             <SidebarLink to="/scanner" icon={<Zap size={22} />} label={language === 'TR' ? 'Tarayıcı' : 'Scanner'} />
             <SidebarLink to="/ai-portfolio" icon={<Bot size={22} />} label="AI Portföy" />
             <SidebarLink to="/portfolio" icon={<Wallet size={22} />} label="Portföy" />
+            <SidebarLink to="/bot-dashboard" icon={<Bot size={22} />} label="Bot Paneli" />
             <SidebarLink to="/charts" icon={<BarChart3 size={22} />} label="Grafikler" />
             <SidebarLink to="/analysis" icon={<LineChart size={22} />} label={t('Analysis')} />
             <SidebarLink to="/chat" icon={<Bot size={22} />} label={t('AIChat')} />
@@ -131,6 +133,7 @@ function AppLayout() {
               <Route path="/scanner" element={<AIScanner />} />
               <Route path="/ai-portfolio" element={<AIPortfolio />} />
               <Route path="/portfolio" element={<PortfolioOverview />} />
+              <Route path="/bot-dashboard" element={<BotDashboard />} />
               <Route path="/charts" element={<Navigate to="/chart/BTC-USD?name=Bitcoin" replace />} />
               <Route path="/chart/:symbol" element={<MarketChart />} />
               <Route path="/analysis" element={<Analysis />} />

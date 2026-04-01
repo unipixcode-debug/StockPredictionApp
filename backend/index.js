@@ -33,6 +33,7 @@ const paymentRoutes = require('./routes/payment');
 const portfolioRoutes = require('./routes/portfolio');
 const aiPortfolioRoutes = require('./routes/aiPortfolio');
 const scannerRoutes = require('./routes/scanner');
+const botRoutes = require('./routes/bot');
 const cacheService = require('./services/cacheService');
 const creditService = require('./services/creditService');
 const scraperService = require('./services/scraperService');
@@ -83,6 +84,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/ai-portfolio', aiPortfolioRoutes);
 app.use('/api/scanner', scannerRoutes);
+app.use('/api/bot', botRoutes);
 
 // Basic Route for testing
 app.get('/', (req, res) => {
