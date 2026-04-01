@@ -12,6 +12,7 @@ const PortfolioPrediction = require('./PortfolioPrediction');
 const AIPortfolio = require('./AIPortfolio');
 const BinanceBotConfig = require('./BinanceBotConfig');
 const ExecutedTrade = require('./ExecutedTrade');
+const BotLog = require('./BotLog');
 
 // Associations
 User.hasMany(Portfolio, { foreignKey: 'userId' });
@@ -29,6 +30,9 @@ BinanceBotConfig.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(ExecutedTrade, { foreignKey: 'userId' });
 ExecutedTrade.belongsTo(User, { foreignKey: 'userId' });
 
+User.hasMany(BotLog, { foreignKey: 'userId' });
+BotLog.belongsTo(User, { foreignKey: 'userId' });
+
 module.exports = {
     User,
     Prediction,
@@ -43,5 +47,6 @@ module.exports = {
     PortfolioPrediction,
     AIPortfolio,
     BinanceBotConfig,
-    ExecutedTrade
+    ExecutedTrade,
+    BotLog
 };

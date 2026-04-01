@@ -38,6 +38,7 @@ const cacheService = require('./services/cacheService');
 const creditService = require('./services/creditService');
 const scraperService = require('./services/scraperService');
 const newsService = require('./services/newsService');
+const botScannerService = require('./services/botScannerService');
 
 const app = express();
 
@@ -111,6 +112,7 @@ function startServices() {
     creditService.startBackgroundTasks();
     scraperService.startBackgroundTasks();
     newsService.startBackgroundTasks();
+    botScannerService.startBackgroundTasks();
 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, '0.0.0.0', () => {

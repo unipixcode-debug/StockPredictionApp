@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { authCheck } = require('../middleware/auth');
-const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
+const { BinanceBotConfig, ExecutedTrade, User, BotLog } = require('../models');
 const binanceService = require('../services/binanceService');
+const botScannerService = require('../services/botScannerService');
 
 // Get Bot Config
 router.get('/config', authCheck, async (req, res) => {
@@ -34,17 +35,15 @@ router.post('/config', authCheck, async (req, res) => {
 
         if (apiKey !== undefined) config.apiKey = apiKey;
         if (apiSecret !== undefined) config.apiSecret = apiSecret;
-        if (isActive !== undefined) config.isActive = isActive;
-        if (budgetMode !== undefined) config.budgetMode = budgetMode;
-        if (budgetAmount !== undefined) config.budgetAmount = budgetAmount;
-        if (maxPositions !== undefined) config.maxPositions = maxPositions;
-        if (maxPerAsset !== undefined) config.maxPerAsset = maxPerAsset;
-        if (enableSpot !== undefined) config.enableSpot = enableSpot;
-        if (enableFutures !== undefined) config.enableFutures = enableFutures;
-        if (defaultLeverage !== undefined) config.defaultLeverage = defaultLeverage;
-        if (riskLevel !== undefined) config.riskLevel = riskLevel;
-        if (isTestnet !== undefined) config.isTestnet = isTestnet;
-
+        if (isActive !== undefined && config.isActive !== isActive) {
+            config.isActive = isActive;
+            if (isActive) {
+                await botScannerService.log(req.user.id, 'Bot aktif duruma getirildi. Tarama başlatılıyor...', 'success');
+            } else {
+                await botScannerService.log(req.user.id, 'Bot durduruldu. Piyasa izlemesi kapatıldı.', 'error');
+            }
+        }
+        
         await config.save();
         res.json({ message: 'Bot configuration updated successfully', config });
     } catch (error) {
@@ -106,6 +105,21 @@ router.post('/trade/:tradeId/close', authCheck, async (req, res) => {
         
         await trade.save();
         res.json({ message: 'Trade closed.', trade });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get Bot Logs
+router.get('/logs', authCheck, async (req, res) => {
+    try {
+        const logs = await BotLog.findAll({
+            where: { userId: req.user.id },
+            order: [['createdAt', 'DESC']],
+            limit: 50
+        });
+        
+        res.json(logs);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -21,45 +21,53 @@ export default function BotDashboard() {
     const [isTesting, setIsTesting] = useState(false);
     
     // Terminal Logs State
-    const [logs, setLogs] = useState([
-        { time: new Date().toLocaleTimeString(), text: 'Bot sistemi başlatıldı.', type: 'info' },
-        { time: new Date().toLocaleTimeString(), text: 'Yapay zeka analiz motoruna bağlandı.', type: 'success' },
-        { time: new Date().toLocaleTimeString(), text: 'Piyasa verileri için sinyal gözleniyor...', type: 'warning' }
-    ]);
+    const [logs, setLogs] = useState([]);
 
     useEffect(() => {
         fetchData();
         
-        // Simüle edilmiş "tarama" logları (kullanıcı botun çalıştığını hissetsin diye)
+        // Gerçek API'den (BotLog veritabanından) 15 saniyede bir logları çek
         const logInterval = setInterval(() => {
-            if (isBotActive) {
-                const cryptos = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'XRP/USDT', 'AVAX/USDT'];
-                const randomCrypto = cryptos[Math.floor(Math.random() * cryptos.length)];
-                addLog(`${randomCrypto} için AI sinyal ihtimali taranıyor... Alım şartı henüz oluşmadı.`, 'info');
-            }
-        }, 12000);
+            fetchLogs();
+        }, 15000);
 
         return () => clearInterval(logInterval);
-    }, [isBotActive]);
+    }, []);
 
-    const addLog = (text, type = 'info') => {
-        setLogs(prev => {
-            const newLogs = [{ time: new Date().toLocaleTimeString(), text, type }, ...prev];
-            return newLogs.slice(0, 50); // Son 50 logu sakla
-        });
+    const fetchLogs = async () => {
+        try {
+            const result = await api.get('/bot/logs');
+            // Gelen veriyi (createdAt, message, type) formatlayarak state'e at
+            const formatted = result.map(l => ({
+                time: new Date(l.createdAt).toLocaleTimeString(),
+                text: l.message,
+                type: l.type
+            }));
+            setLogs(formatted);
+        } catch (error) {
+            console.error('Bot logs hatası:', error);
+        }
     };
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [configRes, tradeRes] = await Promise.all([
+            const [configRes, tradeRes, logsRes] = await Promise.all([
                 api.get('/bot/config'),
-                api.get('/bot/trades')
+                api.get('/bot/trades'),
+                api.get('/bot/logs')
             ]);
             setConfig(configRes);
             setTrades(tradeRes.trades || []);
             setStats(tradeRes.stats || { totalPnl: 0, winCount: 0, lossCount: 0 });
             setIsBotActive(tradeRes.isBotActive || false);
+            
+            const formattedLogs = logsRes.map(l => ({
+                time: new Date(l.createdAt).toLocaleTimeString(),
+                text: l.message,
+                type: l.type
+            }));
+            setLogs(formattedLogs.length ? formattedLogs : [{ time: new Date().toLocaleTimeString(), text: 'Sistem başlatıldı, log bekleniyor...', type: 'info' }]);
         } catch (error) {
             console.error(error);
         } finally {
@@ -72,12 +80,7 @@ export default function BotDashboard() {
             const res = await api.post('/bot/config', updatedConfig);
             setConfig(res.config);
             setIsBotActive(res.config.isActive);
-            addLog('Bot ayarları ve risk parametreleri başarıyla güncellendi.', 'success');
-            if (res.config.isActive) {
-                addLog('Bot Aktif konuma getirildi. Sinyal bekleniyor...', 'warning');
-            } else {
-                addLog('Bot pasif konuma alındı. Alım/Satım durduruldu.', 'error');
-            }
+            fetchLogs(); // Logu güncelle
             alert(language === 'TR' ? 'Ayarlar kaydedildi' : 'Settings saved');
         } catch (error) {
             alert('Error: ' + (error.response?.data?.error || error.message));
