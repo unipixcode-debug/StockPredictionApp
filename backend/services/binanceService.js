@@ -22,9 +22,16 @@ class BinanceService {
             if (!apiKey || !apiSecret) throw new Error('BINANCE_SPOT_API_NOT_CONFIGURED');
         }
 
+        // Trim keys to remove any accidental spaces/newlines which cause -2008 errors
+        const trimmedKey = apiKey.trim();
+        const trimmedSecret = apiSecret.trim();
+
+        // Security-safe length log for debugging -2008 errors
+        console.log(`[Binance] Instance created for ${marketType}. Key length: ${trimmedKey.length}, Secret length: ${trimmedSecret.length}`);
+
         const exchange = new ccxt.binance({
-            apiKey,
-            secret: apiSecret,
+            apiKey: trimmedKey,
+            secret: trimmedSecret,
             enableRateLimit: true,
             options: {
                 defaultType: marketType === 'FUTURES' ? 'future' : 'spot',
