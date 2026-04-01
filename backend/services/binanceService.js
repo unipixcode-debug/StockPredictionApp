@@ -33,15 +33,20 @@ class BinanceService {
 
         if (config.isTestnet) {
             if (marketType === 'FUTURES') {
-                // IMPORTANT: setSandboxMode(true) is DEPRECATED for Futures in CCXT.
-                // We must use manual Demo Trading URLs instead.
-                const mockUrl = 'https://demo-fapi.binance.com';
-                exchange.urls['api']['fapiPublic'] = `${mockUrl}/fapi/v1`;
-                exchange.urls['api']['fapiPrivate'] = `${mockUrl}/fapi/v1`;
-                if (exchange.urls['api']['fapiPublicV2']) exchange.urls['api']['fapiPublicV2'] = `${mockUrl}/fapi/v2`;
-                if (exchange.urls['api']['fapiPrivateV2']) exchange.urls['api']['fapiPrivateV2'] = `${mockUrl}/fapi/v2`;
+                // IMPORTANT: Binance modern Demo Trading (v2) configuration
+                const demoUrl = 'https://demo-fapi.binance.com';
+                
+                // Explicitly set all potential fapi endpoints to demo domain
+                exchange.urls['api']['fapiPublic'] = `${demoUrl}/fapi/v1`;
+                exchange.urls['api']['fapiPrivate'] = `${demoUrl}/fapi/v1`;
+                exchange.urls['api']['fapiPublicV2'] = `${demoUrl}/fapi/v2`;
+                exchange.urls['api']['fapiPrivateV2'] = `${demoUrl}/fapi/v2`;
+                
+                // Add time sync options which are critical for Demo Trading
+                exchange.options['adjustForTimeDifference'] = true;
+                exchange.options['recvWindow'] = 10000;
             } else {
-                // Standard sandbox mode still works fine for Spot
+                // Standard sandbox mode for Spot
                 exchange.setSandboxMode(true);
             }
         }
