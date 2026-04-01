@@ -343,10 +343,10 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
     useEffect(() => {
         if (config) {
             setFormData({
-                apiKey: config.apiKey ? '**********************' : '',
-                apiSecret: config.apiSecret ? '**********************' : '',
-                futuresApiKey: config.futuresApiKey ? '**********************' : '',
-                futuresApiSecret: config.futuresApiSecret ? '**********************' : '',
+                apiKey: config.apiKey || '',
+                apiSecret: config.apiSecret || '',
+                futuresApiKey: config.futuresApiKey || '',
+                futuresApiSecret: config.futuresApiSecret || '',
                 isSpotActive: config.isSpotActive,
                 isFuturesActive: config.isFuturesActive,
                 isTestnet: config.isTestnet,
@@ -372,12 +372,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const payload = { ...formData };
-        if (payload.apiKey === '**********************') delete payload.apiKey;
-        if (payload.apiSecret === '**********************') delete payload.apiSecret;
-        if (payload.futuresApiKey === '**********************') delete payload.futuresApiKey;
-        if (payload.futuresApiSecret === '**********************') delete payload.futuresApiSecret;
-        onSave(payload);
+        onSave(formData);
     };
 
     return (
@@ -401,7 +396,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                             className="w-full bg-black/40 border border-white/5 p-4 pr-12 rounded-2xl focus:border-emerald-500/50 text-foreground transition-all"
                                         />
                                         <button type="button" onClick={() => toggleKey('apiKey')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-emerald-500 transition-colors">
-                                            {showKeys.apiKey ? <Zap size={16} /> : <Bot size={16} />}
+                                            {showKeys.apiKey ? <RefreshCw size={16} /> : <ShieldCheck size={16} />}
                                         </button>
                                     </div>
                                 </div>
@@ -414,7 +409,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                             className="w-full bg-black/40 border border-white/5 p-4 pr-12 rounded-2xl focus:border-emerald-500/50 text-foreground transition-all"
                                         />
                                          <button type="button" onClick={() => toggleKey('apiSecret')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-emerald-500 transition-colors">
-                                            {showKeys.apiSecret ? <Zap size={16} /> : <Bot size={16} />}
+                                            {showKeys.apiSecret ? <RefreshCw size={16} /> : <ShieldCheck size={16} />}
                                         </button>
                                     </div>
                                 </div>
@@ -435,7 +430,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                             className="w-full bg-black/40 border border-white/5 p-4 pr-12 rounded-2xl focus:border-cyan-500/50 text-foreground transition-all"
                                         />
                                         <button type="button" onClick={() => toggleKey('fKey')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-cyan-500 transition-colors">
-                                            {showKeys.fKey ? <Zap size={16} /> : <Bot size={16} />}
+                                            {showKeys.fKey ? <RefreshCw size={16} /> : <ShieldCheck size={16} />}
                                         </button>
                                     </div>
                                 </div>
@@ -448,13 +443,13 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                             className="w-full bg-black/40 border border-white/5 p-4 pr-12 rounded-2xl focus:border-cyan-500/50 text-foreground transition-all"
                                         />
                                         <button type="button" onClick={() => toggleKey('fSecret')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-cyan-500 transition-colors">
-                                            {showKeys.fSecret ? <Zap size={16} /> : <Bot size={16} />}
+                                            {showKeys.fSecret ? <RefreshCw size={16} /> : <ShieldCheck size={16} />}
                                         </button>
                                     </div>
                                 </div>
                             </div>
                             <p className="mt-4 text-[9px] font-black uppercase text-cyan-500/60 tracking-[0.2em] leading-relaxed">
-                                * Not: Vadeli test (Mock) işlemleri için Binance Mock Trading anahtarlarını kullanın ve Testnet şalterini kapatın.
+                                * Not: Vadeli test (Mock) işlemleri için Binance Mock Trading anahtarlarını kullanın ve yukarıdaki Testnet şalterini AÇIN.
                             </p>
                         </div>
                     </div>

@@ -36,13 +36,16 @@ router.post('/config', authCheck, async (req, res) => {
             config = await BinanceBotConfig.create({ userId: req.user.id });
         }
 
+        // Helper to check if value is just stars or empty
+        const isMasked = (val) => !val || /^\*+$/.test(val.trim());
+
         // Spot Keys
-        if (apiKey !== undefined && apiKey !== '**********************') config.apiKey = apiKey.trim();
-        if (apiSecret !== undefined && apiSecret !== '**********************') config.apiSecret = apiSecret.trim();
+        if (apiKey !== undefined && !isMasked(apiKey)) config.apiKey = apiKey.trim();
+        if (apiSecret !== undefined && !isMasked(apiSecret)) config.apiSecret = apiSecret.trim();
         
         // Futures Keys
-        if (futuresApiKey !== undefined && futuresApiKey !== '**********************') config.futuresApiKey = futuresApiKey.trim();
-        if (futuresApiSecret !== undefined && futuresApiSecret !== '**********************') config.futuresApiSecret = futuresApiSecret.trim();
+        if (futuresApiKey !== undefined && !isMasked(futuresApiKey)) config.futuresApiKey = futuresApiKey.trim();
+        if (futuresApiSecret !== undefined && !isMasked(futuresApiSecret)) config.futuresApiSecret = futuresApiSecret.trim();
 
         // Status Toggles
         if (isSpotActive !== undefined && config.isSpotActive !== isSpotActive) {
