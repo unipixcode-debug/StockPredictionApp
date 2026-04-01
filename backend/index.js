@@ -42,6 +42,7 @@ const newsService = require('./services/newsService');
 const app = express();
 
 // Middleware
+app.set('trust proxy', 1); // Trust first proxy (Nginx) for secure cookies and OAuth URLs
 app.use(express.json());
 app.use(cors());
 app.use(helmet({ contentSecurityPolicy: false }));
