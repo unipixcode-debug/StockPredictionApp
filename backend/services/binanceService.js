@@ -32,13 +32,20 @@ class BinanceService {
         });
 
         if (config.isTestnet) {
-            try {
-                exchange.setSandboxMode(true);
-            } catch (e) {
-                if (marketType === 'FUTURES' && e.message.includes('not supported for futures')) {
-                    throw new Error('BINANCE_FUTURES_TESTNET_DEPRECATED: Binance vadeli işlemler testneti artık desteklenmiyor. Lütfen "Mock Trading" anahtarlarınızı kullanın ve "Testnet Modu" şalterini kapatın.');
+            if (marketType === 'FUTURES') {
+                // Manual URL override for Binance Futures Mock Trading (Sandbox mode is buggy/deprecated for futures in newer CCXT)
+                exchange.urls['api'] = {
+                    'public': 'https://testnet.binancefuture.com/fapi/v1',
+                    'private': 'https://testnet.binancefuture.com/fapi/v1',
+                    'fapiPublic': 'https://testnet.binancefuture.com/fapi/v1',
+                    'fapiPrivate': 'https://testnet.binancefuture.com/fapi/v1',
+                };
+            } else {
+                try {
+                    exchange.setSandboxMode(true);
+                } catch (e) {
+                    throw e;
                 }
-                throw e;
             }
         }
 
