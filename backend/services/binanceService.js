@@ -33,22 +33,12 @@ class BinanceService {
 
         if (config.isTestnet) {
             if (marketType === 'FUTURES') {
-                // Manual URL override for Binance Futures Mock Trading
-                exchange.urls['api'] = {
-                    'public': 'https://testnet.binancefuture.com/fapi/v1',
-                    'private': 'https://testnet.binancefuture.com/fapi/v1',
-                    'fapiPublic': 'https://testnet.binancefuture.com/fapi/v1',
-                    'fapiPrivate': 'https://testnet.binancefuture.com/fapi/v1',
-                    'sapi': 'https://testnet.binancefuture.com/fapi/v1', // Satisfy CCXT check
-                };
+                // Manual URL override for Binance Futures Mock Trading (Sandbox mode is BUGGY in CCXT for futures)
+                exchange.urls['api']['fapiPublic'] = 'https://testnet.binancefuture.com/fapi/v1';
+                exchange.urls['api']['fapiPrivate'] = 'https://testnet.binancefuture.com/fapi/v1';
             } else {
-                // Manual URL override for Binance Spot Testnet
-                exchange.urls['api'] = {
-                    'public': 'https://testnet.binance.vision/api/v3',
-                    'private': 'https://testnet.binance.vision/api/v3',
-                    'v3': 'https://testnet.binance.vision/api/v3',
-                    'sapi': 'https://testnet.binance.vision/api/v3', // Satisfy CCXT check
-                };
+                // Std sandbox mode works fine for Spot and handles all sapi/v3 mapping automatically
+                exchange.setSandboxMode(true);
             }
         }
 
@@ -66,12 +56,12 @@ class BinanceService {
             let totalUSDT = 0;
 
             if (marketType === 'FUTURES') {
-                // Use a more direct futures-only balance call to avoid SAPI capital/config/getall errors
-                const balances = await exchange.fapiPrivateGetBalance();
-                const usdtBalance = balances.find(b => b.asset === 'USDT');
-                if (usdtBalance) {
-                    freeUSDT = parseFloat(usdtBalance.withdrawAvailable || usdtBalance.balance);
-                    totalUSDT = parseFloat(usdtBalance.balance);
+                // Use a more robust direct call for Futures account info
+                const accountInfo = await exchange.fapiPrivateGetAccount();
+                const usdtAsset = accountInfo.assets.find(a => a.asset === 'USDT');
+                if (usdtAsset) {
+                    freeUSDT = parseFloat(usdtAsset.availableBalance);
+                    totalUSDT = parseFloat(usdtAsset.walletBalance);
                 }
             } else {
                 const balance = await exchange.fetchBalance();
@@ -83,7 +73,7 @@ class BinanceService {
                 success: true,
                 freeUSDT,
                 totalUSDT,
-                testnet: exchange.urls.api.public.includes('testnet'),
+                testnet: exchange.urls.api.public.includes('testnet') || exchange.urls.api.fapiPublic?.includes('testnet'),
                 marketType
             };
         } catch (error) {
