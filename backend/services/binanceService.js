@@ -33,11 +33,17 @@ class BinanceService {
 
         if (config.isTestnet) {
             if (marketType === 'FUTURES') {
-                // Manual URL override for Binance Futures Mock Trading (Base domain only, so CCXT can append /fapi/v1 or /fapi/v2)
-                exchange.urls['api']['fapiPublic'] = 'https://testnet.binancefuture.com';
-                exchange.urls['api']['fapiPrivate'] = 'https://testnet.binancefuture.com';
-                exchange.urls['api']['fapiPublicV2'] = 'https://testnet.binancefuture.com';
-                exchange.urls['api']['fapiPrivateV2'] = 'https://testnet.binancefuture.com';
+                // Broad manual URL override for Binance Futures Mock Trading (Handles all subtypes)
+                const mockUrl = 'https://testnet.binancefuture.com';
+                exchange.urls['api'] = {
+                    ...exchange.urls['api'],
+                    'fapiPublic': `${mockUrl}/fapi/v1`, // Some still use fapi/v1 prefix
+                    'fapiPrivate': `${mockUrl}/fapi/v1`,
+                    'fapiPublicV2': `${mockUrl}/fapi/v2`,
+                    'fapiPrivateV2': `${mockUrl}/fapi/v2`,
+                    'public': `${mockUrl}/fapi/v1`, // Fallback for various methods
+                    'private': `${mockUrl}/fapi/v1`,
+                };
             } else {
                 // Std sandbox mode works fine for Spot and handles all sapi/v3 mapping automatically
                 exchange.setSandboxMode(true);
@@ -58,20 +64,10 @@ class BinanceService {
             let totalUSDT = 0;
 
             if (marketType === 'FUTURES') {
-                // Use a more robust direct call for Futures account info
-                const accountInfo = await exchange.fapiPrivateGetAccount();
-                if (accountInfo && accountInfo.assets) {
-                    const usdtAsset = accountInfo.assets.find(a => a.asset === 'USDT');
-                    if (usdtAsset) {
-                        freeUSDT = parseFloat(usdtAsset.availableBalance || 0);
-                        totalUSDT = parseFloat(usdtAsset.walletBalance || 0);
-                    }
-                } else {
-                    // Fallback to fetchBalance if getAccount returns unknown structure
-                    const balance = await exchange.fetchBalance({ type: 'future' });
-                    freeUSDT = balance['USDT']?.free || 0;
-                    totalUSDT = balance['USDT']?.total || 0;
-                }
+                // fetchBalance with type: future is the most robust way in CCXT (handles v1/v2 auto-routing)
+                const balance = await exchange.fetchBalance({ type: 'future' });
+                freeUSDT = balance['USDT']?.free || 0;
+                totalUSDT = balance['USDT']?.total || 0;
             } else {
                 const balance = await exchange.fetchBalance();
                 freeUSDT = balance['USDT']?.free || 0;
@@ -82,13 +78,15 @@ class BinanceService {
                 success: true,
                 freeUSDT,
                 totalUSDT,
-                testnet: exchange.urls.api.public.includes('testnet') || exchange.urls.api.fapiPublic?.includes('testnet'),
+                testnet: exchange.urls.api.public.includes('testnet') || (exchange.urls.api.fapiPublic && exchange.urls.api.fapiPublic.includes('testnet')),
                 marketType
             };
         } catch (error) {
             let errorMsg = error.message;
             if (errorMsg.includes('-2008') || errorMsg.includes('Invalid API-key ID')) {
                 errorMsg = 'Hata (-2008): API Anahtarı geçersiz. Lütfen girdiğiniz anahtarların doğruluğunu ve "Testnet Modu" şalterinin anahtarlarla uyumlu (Spot Testnet -> Açık, Mock Trading/Mainnet/Real -> Kapalı) olduğunu kontrol edin.';
+            } else if (error.message.includes('404')) {
+                errorMsg = 'Hata (404): Binance sunucusuna bağlanılamadı. Lütfen "Testnet Modu" şalterinin anahtarlarınızla uyumlu olduğundan emin olun (Yenile düğmesine basıp deneyin).';
             }
             return { success: false, error: errorMsg, marketType };
         }
