@@ -430,6 +430,9 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                     />
                                 </div>
                             </div>
+                            <p className="mt-4 text-[9px] font-black uppercase text-cyan-500/60 tracking-[0.2em] leading-relaxed">
+                                * Not: Vadeli test (Mock) işlemleri için Binance Mock Trading anahtarlarını kullanın ve Testnet şalterini kapatın.
+                            </p>
                         </div>
                     </div>
 

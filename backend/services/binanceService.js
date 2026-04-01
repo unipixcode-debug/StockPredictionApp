@@ -32,7 +32,14 @@ class BinanceService {
         });
 
         if (config.isTestnet) {
-            exchange.setSandboxMode(true);
+            try {
+                exchange.setSandboxMode(true);
+            } catch (e) {
+                if (marketType === 'FUTURES' && e.message.includes('not supported for futures')) {
+                    throw new Error('BINANCE_FUTURES_TESTNET_DEPRECATED: Binance vadeli işlemler testneti artık desteklenmiyor. Lütfen "Mock Trading" anahtarlarınızı kullanın ve "Testnet Modu" şalterini kapatın.');
+                }
+                throw e;
+            }
         }
 
         return { exchange, config };
