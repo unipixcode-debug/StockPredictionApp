@@ -82,10 +82,11 @@ class BinanceService {
             let totalUSDT = 0;
 
             if (marketType === 'FUTURES') {
-                // fetchBalance with type: future is the most robust way in CCXT (handles v1/v2 auto-routing)
-                const balance = await exchange.fetchBalance({ type: 'future' });
-                freeUSDT = balance['USDT']?.free || 0;
-                totalUSDT = balance['USDT']?.total || 0;
+                // Using a lower-level direct call to bypass CCXT's complex internal routing for Demo
+                const balanceArray = await exchange.fapiPrivateGetBalance();
+                const usdtBalance = balanceArray.find(b => b.asset === 'USDT');
+                freeUSDT = parseFloat(usdtBalance?.withdrawAvailable || usdtBalance?.balance || 0);
+                totalUSDT = parseFloat(usdtBalance?.balance || usdtBalance?.marginBalance || 0);
             } else {
                 const balance = await exchange.fetchBalance();
                 freeUSDT = balance['USDT']?.free || 0;
