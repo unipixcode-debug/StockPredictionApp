@@ -4,19 +4,30 @@ const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
 class BinanceService {
     /**
      * Initializes a ccxt binance instance for a user
+     * @param {string} userId
+     * @param {string} marketType - 'SPOT' or 'FUTURES'
      */
-    async getExchangeInstance(userId) {
+    async getExchangeInstance(userId, marketType = 'SPOT') {
         const config = await BinanceBotConfig.findOne({ where: { userId } });
-        if (!config || !config.apiKey || !config.apiSecret) {
-            throw new Error('BINANCE_API_NOT_CONFIGURED');
+        if (!config) throw new Error('BINANCE_NOT_CONFIGURED');
+
+        let apiKey, apiSecret;
+        if (marketType === 'FUTURES') {
+            apiKey = config.futuresApiKey;
+            apiSecret = config.futuresApiSecret;
+            if (!apiKey || !apiSecret) throw new Error('BINANCE_FUTURES_API_NOT_CONFIGURED');
+        } else {
+            apiKey = config.apiKey;
+            apiSecret = config.apiSecret;
+            if (!apiKey || !apiSecret) throw new Error('BINANCE_SPOT_API_NOT_CONFIGURED');
         }
 
         const exchange = new ccxt.binance({
-            apiKey: config.apiKey,
-            secret: config.apiSecret,
+            apiKey,
+            secret: apiSecret,
             enableRateLimit: true,
             options: {
-                defaultType: config.enableSpot ? 'spot' : 'future', // spot or future
+                defaultType: marketType === 'FUTURES' ? 'future' : 'spot',
             }
         });
 
@@ -28,41 +39,44 @@ class BinanceService {
     }
 
     /**
-     * Tests connection for given userId
+     * Tests connection for given userId and market
      */
-    async testConnection(userId) {
+    async testConnection(userId, marketType = 'SPOT') {
         try {
-            const { exchange } = await this.getExchangeInstance(userId);
+            const { exchange } = await this.getExchangeInstance(userId, marketType);
             const balance = await exchange.fetchBalance();
             return {
                 success: true,
                 freeUSDT: balance['USDT']?.free || 0,
                 totalUSDT: balance['USDT']?.total || 0,
-                testnet: exchange.urls.api.public.includes('testnet')
+                testnet: exchange.urls.api.public.includes('testnet'),
+                marketType
             };
         } catch (error) {
-            return { success: false, error: error.message };
+            return { success: false, error: error.message, marketType };
         }
     }
 
     /**
      * Executes a trade based on AI Signal
      * @param {*} userId 
-     * @param {Object} signal - { symbol: 'BTC-USD', direction: 'BUY'|'SELL', market: 'CRYPTO' }
+     * @param {Object} signal - { symbol: 'BTC-USD', direction: 'BUY'|'SELL', market: 'CRYPTO', type: 'SPOT'|'FUTURES' }
      */
     async executeTrade(userId, signal) {
         if (signal.market !== 'CRYPTO') return null;
         
         // Map symbol format: BTC-USD -> BTC/USDT
         const pair = signal.symbol.replace('-USD', '') + '/USDT';
+        const marketType = signal.type || 'SPOT'; // Default to spot if not specified
 
         try {
-            const { exchange, config } = await this.getExchangeInstance(userId);
+            const { exchange, config } = await this.getExchangeInstance(userId, marketType);
             
-            if (!config.isActive) return null;
+            // Check specific activation
+            if (marketType === 'SPOT' && !config.isSpotActive) return null;
+            if (marketType === 'FUTURES' && !config.isFuturesActive) return null;
 
             // Simple basic logic for execution
-            // We fetch ticker to get current price to calculate size
             const ticker = await exchange.fetchTicker(pair);
             const currentPrice = ticker.last;
 
@@ -87,7 +101,7 @@ class BinanceService {
                 tradeAmountUSDT = freeUSDT;
             }
 
-            // Min order size for Binance is normally 5-10 USDT depending on pair
+            // Min order size check
             if (tradeAmountUSDT < 5) {
                 throw new Error('INSUFFICIENT_BALANCE_FOR_MIN_ORDER');
             }
@@ -96,10 +110,6 @@ class BinanceService {
             const amount = tradeAmountUSDT / currentPrice;
             const side = signal.direction.toLowerCase(); // 'buy' or 'sell'
             
-            // Execute Market Order
-            // Warning: For 'sell', we should check if we already hold the coin in spot. 
-            // If it's spot, we can't 'short'. So 'sell' only works if we hold it.
-            // If futures, we can short.
             let activeOpenPositions = await ExecutedTrade.count({
                 where: { userId, status: 'OPEN' }
             });
@@ -108,19 +118,17 @@ class BinanceService {
                  throw new Error('MAX_POSITIONS_REACHED');
             }
 
-            // Let's create a pending DB record
+            // Create record
             const tradeRecord = await ExecutedTrade.create({
                 userId,
                 symbol: pair,
                 side: signal.direction,
-                type: exchange.options.defaultType.toUpperCase(),
+                type: marketType,
                 amount: amount,
                 status: 'OPEN'
             });
 
             try {
-                // Warning: This is a simplified market order logic. 
-                // In production, we should handle filters like lot size, min notional, etc.
                 const order = await exchange.createMarketOrder(pair, side, amount);
                 
                 tradeRecord.exchangeOrderId = order.id;
@@ -137,7 +145,7 @@ class BinanceService {
             }
 
         } catch (error) {
-            console.error(`Binance bot error for user ${userId}:`, error.message);
+            console.error(`Binance bot error for user ${userId} (${marketType}):`, error.message);
             throw error;
         }
     }

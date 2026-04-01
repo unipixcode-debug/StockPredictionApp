@@ -117,11 +117,19 @@ export default function BotDashboard() {
                     </div>
                     <div>
                         <h1 className="text-4xl font-black tracking-tight italic uppercase">AI Trade Bot</h1>
-                        <div className="flex items-center space-x-2 mt-1">
-                            <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${isBotActive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                            <p className="text-muted-foreground font-black text-xs uppercase tracking-widest">
-                                {isBotActive ? 'Bot Taramada (Aktif)' : 'Bot Beklemede (Pasif)'}
-                            </p>
+                        <div className="flex items-center space-x-4 mt-1">
+                            <div className="flex items-center space-x-1.5">
+                                <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${config?.isSpotActive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                <p className="text-muted-foreground font-black text-[10px] uppercase tracking-widest">
+                                    SPOT: {config?.isSpotActive ? 'AKTİF' : 'PASİF'}
+                                </p>
+                            </div>
+                            <div className="flex items-center space-x-1.5">
+                                <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${config?.isFuturesActive ? 'bg-cyan-500' : 'bg-rose-500'}`} />
+                                <p className="text-muted-foreground font-black text-[10px] uppercase tracking-widest">
+                                    FUTURES: {config?.isFuturesActive ? 'AKTİF' : 'PASİF'}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -317,15 +325,19 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
     const [formData, setFormData] = useState({
         apiKey: '',
         apiSecret: '',
-        isActive: false,
+        futuresApiKey: '',
+        futuresApiSecret: '',
+        isSpotActive: false,
+        isFuturesActive: false,
         isTestnet: true,
-        enableSpot: true,
-        enableFutures: false,
         budgetMode: 'PERCENTAGE',
         budgetAmount: 10,
         maxPositions: 3,
-        maxPerAsset: 50
+        maxPerAsset: 50,
+        scanInterval: 300
     });
+
+    const [testMarket, setTestMarket] = useState('SPOT');
 
     // Populate initial
     useEffect(() => {
@@ -333,14 +345,16 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
             setFormData({
                 apiKey: config.apiKey ? '**********************' : '',
                 apiSecret: config.apiSecret ? '**********************' : '',
-                isActive: config.isActive,
+                futuresApiKey: config.futuresApiKey ? '**********************' : '',
+                futuresApiSecret: config.futuresApiSecret ? '**********************' : '',
+                isSpotActive: config.isSpotActive,
+                isFuturesActive: config.isFuturesActive,
                 isTestnet: config.isTestnet,
-                enableSpot: config.enableSpot,
-                enableFutures: config.enableFutures,
                 budgetMode: config.budgetMode || 'PERCENTAGE',
                 budgetAmount: config.budgetAmount || 10,
                 maxPositions: config.maxPositions || 3,
-                maxPerAsset: config.maxPerAsset || 50
+                maxPerAsset: config.maxPerAsset || 50,
+                scanInterval: config.scanInterval || 300
             });
         }
     }, [config]);
@@ -358,6 +372,8 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
         const payload = { ...formData };
         if (payload.apiKey === '**********************') delete payload.apiKey;
         if (payload.apiSecret === '**********************') delete payload.apiSecret;
+        if (payload.futuresApiKey === '**********************') delete payload.futuresApiKey;
+        if (payload.futuresApiSecret === '**********************') delete payload.futuresApiSecret;
         onSave(payload);
     };
 
@@ -367,52 +383,88 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                 <form onSubmit={handleSubmit} className="glass-card p-8 space-y-8 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10" />
 
-                    <div>
-                        <h2 className="text-2xl font-black italic uppercase tracking-tight mb-2">API Yapılandırması</h2>
-                        <p className="text-sm font-medium text-muted-foreground">Binance Testnet veya Mainnet API anahtarlarınızı girin. Sadece "Spot & Margin" ve "Futures" okuma ve işlem yapma izni verin. Çekme (Withdraw) izni KAPALI olmalıdır.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-xs font-black uppercase text-muted-foreground tracking-widest pl-2">API Key</label>
-                            <input 
-                                type="text" name="apiKey" value={formData.apiKey} onChange={handleChange}
-                                placeholder="Binance API Key"
-                                className="w-full bg-secondary/50 border border-border p-4 rounded-2xl focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-foreground transition-all"
-                            />
+                    <div className="space-y-6">
+                        <div className="p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/20">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-emerald-500 mb-4 flex items-center gap-2">
+                                <Zap size={14} /> Spot API Anahtarları
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Spot API Key</label>
+                                    <input 
+                                        type="text" name="apiKey" value={formData.apiKey} onChange={handleChange}
+                                        placeholder="Binance Spot API Key"
+                                        className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl focus:border-emerald-500/50 text-foreground transition-all"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Spot Secret Key</label>
+                                    <input 
+                                        type="password" name="apiSecret" value={formData.apiSecret} onChange={handleChange}
+                                        placeholder="Binance Spot Secret Key"
+                                        className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl focus:border-emerald-500/50 text-foreground transition-all"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-black uppercase text-muted-foreground tracking-widest pl-2">Secret Key</label>
-                            <input 
-                                type="password" name="apiSecret" value={formData.apiSecret} onChange={handleChange}
-                                placeholder="Binance Secret Key"
-                                className="w-full bg-secondary/50 border border-border p-4 rounded-2xl focus:border-primary/50 focus:ring-1 focus:ring-primary/50 text-foreground transition-all"
-                            />
+
+                        <div className="p-6 bg-cyan-500/5 rounded-3xl border border-cyan-500/20">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-cyan-500 mb-4 flex items-center gap-2">
+                                <Bot size={14} /> Vadeli (Futures) API Anahtarları
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Futures API Key</label>
+                                    <input 
+                                        type="text" name="futuresApiKey" value={formData.futuresApiKey} onChange={handleChange}
+                                        placeholder="Binance Futures API Key"
+                                        className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl focus:border-cyan-500/50 text-foreground transition-all"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Futures Secret Key</label>
+                                    <input 
+                                        type="password" name="futuresApiSecret" value={formData.futuresApiSecret} onChange={handleChange}
+                                        placeholder="Binance Futures Secret Key"
+                                        className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl focus:border-cyan-500/50 text-foreground transition-all"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div className="border-t border-border pt-8 mt-8">
                         <h2 className="text-2xl font-black italic uppercase tracking-tight mb-6">Risk Parametreleri</h2>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                             <div className="p-4 bg-secondary/30 rounded-2xl border border-border/50 flex justify-between items-center">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                             <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 flex justify-between items-center">
                                  <div>
-                                     <p className="font-black text-sm uppercase">Bot Aktif</p>
-                                     <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Sinyallere işlem uygular</p>
+                                     <p className="font-black text-[10px] uppercase text-emerald-500">Spot Bot</p>
+                                     <p className="text-[8px] text-muted-foreground uppercase tracking-widest">Spot piyasada al-sat</p>
                                  </div>
                                  <label className="relative inline-flex items-center cursor-pointer">
-                                     <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleChange} className="sr-only peer" />
-                                     <div className="w-11 h-6 bg-secondary border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                     <input type="checkbox" name="isSpotActive" checked={formData.isSpotActive} onChange={handleChange} className="sr-only peer" />
+                                     <div className="w-9 h-5 bg-secondary border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
                                  </label>
                              </div>
-                             <div className="p-4 bg-secondary/30 rounded-2xl border border-border/50 flex justify-between items-center">
+                             <div className="p-4 bg-cyan-500/5 rounded-2xl border border-cyan-500/10 flex justify-between items-center">
                                  <div>
-                                     <p className="font-black text-sm uppercase text-amber-500">Testnet Modu</p>
-                                     <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Sanal bakiye ile işlem yapar</p>
+                                     <p className="font-black text-[10px] uppercase text-cyan-500">Futures Bot</p>
+                                     <p className="text-[8px] text-muted-foreground uppercase tracking-widest">Vadeli piyasada al-sat</p>
+                                 </div>
+                                 <label className="relative inline-flex items-center cursor-pointer">
+                                     <input type="checkbox" name="isFuturesActive" checked={formData.isFuturesActive} onChange={handleChange} className="sr-only peer" />
+                                     <div className="w-9 h-5 bg-secondary border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                                 </label>
+                             </div>
+                             <div className="p-4 bg-amber-500/5 rounded-2xl border border-amber-500/10 flex justify-between items-center">
+                                 <div>
+                                     <p className="font-black text-[10px] uppercase text-amber-500">Testnet</p>
+                                     <p className="text-[8px] text-muted-foreground uppercase tracking-widest">Sanal bakiye kullanımı</p>
                                  </div>
                                  <label className="relative inline-flex items-center cursor-pointer">
                                      <input type="checkbox" name="isTestnet" checked={formData.isTestnet} onChange={handleChange} className="sr-only peer" />
-                                     <div className="w-11 h-6 bg-secondary border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                     <div className="w-9 h-5 bg-secondary border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
                                  </label>
                              </div>
                         </div>
@@ -448,15 +500,16 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                 <label className="text-xs font-black uppercase text-muted-foreground tracking-widest pl-2">Aynı Anda Maksimum İşlem</label>
                                 <input 
                                     type="number" name="maxPositions" value={formData.maxPositions} onChange={handleChange}
-                                    className="w-full bg-secondary/50 border border-border p-4 rounded-2xl focus:border-primary/50 text-foreground"
+                                    className="w-full bg-secondary/30 border border-border p-4 rounded-2xl focus:border-primary/50 text-foreground"
                                 />
                              </div>
 
                              <div className="space-y-2">
-                                <label className="text-xs font-black uppercase text-muted-foreground tracking-widest pl-2">İşlem Başına Maks. USDT Limiti</label>
+                                <label className="text-xs font-black uppercase text-muted-foreground tracking-widest pl-2 font-black text-amber-500">Tarama Aralığı (Saniye)</label>
                                 <input 
-                                    type="number" name="maxPerAsset" value={formData.maxPerAsset} onChange={handleChange}
-                                    className="w-full bg-secondary/50 border border-border p-4 rounded-2xl focus:border-primary/50 text-foreground"
+                                    type="number" name="scanInterval" value={formData.scanInterval} onChange={handleChange}
+                                    placeholder="Örn: 300 (5 dk)"
+                                    className="w-full bg-amber-500/5 border border-amber-500/20 p-4 rounded-2xl focus:border-amber-500 text-foreground font-black"
                                 />
                              </div>
                         </div>
@@ -476,14 +529,28 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                         <ShieldCheck className="text-blue-500" />
                         <h3 className="text-lg font-black italic uppercase">Bağlantı Testi</h3>
                     </div>
-                    <p className="text-sm font-medium text-muted-foreground mb-6">API Key'lerinizin doğru yapılandırıldığını ve bütçe erişimi olduğunu test edin.</p>
+                    <p className="text-sm font-medium text-muted-foreground mb-4">API Key'lerinizin doğruluğunu test edin.</p>
+                    
+                    <div className="flex bg-black/40 p-1 rounded-xl mb-4 border border-white/5">
+                        <button 
+                            type="button"
+                            onClick={() => setTestMarket('SPOT')}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${testMarket === 'SPOT' ? 'bg-emerald-500 text-black' : 'text-muted-foreground'}`}
+                        >Spot</button>
+                        <button 
+                            type="button"
+                            onClick={() => setTestMarket('FUTURES')}
+                            className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${testMarket === 'FUTURES' ? 'bg-cyan-500 text-black' : 'text-muted-foreground'}`}
+                        >Futures</button>
+                    </div>
+
                     <button 
                          type="button"
-                         onClick={onTest}
+                         onClick={() => onTest({ marketType: testMarket })}
                          disabled={isTesting}
-                         className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all flex justify-center items-center"
+                         className={`w-full py-3 ${testMarket === 'SPOT' ? 'bg-emerald-500' : 'bg-cyan-500'} text-black font-black uppercase tracking-widest rounded-2xl shadow-lg transition-all flex justify-center items-center`}
                     >
-                         {isTesting ? <RefreshCw className="animate-spin" /> : 'API Testi Yap'}
+                         {isTesting ? <RefreshCw className="animate-spin" /> : `${testMarket} Test Et`}
                     </button>
 
                     {testResult && (

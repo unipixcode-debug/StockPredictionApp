@@ -23,9 +23,12 @@ router.get('/config', authCheck, async (req, res) => {
 router.post('/config', authCheck, async (req, res) => {
     try {
         const { 
-            apiKey, apiSecret, isActive, budgetMode, budgetAmount, 
-            maxPositions, maxPerAsset, enableSpot, enableFutures, 
-            defaultLeverage, riskLevel, isTestnet 
+            apiKey, apiSecret, 
+            futuresApiKey, futuresApiSecret,
+            isSpotActive, isFuturesActive,
+            budgetMode, budgetAmount, 
+            maxPositions, maxPerAsset, 
+            isTestnet, scanInterval
         } = req.body;
 
         let config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
@@ -33,17 +36,33 @@ router.post('/config', authCheck, async (req, res) => {
             config = await BinanceBotConfig.create({ userId: req.user.id });
         }
 
+        // Spot Keys
         if (apiKey !== undefined) config.apiKey = apiKey;
         if (apiSecret !== undefined) config.apiSecret = apiSecret;
-        if (isActive !== undefined && config.isActive !== isActive) {
-            config.isActive = isActive;
-            if (isActive) {
-                await botScannerService.log(req.user.id, 'Bot aktif duruma getirildi. Tarama başlatılıyor...', 'success');
-            } else {
-                await botScannerService.log(req.user.id, 'Bot durduruldu. Piyasa izlemesi kapatıldı.', 'error');
-            }
+        
+        // Futures Keys
+        if (futuresApiKey !== undefined) config.futuresApiKey = futuresApiKey;
+        if (futuresApiSecret !== undefined) config.futuresApiSecret = futuresApiSecret;
+
+        // Status Toggles
+        if (isSpotActive !== undefined && config.isSpotActive !== isSpotActive) {
+            config.isSpotActive = isSpotActive;
+            await botScannerService.log(req.user.id, `Spot Bot ${isSpotActive ? 'Açıldı' : 'Kapatıldı'}.`, isSpotActive ? 'success' : 'error');
         }
         
+        if (isFuturesActive !== undefined && config.isFuturesActive !== isFuturesActive) {
+            config.isFuturesActive = isFuturesActive;
+            await botScannerService.log(req.user.id, `Futures Bot ${isFuturesActive ? 'Açıldı' : 'Kapatıldı'}.`, isFuturesActive ? 'success' : 'error');
+        }
+
+        // Other settings
+        if (budgetMode !== undefined) config.budgetMode = budgetMode;
+        if (budgetAmount !== undefined) config.budgetAmount = budgetAmount;
+        if (maxPositions !== undefined) config.maxPositions = maxPositions;
+        if (maxPerAsset !== undefined) config.maxPerAsset = maxPerAsset;
+        if (isTestnet !== undefined) config.isTestnet = isTestnet;
+        if (scanInterval !== undefined) config.scanInterval = parseInt(scanInterval) || 300;
+
         await config.save();
         res.json({ message: 'Bot configuration updated successfully', config });
     } catch (error) {
@@ -54,8 +73,8 @@ router.post('/config', authCheck, async (req, res) => {
 // Test API Connection
 router.post('/test-connection', authCheck, async (req, res) => {
     try {
-        // We will test using current DB config
-        const result = await binanceService.testConnection(req.user.id);
+        const { marketType } = req.body; // 'SPOT' or 'FUTURES'
+        const result = await binanceService.testConnection(req.user.id, marketType || 'SPOT');
         res.json(result);
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

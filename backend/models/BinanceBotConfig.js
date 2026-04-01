@@ -60,9 +60,47 @@ const BinanceBotConfig = sequelize.define('BinanceBotConfig', {
             return val ? decrypt(val) : null;
         }
     },
+    futuresApiKey: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        set(value) {
+            this.setDataValue('futuresApiKey', encrypt(value));
+        },
+        get() {
+            const val = this.getDataValue('futuresApiKey');
+            return val ? decrypt(val) : null;
+        }
+    },
+    futuresApiSecret: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        set(value) {
+            this.setDataValue('futuresApiSecret', encrypt(value));
+        },
+        get() {
+            const val = this.getDataValue('futuresApiSecret');
+            return val ? decrypt(val) : null;
+        }
+    },
     isActive: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+    },
+    isSpotActive: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    isFuturesActive: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    scanInterval: {
+        type: DataTypes.INTEGER,
+        defaultValue: 300 // default 5 mins
+    },
+    lastScanAt: {
+        type: DataTypes.DATE,
+        allowNull: true
     },
     isTestnet: {
         type: DataTypes.BOOLEAN,
