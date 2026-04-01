@@ -60,10 +60,17 @@ class BinanceService {
             if (marketType === 'FUTURES') {
                 // Use a more robust direct call for Futures account info
                 const accountInfo = await exchange.fapiPrivateGetAccount();
-                const usdtAsset = accountInfo.assets.find(a => a.asset === 'USDT');
-                if (usdtAsset) {
-                    freeUSDT = parseFloat(usdtAsset.availableBalance);
-                    totalUSDT = parseFloat(usdtAsset.walletBalance);
+                if (accountInfo && accountInfo.assets) {
+                    const usdtAsset = accountInfo.assets.find(a => a.asset === 'USDT');
+                    if (usdtAsset) {
+                        freeUSDT = parseFloat(usdtAsset.availableBalance || 0);
+                        totalUSDT = parseFloat(usdtAsset.walletBalance || 0);
+                    }
+                } else {
+                    // Fallback to fetchBalance if getAccount returns unknown structure
+                    const balance = await exchange.fetchBalance({ type: 'future' });
+                    freeUSDT = balance['USDT']?.free || 0;
+                    totalUSDT = balance['USDT']?.total || 0;
                 }
             } else {
                 const balance = await exchange.fetchBalance();
