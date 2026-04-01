@@ -37,12 +37,12 @@ router.post('/config', authCheck, async (req, res) => {
         }
 
         // Spot Keys
-        if (apiKey !== undefined && apiKey !== '**********************') config.apiKey = apiKey;
-        if (apiSecret !== undefined && apiSecret !== '**********************') config.apiSecret = apiSecret;
+        if (apiKey !== undefined && apiKey !== '**********************') config.apiKey = apiKey.trim();
+        if (apiSecret !== undefined && apiSecret !== '**********************') config.apiSecret = apiSecret.trim();
         
         // Futures Keys
-        if (futuresApiKey !== undefined && futuresApiKey !== '**********************') config.futuresApiKey = futuresApiKey;
-        if (futuresApiSecret !== undefined && futuresApiSecret !== '**********************') config.futuresApiSecret = futuresApiSecret;
+        if (futuresApiKey !== undefined && futuresApiKey !== '**********************') config.futuresApiKey = futuresApiKey.trim();
+        if (futuresApiSecret !== undefined && futuresApiSecret !== '**********************') config.futuresApiSecret = futuresApiSecret.trim();
 
         // Status Toggles
         if (isSpotActive !== undefined && config.isSpotActive !== isSpotActive) {

@@ -359,6 +359,9 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
         }
     }, [config]);
 
+    const [showKeys, setShowKeys] = useState({});
+    const toggleKey = (key) => setShowKeys(p => ({...p, [key]: !p[key]}));
+
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => ({
@@ -391,19 +394,29 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Spot API Key</label>
-                                    <input 
-                                        type="text" name="apiKey" value={formData.apiKey} onChange={handleChange}
-                                        placeholder="Binance Spot API Key"
-                                        className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl focus:border-emerald-500/50 text-foreground transition-all"
-                                    />
+                                    <div className="relative">
+                                        <input 
+                                            type={showKeys.apiKey ? "text" : "password"} name="apiKey" value={formData.apiKey} onChange={handleChange}
+                                            placeholder="Binance Spot API Key"
+                                            className="w-full bg-black/40 border border-white/5 p-4 pr-12 rounded-2xl focus:border-emerald-500/50 text-foreground transition-all"
+                                        />
+                                        <button type="button" onClick={() => toggleKey('apiKey')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-emerald-500 transition-colors">
+                                            {showKeys.apiKey ? <Zap size={16} /> : <Bot size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Spot Secret Key</label>
-                                    <input 
-                                        type="password" name="apiSecret" value={formData.apiSecret} onChange={handleChange}
-                                        placeholder="Binance Spot Secret Key"
-                                        className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl focus:border-emerald-500/50 text-foreground transition-all"
-                                    />
+                                    <div className="relative">
+                                        <input 
+                                            type={showKeys.apiSecret ? "text" : "password"} name="apiSecret" value={formData.apiSecret} onChange={handleChange}
+                                            placeholder="Binance Spot Secret Key"
+                                            className="w-full bg-black/40 border border-white/5 p-4 pr-12 rounded-2xl focus:border-emerald-500/50 text-foreground transition-all"
+                                        />
+                                         <button type="button" onClick={() => toggleKey('apiSecret')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-emerald-500 transition-colors">
+                                            {showKeys.apiSecret ? <Zap size={16} /> : <Bot size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -415,19 +428,29 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Futures API Key</label>
-                                    <input 
-                                        type="text" name="futuresApiKey" value={formData.futuresApiKey} onChange={handleChange}
-                                        placeholder="Binance Futures API Key"
-                                        className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl focus:border-cyan-500/50 text-foreground transition-all"
-                                    />
+                                    <div className="relative">
+                                        <input 
+                                            type={showKeys.fKey ? "text" : "password"} name="futuresApiKey" value={formData.futuresApiKey} onChange={handleChange}
+                                            placeholder="Binance Futures API Key"
+                                            className="w-full bg-black/40 border border-white/5 p-4 pr-12 rounded-2xl focus:border-cyan-500/50 text-foreground transition-all"
+                                        />
+                                        <button type="button" onClick={() => toggleKey('fKey')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-cyan-500 transition-colors">
+                                            {showKeys.fKey ? <Zap size={16} /> : <Bot size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Futures Secret Key</label>
-                                    <input 
-                                        type="password" name="futuresApiSecret" value={formData.futuresApiSecret} onChange={handleChange}
-                                        placeholder="Binance Futures Secret Key"
-                                        className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl focus:border-cyan-500/50 text-foreground transition-all"
-                                    />
+                                    <div className="relative">
+                                        <input 
+                                            type={showKeys.fSecret ? "text" : "password"} name="futuresApiSecret" value={formData.futuresApiSecret} onChange={handleChange}
+                                            placeholder="Binance Futures Secret Key"
+                                            className="w-full bg-black/40 border border-white/5 p-4 pr-12 rounded-2xl focus:border-cyan-500/50 text-foreground transition-all"
+                                        />
+                                        <button type="button" onClick={() => toggleKey('fSecret')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-cyan-500 transition-colors">
+                                            {showKeys.fSecret ? <Zap size={16} /> : <Bot size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <p className="mt-4 text-[9px] font-black uppercase text-cyan-500/60 tracking-[0.2em] leading-relaxed">
