@@ -67,6 +67,10 @@ class BinanceService {
         try {
             const { exchange } = await this.getExchangeInstance(userId, marketType);
             
+            // Explicitly sync time with Binance server to avoid signature/-2008 errors
+            // (Uses /fapi/v1/time as suggested by the user's documentation)
+            await exchange.loadTimeDifference();
+            
             let freeUSDT = 0;
             let totalUSDT = 0;
 
