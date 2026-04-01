@@ -33,19 +33,22 @@ class BinanceService {
 
         if (config.isTestnet) {
             if (marketType === 'FUTURES') {
-                // Manual URL override for Binance Futures Mock Trading (Sandbox mode is buggy/deprecated for futures in newer CCXT)
+                // Manual URL override for Binance Futures Mock Trading
                 exchange.urls['api'] = {
                     'public': 'https://testnet.binancefuture.com/fapi/v1',
                     'private': 'https://testnet.binancefuture.com/fapi/v1',
                     'fapiPublic': 'https://testnet.binancefuture.com/fapi/v1',
                     'fapiPrivate': 'https://testnet.binancefuture.com/fapi/v1',
+                    'sapi': 'https://testnet.binancefuture.com/fapi/v1', // Satisfy CCXT check
                 };
             } else {
-                try {
-                    exchange.setSandboxMode(true);
-                } catch (e) {
-                    throw e;
-                }
+                // Manual URL override for Binance Spot Testnet
+                exchange.urls['api'] = {
+                    'public': 'https://testnet.binance.vision/api/v3',
+                    'private': 'https://testnet.binance.vision/api/v3',
+                    'v3': 'https://testnet.binance.vision/api/v3',
+                    'sapi': 'https://testnet.binance.vision/api/v3', // Satisfy CCXT check
+                };
             }
         }
 
