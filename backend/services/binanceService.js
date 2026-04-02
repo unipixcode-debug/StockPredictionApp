@@ -52,6 +52,44 @@ function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
     });
 }
 
+// ── Demo-fapi symbol cache ────────────────────────────────────────────────────
+// CCXT loadMarkets() ignores URL overrides → fetches mainnet symbols.
+// We cache demo-fapi's own exchangeInfo via raw HTTPS to validate symbols correctly.
+let _demoSymbolCache = null;
+let _demoSymbolCacheTime = 0;
+const DEMO_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getCachedDemoSymbols() {
+    if (_demoSymbolCache && Date.now() - _demoSymbolCacheTime < DEMO_CACHE_TTL) {
+        return Promise.resolve(_demoSymbolCache);
+    }
+    return new Promise((resolve) => {
+        const req = https.request({
+            hostname: 'demo-fapi.binance.com',
+            port: 443,
+            path: '/fapi/v1/exchangeInfo',
+            method: 'GET',
+        }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    const symbols = new Set(parsed.symbols.map(s => s.symbol));
+                    _demoSymbolCache = symbols;
+                    _demoSymbolCacheTime = Date.now();
+                    console.log(`[Binance] demo-fapi cache: ${symbols.size} available symbols.`);
+                    resolve(symbols);
+                } catch {
+                    resolve(new Set(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT']));
+                }
+            });
+        });
+        req.on('error', () => resolve(new Set(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT'])));
+        req.end();
+    });
+}
+
 class BinanceService {
     /**
      * Initializes a ccxt binance instance for a user
@@ -189,11 +227,19 @@ class BinanceService {
             // Sync time before any signed request (critical for Demo Trading)
             if (marketType === 'FUTURES') await exchange.loadTimeDifference();
 
-            // Load markets and validate pair exists in this exchange environment
-            // (Demo Trading only supports a subset of all futures pairs)
-            await exchange.loadMarkets();
-            if (!exchange.markets[pair]) {
-                throw new Error(`SYMBOL_NOT_AVAILABLE: ${pair} is not listed in this exchange environment.`);
+            // Validate symbol is available in the target exchange environment
+            if (marketType === 'FUTURES' && config.isTestnet) {
+                // CCXT loadMarkets() ignores URL overrides and fetches mainnet - use raw HTTPS instead
+                const apiSymbol = pair.split('/')[0] + 'USDT'; // ENA/USDT:USDT → ENAUSDT
+                const demoSymbols = await getCachedDemoSymbols();
+                if (!demoSymbols.has(apiSymbol)) {
+                    throw new Error(`SYMBOL_NOT_ON_DEMO: ${apiSymbol} is not available on demo-fapi. Skipped.`);
+                }
+            } else {
+                await exchange.loadMarkets();
+                if (!exchange.markets[pair]) {
+                    throw new Error(`SYMBOL_NOT_AVAILABLE: ${pair} is not listed in this exchange environment.`);
+                }
             }
 
             // Check specific activation
