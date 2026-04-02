@@ -13,6 +13,7 @@ function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
         const path     = '/fapi/v1/order';
 
+        if (params.symbol) params.symbol = params.symbol.toUpperCase();
         const timestamp = Date.now();
         const body      = querystring.stringify({ ...params, timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
@@ -94,6 +95,7 @@ function rawFuturesBalance(apiKey, apiSecret, isTestnet = true) {
 function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        if (params.symbol) params.symbol = params.symbol.toUpperCase();
         const timestamp = Date.now();
         const body = querystring.stringify({ ...params, timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
@@ -131,7 +133,7 @@ function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true) {
 function rawFuturesPublicOHLCV(symbol, timeframe = '5m', limit = 30, isTestnet = true) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
-        const url = `https://${hostname}/fapi/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=${limit}`;
+        const url = `https://${hostname}/fapi/v1/klines?symbol=${symbol.toUpperCase()}&interval=${timeframe}&limit=${limit}`;
         https.get(url, (res) => {
             let data = '';
             res.on('data', d => data += d);
@@ -159,7 +161,7 @@ function rawFuturesPublicOHLCV(symbol, timeframe = '5m', limit = 30, isTestnet =
 function rawFuturesPublicTickers(isTestnet = true, symbol = null) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
-        const url = `https://${hostname}/fapi/v1/ticker/price` + (symbol ? `?symbol=${symbol}` : '');
+        const url = `https://${hostname}/fapi/v1/ticker/price` + (symbol ? `?symbol=${symbol.toUpperCase()}` : '');
         https.get(url, (res) => {
             let data = '';
             res.on('data', d => data += d);
@@ -466,11 +468,11 @@ class BinanceService {
             if (!currentPrice) {
                 try {
                     if (marketType === 'FUTURES') {
-                        const sym    = signal.symbol.includes('-') ? signal.symbol.split('-')[0] + 'USDT' : signal.symbol.replace('/', '') + 'USDT';
+                        const sym    = (signal.symbol.includes('-') ? signal.symbol.split('-')[0] + 'USDT' : signal.symbol.replace('/', '') + 'USDT').toUpperCase();
                         const prices = await rawFuturesPublicTickers(isTestnet, sym);
                         currentPrice = prices[sym] || 0;
                     } else {
-                        const spotPair = signal.symbol.includes('/') ? signal.symbol : signal.symbol.replace('-USD', '/USDT');
+                        const spotPair = (signal.symbol.includes('/') ? signal.symbol : signal.symbol.replace('-USD', '/USDT')).toUpperCase();
                         const t = await exchange.fetchTicker(spotPair);
                         currentPrice = t.last;
                     }
