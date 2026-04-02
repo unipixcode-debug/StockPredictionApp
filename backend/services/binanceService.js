@@ -53,6 +53,78 @@ function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true, timeOffset
     });
 }
 
+/**
+ * Direct HTTPS GET for balance (bypasses CCXT URL routing)
+ */
+function rawFuturesBalance(apiKey, apiSecret, isTestnet = true, timeOffset = 0) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const timestamp = Date.now() + timeOffset;
+        const query = querystring.stringify({ timestamp, recvWindow: 10000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
+        const path = `/fapi/v2/account?${query}&signature=${signature}`;
+
+        https.get({
+            hostname,
+            path,
+            headers: { 'X-MBX-APIKEY': apiKey }
+        }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.assets) {
+                        const usdtAsset = parsed.assets.find(a => a.asset === 'USDT');
+                        resolve({ free: parseFloat(usdtAsset?.availableBalance || 0), total: parseFloat(usdtAsset?.walletBalance || 0) });
+                    } else if (parsed.code) {
+                        reject(new Error(`binance balance ${JSON.stringify(parsed)}`));
+                    } else {
+                        reject(new Error('Invalid balance response'));
+                    }
+                } catch { reject(new Error('Invalid JSON: ' + data)); }
+            });
+        }).on('error', reject);
+    });
+}
+
+/**
+ * Direct HTTPS POST for leverage
+ */
+function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true, timeOffset = 0) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const timestamp = Date.now() + timeOffset;
+        const body = querystring.stringify({ ...params, timestamp, recvWindow: 10000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
+        const fullBody = body + '&signature=' + signature;
+
+        const req = https.request({
+            hostname,
+            path: '/fapi/v1/leverage',
+            method: 'POST',
+            headers: {
+                'X-MBX-APIKEY': apiKey,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(fullBody),
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.code && parsed.code < 0) reject(new Error(`binance leverage ${JSON.stringify(parsed)}`));
+                    else resolve(parsed);
+                } catch { reject(new Error('Invalid JSON: ' + data)); }
+            });
+        });
+        req.on('error', reject);
+        req.write(fullBody);
+        req.end();
+    });
+}
+
 // ── Demo-fapi symbol cache ────────────────────────────────────────────────────
 // CCXT loadMarkets() ignores URL overrides → fetches mainnet symbols.
 // We cache demo-fapi's own exchangeInfo via raw HTTPS to validate symbols correctly.
