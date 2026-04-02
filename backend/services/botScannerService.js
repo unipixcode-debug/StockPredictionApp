@@ -70,30 +70,33 @@ async function getTechnicalSignal(ccxtSymbol, exchange) {
 async function getDynamicScanList(exchange, limit = TOP_COINS_TO_SCAN) {
     try {
         const tickers = await exchange.fetchTickers();
-        const pairs   = Object.values(tickers)
+        // Futures CCXT format: 'BTC/USDT:USDT' (USDT-margined perpetual)
+        // NOT 'BTC/USDT' — that's spot format
+        const pairs = Object.values(tickers)
             .filter(t =>
-                t.symbol.endsWith('/USDT') &&
-                t.quoteVolume > MIN_VOLUME_USDT &&
+                t.symbol.endsWith(':USDT') &&           // USDT-margined perpetuals only
+                (t.quoteVolume || 0) > MIN_VOLUME_USDT &&
                 t.percentage != null
             )
             .sort((a, b) => Math.abs(b.percentage) - Math.abs(a.percentage))
             .slice(0, limit)
             .map(t => ({
-                ccxtSymbol:   t.symbol,                          // 'BTC/USDT'
-                engineSymbol: t.symbol.replace('/USDT', '-USD'), // 'BTC-USD'
+                ccxtSymbol:   t.symbol,                                    // 'BTC/USDT:USDT'
+                displaySymbol: t.symbol.replace(':USDT', ''),              // 'BTC/USDT'
+                engineSymbol: t.symbol.split('/')[0] + '-USD',            // 'BTC-USD'
                 change24h:    t.percentage?.toFixed(2),
                 volume:       t.quoteVolume,
                 currentPrice: t.last
             }));
 
-        console.log(`[BotScanner] ${pairs.length} coins selected from ${Object.keys(tickers).length} total.`);
+        console.log(`[BotScanner] ${pairs.length} futures pairs selected from ${Object.keys(tickers).length} total.`);
         return pairs;
     } catch (err) {
         console.error('[BotScanner] fetchTickers error:', err.message);
         return [
-            { ccxtSymbol: 'BTC/USDT', engineSymbol: 'BTC-USD', change24h: '0' },
-            { ccxtSymbol: 'ETH/USDT', engineSymbol: 'ETH-USD', change24h: '0' },
-            { ccxtSymbol: 'SOL/USDT', engineSymbol: 'SOL-USD', change24h: '0' },
+            { ccxtSymbol: 'BTC/USDT:USDT', displaySymbol: 'BTC/USDT', engineSymbol: 'BTC-USD' },
+            { ccxtSymbol: 'ETH/USDT:USDT', displaySymbol: 'ETH/USDT', engineSymbol: 'ETH-USD' },
+            { ccxtSymbol: 'SOL/USDT:USDT', displaySymbol: 'SOL/USDT', engineSymbol: 'SOL-USD' },
         ];
     }
 }
