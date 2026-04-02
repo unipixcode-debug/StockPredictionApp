@@ -261,6 +261,7 @@ class BotScannerService {
                     direction: techSignal.direction,
                     market:    'CRYPTO',
                     type:      targetMarket,
+                    currentPrice: techSignal.currentPrice || pair.currentPrice, // Pass the price we just verified
                     stopLossPct: STOP_LOSS_PCT // Pass SL% to executeTrade
                 });
 
