@@ -172,4 +172,32 @@ router.get('/logs', authCheck, async (req, res) => {
     }
 });
 
+// Get Trade Chart Data
+router.get('/trades/:tradeId/chart', authCheck, async (req, res) => {
+    try {
+        const trade = await ExecutedTrade.findOne({ 
+            where: { id: req.params.tradeId, userId: req.user.id }
+        });
+        if (!trade) return res.status(404).json({ error: 'Trade not found.' });
+
+        const isTestnet = true; // Bot mostly runs on testnet for now
+        // Symbol cleanup (e.g. BTC/USDT:USDT -> BTCUSDT)
+        const apiSymbol = trade.symbol.split(':')[0].replace('/', '');
+        
+        const ohlcv = await binanceService.rawFuturesPublicOHLCV(apiSymbol, '1m', 100, isTestnet);
+        const formatted = ohlcv.map(item => ({
+            time: item[0],
+            open: item[1],
+            high: item[2],
+            low: item[3],
+            close: item[4],
+            volume: item[5]
+        }));
+
+        res.json(formatted);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

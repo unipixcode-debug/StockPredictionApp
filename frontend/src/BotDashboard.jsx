@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Settings, TrendingUp, TrendingDown, RefreshCw, Bot, AlertTriangle, ShieldCheck, Zap, X } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine, CartesianGrid } from 'recharts';
 import api from './api';
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
@@ -20,6 +20,7 @@ export default function BotDashboard() {
     const [testResult, setTestResult] = useState(null);
     const [isTesting, setIsTesting] = useState(false);
     const [closingTradeId, setClosingTradeId] = useState(null);
+    const [expandedTradeId, setExpandedTradeId] = useState(null);
     
     // Terminal Logs State
     const [logs, setLogs] = useState([]);
@@ -281,69 +282,92 @@ export default function BotDashboard() {
                                             const isLong = trade.side === 'BUY';
                                             const pnl = trade.unrealizedPnl ?? trade.pnl ?? 0;
                                             const isClosing = closingTradeId === trade.id;
+                                            const isExpanded = expandedTradeId === trade.id;
+
                                             return (
-                                                <div key={trade.id} className={`flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl border transition-all ${
-                                                    isLong ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'
-                                                }`}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border text-sm font-black ${
-                                                            isLong ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                                                        }`}>
-                                                            {isLong ? '↑' : '↓'}
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-black text-base">{trade.symbol}</span>
-                                                                <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                                                    isLong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-                                                                }`}>{isLong ? 'LONG' : 'SHORT'}</span>
-                                                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{trade.type}</span>
-                                                            </div>
-                                                            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-1.5 pt-1.5 border-t border-white/5">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[10px] text-muted-foreground uppercase font-bold">Giriş:</span>
-                                                                    <span className="text-xs text-foreground font-black">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span>
-                                                                </div>
-                                                                
-                                                                {trade.stopLossPrice && (
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-[10px] text-rose-400/70 uppercase font-bold">Stop:</span>
-                                                                        <span className="text-xs text-rose-400 font-black">${parseFloat(trade.stopLossPrice).toFixed(4)}</span>
-                                                                    </div>
-                                                                )}
-                                                                
-                                                                {trade.targetPrice && (
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-[10px] text-emerald-400/70 uppercase font-bold">Hedef:</span>
-                                                                        <span className="text-xs text-emerald-400 font-black">${parseFloat(trade.targetPrice).toFixed(4)}</span>
-                                                                    </div>
-                                                                )}
-                                                                
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[10px] text-muted-foreground uppercase font-bold">Miktar:</span>
-                                                                    <span className="text-xs text-foreground/80 font-bold">{parseFloat(trade.amount || 0).toFixed(4)}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-4 ml-auto">
-                                                        <div className="text-right">
-                                                            <p className={`text-lg font-black ${
-                                                                pnl > 0 ? 'text-emerald-400' : pnl < 0 ? 'text-rose-400' : 'text-muted-foreground'
+                                                <div key={trade.id} className="space-y-2">
+                                                    <div 
+                                                        onClick={() => setExpandedTradeId(isExpanded ? null : trade.id)}
+                                                        className={`flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl border transition-all cursor-pointer group ${
+                                                            isLong ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40' : 'bg-rose-500/5 border-rose-500/20 hover:border-rose-500/40'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border text-sm font-black ${
+                                                                isLong ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
                                                             }`}>
-                                                                {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}$
-                                                            </p>
-                                                            <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Anlık P&L</p>
+                                                                {isLong ? '↑' : '↓'}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-black text-base">{trade.symbol}</span>
+                                                                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                                        isLong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                                                                    }`}>{isLong ? 'LONG' : 'SHORT'}</span>
+                                                                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{trade.type}</span>
+                                                                </div>
+                                                                <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-1.5 pt-1.5 border-t border-white/5">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Giriş:</span>
+                                                                        <span className="text-xs text-foreground font-black">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span>
+                                                                    </div>
+                                                                    
+                                                                    {trade.stopLossPrice && (
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="text-[10px] text-rose-400/70 uppercase font-bold">Stop:</span>
+                                                                            <span className="text-xs text-rose-400 font-black">${parseFloat(trade.stopLossPrice).toFixed(4)}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {trade.targetPrice && (
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="text-[10px] text-emerald-400/70 uppercase font-bold">Hedef:</span>
+                                                                            <span className="text-xs text-emerald-400 font-black">${parseFloat(trade.targetPrice).toFixed(4)}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <button
-                                                            onClick={() => handleClosePosition(trade.id)}
-                                                            disabled={isClosing}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50"
-                                                        >
-                                                            {isClosing ? <RefreshCw size={12} className="animate-spin"/> : <X size={12}/>}
-                                                            {isClosing ? 'Kapatılıyor' : 'Kapat'}
-                                                        </button>
+                                                        <div className="flex items-center gap-4 ml-auto">
+                                                            <div className="text-right">
+                                                                <p className={`text-lg font-black ${
+                                                                    pnl > 0 ? 'text-emerald-400' : pnl < 0 ? 'text-rose-400' : 'text-muted-foreground'
+                                                                }`}>
+                                                                    {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}$
+                                                                </p>
+                                                                <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Anlık P&L</p>
+                                                            </div>
+                                                            <div className="flex flex-col gap-2">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleClosePosition(trade.id);
+                                                                    }}
+                                                                    disabled={isClosing}
+                                                                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 min-w-20"
+                                                                >
+                                                                    {isClosing ? <RefreshCw size={12} className="animate-spin"/> : <X size={12}/>}
+                                                                    {isClosing ? '...' : 'Kapat'}
+                                                                </button>
+                                                                <button className="text-[9px] font-black uppercase text-muted-foreground/50 hover:text-primary transition-colors">
+                                                                    {isExpanded ? 'Grafiği Gizle' : 'Grafiği Gör'}
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
+
+                                                    <AnimatePresence>
+                                                        {isExpanded && (
+                                                            <motion.div
+                                                                initial={{ height: 0, opacity: 0 }}
+                                                                animate={{ height: 'auto', opacity: 1 }}
+                                                                exit={{ height: 0, opacity: 0 }}
+                                                                className="overflow-hidden bg-black/20 rounded-2xl border border-white/5"
+                                                            >
+                                                                <TradeLiveChart trade={trade} />
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
                                                 </div>
                                             );
                                         })}
@@ -708,6 +732,111 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                         Kesinlikle "Enable Withdrawals" (Çekme İzni) kutucuğunu İŞARETLEMEYİN. PredictPro bakiye çekimine ihtiyaç duymaz.
                     </p>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Live Chart Component ─────────────────────────────────────────────────────────────
+function TradeLiveChart({ trade }) {
+    const [chartData, setChartData] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchChart();
+        const interval = setInterval(fetchChart, 15000); // 15sn refresh
+        return () => clearInterval(interval);
+    }, [trade.id]);
+
+    const fetchChart = async () => {
+        try {
+            const res = await api.get(`/bot/trades/${trade.id}/chart`);
+            setChartData(res);
+        } catch (e) {
+            console.error('[Chart] Error:', e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading && chartData.length === 0) {
+        return (
+            <div className="h-48 flex items-center justify-center">
+                <RefreshCw size={24} className="text-primary animate-spin" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-4 pt-2">
+            <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData}>
+                        <defs>
+                            <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#00f2fe" stopOpacity={0.2}/>
+                                <stop offset="95%" stopColor="#00f2fe" stopOpacity={0}/>
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                        <XAxis 
+                            dataKey="time" 
+                            hide 
+                        />
+                        <YAxis 
+                            domain={['auto', 'auto']} 
+                            hide
+                        />
+                        <RechartsTooltip 
+                            contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px', fontSize: '10px' }}
+                            itemStyle={{ color: '#00f2fe' }}
+                            labelFormatter={(val) => new Date(val).toLocaleTimeString()}
+                        />
+                        <Area 
+                            type="monotone" 
+                            dataKey="close" 
+                            stroke="#00f2fe" 
+                            strokeWidth={2} 
+                            fillOpacity={1} 
+                            fill="url(#priceGradient)" 
+                            animationDuration={1000}
+                        />
+
+                        {/* Trade Levels */}
+                        {trade.entryPrice && (
+                            <ReferenceLine 
+                                y={parseFloat(trade.entryPrice)} 
+                                stroke="#3b82f6" 
+                                strokeWidth={2}
+                                label={{ position: 'left', value: 'GİRİŞ', fill: '#3b82f6', fontSize: 8, fontWeight: 'black', offset: 10 }} 
+                            />
+                        )}
+                        {trade.targetPrice && (
+                            <ReferenceLine 
+                                y={parseFloat(trade.targetPrice)} 
+                                stroke="#10b981" 
+                                strokeDasharray="5 5" 
+                                label={{ position: 'right', value: `HEDEF: ${parseFloat(trade.targetPrice).toFixed(2)}`, fill: '#10b981', fontSize: 8, fontWeight: 'black' }} 
+                            />
+                        )}
+                        {trade.stopLossPrice && (
+                            <ReferenceLine 
+                                y={parseFloat(trade.stopLossPrice)} 
+                                stroke="#ef4444" 
+                                strokeDasharray="5 5" 
+                                label={{ position: 'right', value: `STOP: ${parseFloat(trade.stopLossPrice).toFixed(2)}`, fill: '#ef4444', fontSize: 8, fontWeight: 'black' }} 
+                            />
+                        )}
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
+            <div className="flex justify-between items-center mt-2 px-2">
+                <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest italic flex items-center gap-1">
+                    <RefreshCw size={8} className="animate-spin text-primary"/> Canlı 1D Veri (Binance)
+                </span>
+                <span className="text-[8px] font-black uppercase text-primary tracking-widest italic">
+                    {trade.symbol}
+                </span>
             </div>
         </div>
     );
