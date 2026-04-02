@@ -82,7 +82,19 @@ function getCachedDemoSymbols() {
                     console.log(`[Binance] demo-fapi cache: ${symbols.size} available symbols.`);
                     resolve(symbols);
                 } catch {
-                    resolve(new Set(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT']));
+                    resolve(new Set([
+                        'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
+                        'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'LINKUSDT',
+                        'POLUSDT', 'LTCUSDT', 'SHIBUSDT', 'NEARUSDT', 'OPUSDT',
+                        'ARBUSDT', 'SUIUSDT', 'TIAUSDT', 'INJUSDT', 'APTUSDT',
+                        'ORDIUSDT', 'PEPEUSDT', 'WIFUSDT', 'BONKUSDT', 'SEIUSDT',
+                        'FETUSDT', 'RNDRUSDT', 'IOUSDT', 'GALAUSDT', 'IMXUSDT',
+                        'LDOUSDT', 'AAVEUSDT', 'CRVUSDT', 'MKRUSDT', 'COMPUSDT',
+                        'STXUSDT', 'FILUSDT', 'TRXUSDT', 'BCHUSDT', 'ETCUSDT',
+                        'XLMUSDT', 'UNIUSDT', 'ICPUSDT', 'ALGOUSDT', 'HBARUSDT',
+                        'MANAUSDT', 'SANDUSDT', 'AXSUSDT', 'JUPUSDT', 'PYTHUSDT',
+                        'ONDOUSDT', 'STRKUSDT', 'DYMUSDT', '1000SATSUSDT'
+                    ]));
                 }
             });
         });
@@ -226,7 +238,20 @@ class BinanceService {
             const apiSecret = (marketType === 'FUTURES' ? config.futuresApiSecret : config.apiSecret)?.trim();
 
             // Sync time before any signed request (critical for Demo Trading)
-            if (marketType === 'FUTURES') await exchange.loadTimeDifference();
+            // IMPORTANT: loadTimeDifference() in CCXT for binanceusdm can hit authenticated endpoints.
+            // If URL routing is broken, it hits Mainnet with Testnet keys -> -2008.
+            // We bypass CCXT's time sync for Futures and rely on our own or trust the server.
+            let timeOffset = exchange.options['timeDifference'] || 0;
+            if (marketType === 'FUTURES') {
+                try {
+                    // Try to get public time from Spot (it's the same server clock usually)
+                    const serverTime = await exchange.publicGetTime();
+                    timeOffset = serverTime - Date.now();
+                    exchange.options['timeDifference'] = timeOffset;
+                } catch (tErr) {
+                    console.warn(`[Binance] Public time sync failed, using local time.`, tErr.message);
+                }
+            }
 
             // Validate symbol is available in the target exchange environment
             if (marketType === 'FUTURES' && config.isTestnet) {
