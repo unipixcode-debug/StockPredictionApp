@@ -122,9 +122,11 @@ class BinanceService {
     async executeTrade(userId, signal) {
         if (signal.market !== 'CRYPTO') return null;
         
-        // Map symbol format: BTC-USD -> BTC/USDT
-        const pair = signal.symbol.replace('-USD', '') + '/USDT';
-        const marketType = signal.type || 'SPOT'; // Default to spot if not specified
+        // Map symbol format: BTC-USD → BTC/USDT (spot) or BTC/USDT:USDT (futures perpetual)
+        const baseSymbol = signal.symbol.replace('-USD', '') + '/USDT';
+        const marketType = signal.type || 'SPOT';
+        // Futures CCXT requires ':USDT' suffix for USDT-margined perpetuals
+        const pair = marketType === 'FUTURES' ? baseSymbol + ':USDT' : baseSymbol;
 
         try {
             const { exchange, config } = await this.getExchangeInstance(userId, marketType);

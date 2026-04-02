@@ -42,6 +42,10 @@ async function getTechnicalSignal(ccxtSymbol, exchange) {
         const prevPrice    = closes[closes.length - 2];
         const momentum     = ((currentPrice - prevPrice) / prevPrice) * 100;
 
+        // RSI of exactly 100 or 0 means zero losses or zero gains in the period
+        // — artifact of illiquid coins, not a reliable signal
+        if (rsi === 100 || rsi === 0) return { direction: 'HOLD', score: 50 };
+
         // 24h trend (first vs last of the 30 candles)
         const trend        = ((currentPrice - closes[0]) / closes[0]) * 100;
 
