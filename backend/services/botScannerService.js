@@ -1,23 +1,55 @@
 const { BinanceBotConfig, BotLog, ExecutedTrade } = require('../models');
 const predictionEngine = require('./predictionEngine');
 const binanceService = require('./binanceService');
-
-// Coin pairs to scan (in prediction engine format)
-const SCAN_PAIRS = [
-    { symbol: 'BTC-USD', market: 'CRYPTO' },
-    { symbol: 'ETH-USD', market: 'CRYPTO' },
-    { symbol: 'SOL-USD', market: 'CRYPTO' },
-    { symbol: 'AVAX-USD', market: 'CRYPTO' },
-    { symbol: 'LINK-USD', market: 'CRYPTO' },
-    { symbol: 'XRP-USD', market: 'CRYPTO' },
-    { symbol: 'BNB-USD', market: 'CRYPTO' },
-    { symbol: 'DOGE-USD', market: 'CRYPTO' },
-];
+const ccxt = require('ccxt');
 
 // Minimum score threshold to act on a signal
 const MIN_SCORE_THRESHOLD = 68;
 // Minimum score from second confirmation to proceed
 const MIN_CONFIRM_THRESHOLD = 65;
+// How many top-volatile coins to run AI on (out of all Binance listings)
+const TOP_COINS_TO_SCAN = 50;
+
+/**
+ * Fetches all active USDT pairs from Binance, sorted by absolute 24h change (most volatile first).
+ * Returns top N pairs formatted for predictionEngine.
+ */
+async function getDynamicScanList(limit = TOP_COINS_TO_SCAN) {
+    try {
+        const exchange = new ccxt.binance({ enableRateLimit: true });
+        const tickers = await exchange.fetchTickers(); // All tickers at once (1 API call)
+
+        const usdtPairs = Object.values(tickers)
+            .filter(t =>
+                t.symbol.endsWith('/USDT') &&
+                t.quoteVolume > 100000 && // Min 100k USDT daily volume
+                t.percentage != null
+            )
+            .sort((a, b) => Math.abs(b.percentage) - Math.abs(a.percentage)) // Most volatile first
+            .slice(0, limit)
+            .map(t => ({
+                // Convert 'BTC/USDT' -> 'BTC-USD' for predictionEngine
+                symbol: t.symbol.replace('/USDT', '-USD'),
+                market: 'CRYPTO',
+                displaySymbol: t.symbol,
+                change24h: t.percentage?.toFixed(2)
+            }));
+
+        console.log(`[BotScanner] Dynamic list: ${usdtPairs.length} coins selected from ${Object.keys(tickers).length} total pairs.`);
+        return usdtPairs;
+    } catch (err) {
+        console.error('[BotScanner] Failed to fetch dynamic coin list, falling back to defaults:', err.message);
+        // Fallback to a safe default list
+        return [
+            { symbol: 'BTC-USD', market: 'CRYPTO' },
+            { symbol: 'ETH-USD', market: 'CRYPTO' },
+            { symbol: 'SOL-USD', market: 'CRYPTO' },
+            { symbol: 'BNB-USD', market: 'CRYPTO' },
+            { symbol: 'XRP-USD', market: 'CRYPTO' },
+        ];
+    }
+}
+
 
 class BotScannerService {
     constructor() {
@@ -90,11 +122,14 @@ class BotScannerService {
         const activeType = config.isSpotActive && config.isFuturesActive ? 'Spot+Futures'
             : config.isSpotActive ? 'Spot' : 'Futures';
 
-        await this.log(userId, `🔍 [${activeType}] Piyasa taraması başladı. ${SCAN_PAIRS.length} coin analiz ediliyor...`, 'info');
+        // Fetch the dynamic coin list (top volatile USDT pairs from all of Binance)
+        const scanList = await getDynamicScanList();
+
+        await this.log(userId, `🔍 [${activeType}] Piyasa taraması başladı. Binance'teki en aktif ${scanList.length} coin analiz ediliyor...`, 'info');
 
         let signalsFound = 0;
 
-        for (const pair of SCAN_PAIRS) {
+        for (const pair of scanList) {
             try {
                 // --- Step 1: First-pass AI Analysis ---
                 const firstAnalysis = await predictionEngine.generatePrediction(pair.symbol, pair.market, userId);
