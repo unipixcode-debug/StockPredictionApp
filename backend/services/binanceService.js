@@ -200,6 +200,27 @@ class BinanceService {
                 tradeRecord.entryPrice = order.average || order.price || currentPrice;
                 await tradeRecord.save();
 
+                // ── Place Stop-Loss order immediately after entry ──────────────────
+                if (signal.stopLossPct && marketType === 'FUTURES') {
+                    try {
+                        const ep = tradeRecord.entryPrice;
+                        const slPrice = side === 'buy'
+                            ? ep * (1 - signal.stopLossPct)
+                            : ep * (1 + signal.stopLossPct);
+                        const slParams = {
+                            stopPrice: exchange.priceToPrecision(pair, slPrice),
+                            reduceOnly: true,
+                        };
+                        if (orderParams.positionSide) slParams.positionSide = orderParams.positionSide;
+
+                        await exchange.createOrder(pair, 'STOP_MARKET', side === 'buy' ? 'sell' : 'buy', amount, undefined, slParams);
+                        console.log(`[Binance] Stop-loss placed at ${slPrice.toFixed(4)} for ${pair}`);
+                    } catch (slErr) {
+                        // SL failure is non-fatal — log it but don't abort the trade
+                        console.warn(`[Binance] Stop-loss order failed for ${pair}:`, slErr.message);
+                    }
+                }
+
                 return tradeRecord;
 
             } catch (exchangeError) {

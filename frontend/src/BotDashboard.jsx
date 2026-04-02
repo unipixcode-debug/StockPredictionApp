@@ -279,7 +279,7 @@ export default function BotDashboard() {
                                     <div className="space-y-3">
                                         {openTrades.map(trade => {
                                             const isLong = trade.side === 'BUY';
-                                            const pnl = trade.pnl || 0;
+                                            const pnl = trade.unrealizedPnl ?? trade.pnl ?? 0;
                                             const isClosing = closingTradeId === trade.id;
                                             return (
                                                 <div key={trade.id} className={`flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl border transition-all ${
@@ -301,6 +301,14 @@ export default function BotDashboard() {
                                                             </div>
                                                             <p className="text-xs text-muted-foreground mt-0.5">
                                                                 Giriş: <span className="text-foreground font-bold">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span>
+                                                                {trade.currentPrice && (
+                                                                    <>
+                                                                        <span className="mx-2 opacity-30">→</span>
+                                                                        <span className={`font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                                            ${parseFloat(trade.currentPrice).toFixed(4)}
+                                                                        </span>
+                                                                    </>
+                                                                )}
                                                                 <span className="mx-2 opacity-30">·</span>
                                                                 Miktar: <span className="font-bold">{parseFloat(trade.amount || 0).toFixed(4)}</span>
                                                             </p>
@@ -313,7 +321,7 @@ export default function BotDashboard() {
                                                             }`}>
                                                                 {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}$
                                                             </p>
-                                                            <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Gerçekleşmemiş P&L</p>
+                                                            <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Anlık P&L</p>
                                                         </div>
                                                         <button
                                                             onClick={() => handleClosePosition(trade.id)}

@@ -84,7 +84,7 @@ router.post('/test-connection', authCheck, async (req, res) => {
     }
 });
 
-// Get Trades (History and Open)
+// Get Trades (History and Open) with real-time P&L for open positions
 router.get('/trades', authCheck, async (req, res) => {
     try {
         const trades = await ExecutedTrade.findAll({
@@ -93,19 +93,44 @@ router.get('/trades', authCheck, async (req, res) => {
             limit: 50
         });
         
-        // Compute simple stats
         const config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
         const isBotActive = config ? (config.isSpotActive || config.isFuturesActive) : false;
 
-        const totalPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
-        const winCount = trades.filter(t => t.pnl > 0).length;
-        const lossCount = trades.filter(t => t.pnl < 0).length;
+        // ── Real-time P&L for OPEN positions ─────────────────────────────────
+        const openTrades = trades.filter(t => t.status === 'OPEN' && t.entryPrice);
+        if (openTrades.length > 0) {
+            try {
+                const publicExchange = new (require('ccxt')).binance({ enableRateLimit: true });
+                // Fetch unique symbols (batch approach)
+                const uniqueSymbols = [...new Set(openTrades.map(t => t.symbol))];
+                const priceMap = {};
+                for (const sym of uniqueSymbols) {
+                    try {
+                        const ticker = await publicExchange.fetchTicker(sym);
+                        priceMap[sym] = ticker.last;
+                    } catch { /* symbol not fetchable, skip */ }
+                }
+                // Attach unrealizedPnl to each open trade
+                for (const trade of openTrades) {
+                    const currentPrice = priceMap[trade.symbol];
+                    if (currentPrice && trade.entryPrice) {
+                        const isLong = trade.side === 'BUY';
+                        const priceDiff = currentPrice - parseFloat(trade.entryPrice);
+                        trade.dataValues.unrealizedPnl = (isLong ? priceDiff : -priceDiff) * parseFloat(trade.amount || 0);
+                        trade.dataValues.currentPrice  = currentPrice;
+                    }
+                }
+            } catch (priceErr) {
+                console.warn('[Trades] Real-time P&L fetch failed:', priceErr.message);
+            }
+        }
+
+        const allTrades = trades.map(t => ({ ...t.dataValues }));
+        const totalPnl  = allTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+        const winCount  = allTrades.filter(t => t.pnl > 0).length;
+        const lossCount = allTrades.filter(t => t.pnl < 0).length;
         
-        res.json({
-            isBotActive,
-            trades,
-            stats: { totalPnl, winCount, lossCount }
-        });
+        res.json({ isBotActive, trades: allTrades, stats: { totalPnl, winCount, lossCount } });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

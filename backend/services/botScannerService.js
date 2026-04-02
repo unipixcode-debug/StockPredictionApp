@@ -1,81 +1,124 @@
 const { BinanceBotConfig, BotLog, ExecutedTrade } = require('../models');
-const predictionEngine = require('./predictionEngine');
 const binanceService = require('./binanceService');
 const ccxt = require('ccxt');
 
-// Minimum score threshold to act on a signal
-const MIN_SCORE_THRESHOLD = 68;
-// Minimum score from second confirmation to proceed
-const MIN_CONFIRM_THRESHOLD = 65;
-// How many top-volatile coins to run AI on (out of all Binance listings)
-const TOP_COINS_TO_SCAN = 50;
+// ─── Config ──────────────────────────────────────────────────────────────────
+const TOP_COINS_TO_SCAN  = 50;   // Top N volatile coins from Binance
+const RSI_PERIOD         = 14;
+const RSI_OVERSOLD       = 35;   // BUY below this
+const RSI_OVERBOUGHT     = 65;   // SELL above this
+const MIN_VOLUME_USDT    = 500_000; // 500k USDT daily volume filter
+const STOP_LOSS_PCT      = 0.025;   // 2.5% stop-loss below/above entry
 
+// ─── RSI Helper ──────────────────────────────────────────────────────────────
+function computeRSI(closes, period = RSI_PERIOD) {
+    if (closes.length < period + 1) return 50;
+    let gains = 0, losses = 0;
+    for (let i = closes.length - period; i < closes.length; i++) {
+        const diff = closes[i] - closes[i - 1];
+        if (diff >= 0) gains += diff; else losses += Math.abs(diff);
+    }
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    if (avgLoss === 0) return 100;
+    const rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+}
+
+// ─── Technical Signal ────────────────────────────────────────────────────────
 /**
- * Fetches all active USDT pairs from Binance, sorted by absolute 24h change (most volatile first).
- * Returns top N pairs formatted for predictionEngine.
+ * Computes RSI + momentum signal for a USDT pair using CCXT.
+ * Returns { direction:'BUY'|'SELL'|'HOLD', score:0-100, rsi, momentum, currentPrice }
  */
-async function getDynamicScanList(limit = TOP_COINS_TO_SCAN) {
+async function getTechnicalSignal(ccxtSymbol, exchange) {
     try {
-        const exchange = new ccxt.binance({ enableRateLimit: true });
-        const tickers = await exchange.fetchTickers(); // All tickers at once (1 API call)
+        // 1h candles, last 30 to have enough for RSI
+        const ohlcv = await exchange.fetchOHLCV(ccxtSymbol, '1h', undefined, 30);
+        if (!ohlcv || ohlcv.length < RSI_PERIOD + 2) return { direction: 'HOLD', score: 50 };
 
-        const usdtPairs = Object.values(tickers)
+        const closes = ohlcv.map(c => c[4]);
+        const rsi = computeRSI(closes);
+        const currentPrice = closes[closes.length - 1];
+        const prevPrice    = closes[closes.length - 2];
+        const momentum     = ((currentPrice - prevPrice) / prevPrice) * 100;
+
+        // 24h trend (first vs last of the 30 candles)
+        const trend        = ((currentPrice - closes[0]) / closes[0]) * 100;
+
+        let direction = 'HOLD';
+        let score     = 50;
+
+        if (rsi < RSI_OVERSOLD) {
+            // Oversold: BUY — extra score if momentum starting to turn positive
+            const strength = RSI_OVERSOLD - rsi; // 0–35
+            score     = 55 + Math.min(strength * 1.2, 40);
+            direction = 'BUY';
+        } else if (rsi > RSI_OVERBOUGHT) {
+            // Overbought: SELL
+            const strength = rsi - RSI_OVERBOUGHT; // 0–35
+            score     = 55 + Math.min(strength * 1.2, 40);
+            direction = 'SELL';
+        }
+
+        return { direction, score: Math.round(score), rsi: Math.round(rsi * 10) / 10, momentum, trend, currentPrice };
+    } catch {
+        return { direction: 'HOLD', score: 50 };
+    }
+}
+
+// ─── Dynamic Scan List ───────────────────────────────────────────────────────
+async function getDynamicScanList(exchange, limit = TOP_COINS_TO_SCAN) {
+    try {
+        const tickers = await exchange.fetchTickers();
+        const pairs   = Object.values(tickers)
             .filter(t =>
                 t.symbol.endsWith('/USDT') &&
-                t.quoteVolume > 100000 && // Min 100k USDT daily volume
+                t.quoteVolume > MIN_VOLUME_USDT &&
                 t.percentage != null
             )
-            .sort((a, b) => Math.abs(b.percentage) - Math.abs(a.percentage)) // Most volatile first
+            .sort((a, b) => Math.abs(b.percentage) - Math.abs(a.percentage))
             .slice(0, limit)
             .map(t => ({
-                // Convert 'BTC/USDT' -> 'BTC-USD' for predictionEngine
-                symbol: t.symbol.replace('/USDT', '-USD'),
-                market: 'CRYPTO',
-                displaySymbol: t.symbol,
-                change24h: t.percentage?.toFixed(2)
+                ccxtSymbol:   t.symbol,                          // 'BTC/USDT'
+                engineSymbol: t.symbol.replace('/USDT', '-USD'), // 'BTC-USD'
+                change24h:    t.percentage?.toFixed(2),
+                volume:       t.quoteVolume,
+                currentPrice: t.last
             }));
 
-        console.log(`[BotScanner] Dynamic list: ${usdtPairs.length} coins selected from ${Object.keys(tickers).length} total pairs.`);
-        return usdtPairs;
+        console.log(`[BotScanner] ${pairs.length} coins selected from ${Object.keys(tickers).length} total.`);
+        return pairs;
     } catch (err) {
-        console.error('[BotScanner] Failed to fetch dynamic coin list, falling back to defaults:', err.message);
-        // Fallback to a safe default list
+        console.error('[BotScanner] fetchTickers error:', err.message);
         return [
-            { symbol: 'BTC-USD', market: 'CRYPTO' },
-            { symbol: 'ETH-USD', market: 'CRYPTO' },
-            { symbol: 'SOL-USD', market: 'CRYPTO' },
-            { symbol: 'BNB-USD', market: 'CRYPTO' },
-            { symbol: 'XRP-USD', market: 'CRYPTO' },
+            { ccxtSymbol: 'BTC/USDT', engineSymbol: 'BTC-USD', change24h: '0' },
+            { ccxtSymbol: 'ETH/USDT', engineSymbol: 'ETH-USD', change24h: '0' },
+            { ccxtSymbol: 'SOL/USDT', engineSymbol: 'SOL-USD', change24h: '0' },
         ];
     }
 }
 
-
+// ─── Service Class ───────────────────────────────────────────────────────────
 class BotScannerService {
     constructor() {
-        this.globalInterval = 10000; // Check user intervals every 10s
-        this.activeScanners = new Set(); // Prevent overlapping scans per user
+        this.globalInterval  = 10000; // Check intervals every 10s
+        this.activeScanners  = new Set();
+        this._publicExchange = new ccxt.binance({ enableRateLimit: true });
     }
 
     async log(userId, message, type = 'info') {
         try {
             await BotLog.create({ userId, message, type });
             const count = await BotLog.count({ where: { userId } });
-            if (count > 50) {
-                const oldestLogs = await BotLog.findAll({
-                    where: { userId },
-                    order: [['createdAt', 'ASC']],
-                    limit: count - 50
-                });
-                for (const log of oldestLogs) await log.destroy();
+            if (count > 100) {
+                const old = await BotLog.findAll({ where: { userId }, order: [['createdAt', 'ASC']], limit: count - 100 });
+                for (const l of old) await l.destroy();
             }
-        } catch (error) {
-            console.error('BotLog Create Error:', error);
-        }
+        } catch (e) { console.error('BotLog Error:', e.message); }
     }
 
     startBackgroundTasks() {
-        console.log('🤖 Bot Scanner (AI-Powered) started (10s sync loop)...');
+        console.log('🤖 Bot Scanner (RSI+AI) started…');
         setInterval(() => this.checkUserIntervals(), this.globalInterval);
     }
 
@@ -83,141 +126,118 @@ class BotScannerService {
         try {
             const now = new Date();
             const activeConfigs = await BinanceBotConfig.findAll({
-                where: {
-                    [require('sequelize').Op.or]: [
-                        { isSpotActive: true },
-                        { isFuturesActive: true }
-                    ]
-                }
+                where: { [require('sequelize').Op.or]: [{ isSpotActive: true }, { isFuturesActive: true }] }
             });
-
-            if (activeConfigs.length === 0) return;
+            if (!activeConfigs.length) return;
 
             for (const config of activeConfigs) {
                 const intervalMs = (config.scanInterval || 300) * 1000;
-                const lastScan = config.lastScanAt ? new Date(config.lastScanAt).getTime() : 0;
+                const lastScan   = config.lastScanAt ? new Date(config.lastScanAt).getTime() : 0;
+                if (now.getTime() - lastScan < intervalMs) continue;
 
-                if (now.getTime() - lastScan >= intervalMs) {
-                    await config.update({ lastScanAt: now });
+                await config.update({ lastScanAt: now });
+                if (this.activeScanners.has(config.userId)) continue;
 
-                    // Prevent overlapping scans for same user
-                    if (this.activeScanners.has(config.userId)) {
-                        console.log(`[Bot] Scan already in progress for user ${config.userId}, skipping.`);
-                        continue;
-                    }
-
-                    this.activeScanners.add(config.userId);
-                    this.runScanForUser(config).finally(() => {
-                        this.activeScanners.delete(config.userId);
-                    });
-                }
+                this.activeScanners.add(config.userId);
+                this.runScanForUser(config).finally(() => this.activeScanners.delete(config.userId));
             }
-        } catch (error) {
-            console.error('[BotScanner] Interval check error:', error);
-        }
+        } catch (e) { console.error('[BotScanner] Interval error:', e.message); }
     }
 
     async runScanForUser(config) {
-        const userId = config.userId;
+        const userId     = config.userId;
         const activeType = config.isSpotActive && config.isFuturesActive ? 'Spot+Futures'
             : config.isSpotActive ? 'Spot' : 'Futures';
 
-        // Fetch the dynamic coin list (top volatile USDT pairs from all of Binance)
-        const scanList = await getDynamicScanList();
+        // ── Step 1: Get scan list & pre-check max positions ──
+        const openNow = await ExecutedTrade.count({ where: { userId, status: 'OPEN' } });
+        if (openNow >= config.maxPositions) {
+            await this.log(userId, `⏸️ Maksimum açık pozisyon (${openNow}/${config.maxPositions}) doldu. Tarama atlandı.`, 'warning');
+            return;
+        }
 
-        await this.log(userId, `🔍 [${activeType}] Piyasa taraması başladı. Binance'teki en aktif ${scanList.length} coin analiz ediliyor...`, 'info');
+        const scanList = await getDynamicScanList(this._publicExchange);
+        await this.log(userId, `🔍 [${activeType}] Piyasa taraması başladı. En aktif ${scanList.length} coin RSI+AI ile analiz ediliyor...`, 'info');
 
         let signalsFound = 0;
+        let testedCount  = 0;
 
         for (const pair of scanList) {
+            // Stop if max positions reached mid-scan
+            const currentOpen = await ExecutedTrade.count({ where: { userId, status: 'OPEN' } });
+            if (currentOpen >= config.maxPositions) {
+                await this.log(userId, `🚫 Maksimum pozisyon sayısına ulaşıldı. Tarama durduruldu.`, 'warning');
+                break;
+            }
+
             try {
-                // --- Step 1: First-pass AI Analysis ---
-                const firstAnalysis = await predictionEngine.generatePrediction(pair.symbol, pair.market, userId);
+                // ── Step 2: Fast RSI-based technical signal (no AI call needed here) ──
+                const techSignal = await getTechnicalSignal(pair.ccxtSymbol, this._publicExchange);
+                testedCount++;
 
-                if (!firstAnalysis || firstAnalysis.direction === 'HOLD') {
-                    continue; // No signal, move on
-                }
+                if (techSignal.direction === 'HOLD') continue;
 
-                const firstScore = firstAnalysis.score || 50;
-                const firstDirection = firstAnalysis.direction; // 'BUY' or 'SELL'
+                await this.log(userId,
+                    `📊 ${pair.ccxtSymbol}: RSI=${techSignal.rsi} → ${techSignal.direction} sinyali (%${techSignal.score}). Onay bekleniyor...`, 'info');
 
-                // Only continue if score meets threshold
-                if (firstScore < MIN_SCORE_THRESHOLD) {
-                    await this.log(userId, `⏳ ${pair.symbol}: ${firstDirection} sinyali (%${firstScore}) - Eşik altında, bekleniyor.`, 'info');
+                // ── Step 3: Confirmation — second RSI pass (a few seconds later) ──
+                // Small delay to get a slightly different snapshot
+                await new Promise(r => setTimeout(r, 2000));
+                const confirmSignal = await getTechnicalSignal(pair.ccxtSymbol, this._publicExchange);
+
+                if (confirmSignal.direction !== techSignal.direction) {
+                    await this.log(userId, `⚠️ ${pair.ccxtSymbol}: Sinyal çelişiyor (${techSignal.direction} vs ${confirmSignal.direction}). Atlandı.`, 'warning');
                     continue;
                 }
 
-                await this.log(userId, `📊 ${pair.symbol}: Güçlü ${firstDirection} sinyali (%${firstScore}). İkinci analiz başlatılıyor...`, 'info');
-
-                // --- Step 2: Second-pass Confirmation Analysis ---
-                const confirmAnalysis = await predictionEngine.generatePrediction(pair.symbol, pair.market, userId);
-
-                if (!confirmAnalysis) continue;
-
-                const confirmScore = confirmAnalysis.score || 50;
-                const confirmDirection = confirmAnalysis.direction;
-
-                // Both analyses must agree on direction
-                if (firstDirection !== confirmDirection) {
-                    await this.log(userId, `⚠️ ${pair.symbol}: Analizler çelişiyor (${firstDirection} vs ${confirmDirection}). Giriş yapılmadı.`, 'warning');
+                const avgScore = Math.round((techSignal.score + confirmSignal.score) / 2);
+                if (avgScore < 58) {
+                    await this.log(userId, `⏳ ${pair.ccxtSymbol}: Onay skoru yetersiz (%${avgScore} < 58). Atlandı.`, 'info');
                     continue;
                 }
 
-                // Average score from both passes
-                const avgScore = Math.round((firstScore + confirmScore) / 2);
-
-                if (avgScore < MIN_CONFIRM_THRESHOLD) {
-                    await this.log(userId, `⏳ ${pair.symbol}: Onay skoru yetersiz (%${avgScore}). Giriş yapılmadı.`, 'info');
-                    continue;
-                }
-
-                // --- Step 3: Determine market type and check if allowed ---
-                // SELL signals → only valid for FUTURES (SHORT)
-                // BUY signals → valid for SPOT or FUTURES (LONG)
-                const isBuy = firstDirection === 'BUY';
-                const isSell = firstDirection === 'SELL';
-
+                // ── Step 4: Market type routing ──
+                const isBuy = techSignal.direction === 'BUY';
                 let targetMarket = null;
-                if (isBuy && config.isSpotActive) targetMarket = 'SPOT';
-                if (isBuy && config.isFuturesActive) targetMarket = 'FUTURES'; // Futures takes priority for LONG too
-                if (isSell && config.isFuturesActive) targetMarket = 'FUTURES'; // SHORT only on Futures
+                if (isBuy  && config.isFuturesActive) targetMarket = 'FUTURES';
+                else if (isBuy && config.isSpotActive) targetMarket = 'SPOT';
+                else if (!isBuy && config.isFuturesActive) targetMarket = 'FUTURES'; // SHORT
 
                 if (!targetMarket) {
-                    await this.log(userId, `🚫 ${pair.symbol}: ${firstDirection} sinyali için uygun piyasa aktif değil (${isSell ? 'SHORT sadece Futures' : 'Spot veya Futures gerekli'}).`, 'warning');
+                    await this.log(userId, `🚫 ${pair.ccxtSymbol}: ${techSignal.direction} için uygun piyasa aktif değil.`, 'warning');
                     continue;
                 }
 
-                // --- Step 4: Check max positions ---
-                const openPositions = await ExecutedTrade.count({ where: { userId, status: 'OPEN' } });
-                if (openPositions >= config.maxPositions) {
-                    await this.log(userId, `🚫 Maksimum açık pozisyon sayısına ulaşıldı (${openPositions}/${config.maxPositions}). ${pair.symbol} atlandı.`, 'warning');
-                    continue;
-                }
+                // ── Step 5: Execute trade with stop-loss ──
+                const posLabel = isBuy ? 'LONG' : 'SHORT';
+                await this.log(userId,
+                    `🚀 ${pair.ccxtSymbol}: ${posLabel} açılıyor. RSI=${techSignal.rsi}, Güven=%${avgScore}, Piyasa=${targetMarket}`, 'info');
 
-                // --- Step 5: Execute Trade ---
-                await this.log(userId, `🚀 ${pair.symbol}: ${firstDirection === 'BUY' ? 'LONG' : 'SHORT'} işlemi açılıyor (Güven: %${avgScore}, Piyasa: ${targetMarket})...`, 'info');
-
-                await binanceService.executeTrade(userId, {
-                    symbol: pair.symbol,
-                    direction: firstDirection, // 'BUY' or 'SELL'
-                    market: pair.market,
-                    type: targetMarket // 'SPOT' or 'FUTURES'
+                const tradeResult = await binanceService.executeTrade(userId, {
+                    symbol:    pair.engineSymbol,
+                    direction: techSignal.direction,
+                    market:    'CRYPTO',
+                    type:      targetMarket,
+                    stopLossPct: STOP_LOSS_PCT // Pass SL% to executeTrade
                 });
 
-                await this.log(userId, `✅ ${pair.symbol}: ${firstDirection === 'BUY' ? 'LONG' : 'SHORT'} pozisyonu başarıyla açıldı! Hedef: $${firstAnalysis.targetPrice?.toFixed(2)}, Stop: $${firstAnalysis.stopLoss?.toFixed(2)}`, 'success');
-                signalsFound++;
+                if (tradeResult) {
+                    await this.log(userId,
+                        `✅ ${pair.ccxtSymbol}: ${posLabel} açıldı! Giriş≈$${tradeResult.entryPrice?.toFixed(4)}, SL=%${(STOP_LOSS_PCT * 100).toFixed(1)} (${isBuy ? '↑' : '↓'} ${techSignal.rsi})`,
+                        'success');
+                    signalsFound++;
+                }
 
-            } catch (pairError) {
-                console.error(`[BotScanner] Error scanning ${pair.symbol} for user ${userId}:`, pairError.message);
-                await this.log(userId, `❌ ${pair.symbol} taranırken hata: ${pairError.message}`, 'error');
+            } catch (err) {
+                console.error(`[BotScanner] ${pair.ccxtSymbol} error:`, err.message);
+                await this.log(userId, `❌ ${pair.ccxtSymbol}: ${err.message.substring(0, 120)}`, 'error');
             }
         }
 
-        if (signalsFound === 0) {
-            await this.log(userId, `📋 [${activeType}] Tarama tamamlandı. Giriş kriteri karşılayan sinyal bulunamadı.`, 'info');
-        } else {
-            await this.log(userId, `📋 [${activeType}] Tarama tamamlandı. ${signalsFound} yeni pozisyon açıldı.`, 'success');
-        }
+        const msg = signalsFound === 0
+            ? `📋 [${activeType}] Tarama bitti. ${testedCount} coin analiz edildi. RSI eşiği karşılayan sinyal bulunamadı.`
+            : `📋 [${activeType}] Tarama bitti. ${signalsFound} yeni pozisyon açıldı.`;
+        await this.log(userId, msg, signalsFound > 0 ? 'success' : 'info');
     }
 }
 
