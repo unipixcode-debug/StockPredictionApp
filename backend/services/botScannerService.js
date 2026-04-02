@@ -27,13 +27,14 @@ function computeRSI(closes, period = RSI_PERIOD) {
 
 // ─── Technical Signal ────────────────────────────────────────────────────────
 /**
- * Computes RSI + momentum signal for a USDT pair using CCXT.
+ * Computes RSI + momentum signal for a USDT pair using 100% Direct HTTPS.
  * Returns { direction:'BUY'|'SELL'|'HOLD', score:0-100, rsi, momentum, currentPrice }
  */
-async function getTechnicalSignal(ccxtSymbol, exchange) {
+async function getTechnicalSignal(ccxtSymbol, isTestnet = true) {
     try {
-        // 1h candles, last 30 to have enough for RSI
-        const ohlcv = await exchange.fetchOHLCV(ccxtSymbol, '1h', undefined, 30);
+        const apiSymbol = ccxtSymbol.split('/')[0] + 'USDT';
+        // Use direct HTTPS raw OHLCV fetch
+        const ohlcv = await binanceService.rawFuturesPublicOHLCV(apiSymbol, '1h', 30, isTestnet);
         if (!ohlcv || ohlcv.length < RSI_PERIOD + 2) return { direction: 'HOLD', score: 50 };
 
         const closes = ohlcv.map(c => c[4]);
@@ -42,68 +43,64 @@ async function getTechnicalSignal(ccxtSymbol, exchange) {
         const prevPrice    = closes[closes.length - 2];
         const momentum     = ((currentPrice - prevPrice) / prevPrice) * 100;
 
-        // RSI of exactly 100 or 0 means zero losses or zero gains in the period
-        // — artifact of illiquid coins, not a reliable signal
+        // RSI artifact protection
         if (rsi === 100 || rsi === 0) return { direction: 'HOLD', score: 50 };
 
-        // 24h trend (first vs last of the 30 candles)
-        const trend        = ((currentPrice - closes[0]) / closes[0]) * 100;
-
+        const trend = ((currentPrice - closes[0]) / closes[0]) * 100;
         let direction = 'HOLD';
         let score     = 50;
 
         if (rsi < RSI_OVERSOLD) {
-            // Oversold: BUY — extra score if momentum starting to turn positive
-            const strength = RSI_OVERSOLD - rsi; // 0–35
-            score     = 55 + Math.min(strength * 1.2, 40);
+            const strength = RSI_OVERSOLD - rsi;
+            score     = 55 + Math.min(strength * 1.5, 45); // Boosted score for bot confidence
             direction = 'BUY';
         } else if (rsi > RSI_OVERBOUGHT) {
-            // Overbought: SELL
-            const strength = rsi - RSI_OVERBOUGHT; // 0–35
-            score     = 55 + Math.min(strength * 1.2, 40);
+            const strength = rsi - RSI_OVERBOUGHT;
+            score     = 55 + Math.min(strength * 1.5, 45);
             direction = 'SELL';
         }
 
         return { direction, score: Math.round(score), rsi: Math.round(rsi * 10) / 10, momentum, trend, currentPrice };
-    } catch {
+    } catch (e) {
+        console.error(`[BotScanner] Technical Signal Error for ${ccxtSymbol}:`, e.message);
         return { direction: 'HOLD', score: 50 };
     }
 }
 
 // ─── Dynamic Scan List ───────────────────────────────────────────────────────
-async function getDynamicScanList(exchange, limit = TOP_COINS_TO_SCAN) {
+async function getDynamicScanList(limit = TOP_COINS_TO_SCAN, isTestnet = true) {
     const whitelist = [
         'BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT',
         'ADA/USDT:USDT', 'AVAX/USDT:USDT', 'DOGE/USDT:USDT', 'DOT/USDT:USDT', 'LINK/USDT:USDT',
         'POL/USDT:USDT', 'LTC/USDT:USDT', 'SHIB/USDT:USDT', 'NEAR/USDT:USDT', 'OP/USDT:USDT',
         'ARB/USDT:USDT', 'SUI/USDT:USDT', 'TIA/USDT:USDT', 'INJ/USDT:USDT', 'APT/USDT:USDT',
         'ORDI/USDT:USDT', 'PEPE/USDT:USDT', 'WIF/USDT:USDT', 'BONK/USDT:USDT', 'SEI/USDT:USDT',
-        'FET/USDT:USDT', 'RNDR/USDT:USDT', 'IO/USDT:USDT', 'GALA/USDT:USDT', 'IMX/USDT:USDT',
-        'LDO/USDT:USDT', 'AAVE/USDT:USDT', 'CRV/USDT:USDT', 'MKR/USDT:USDT', 'COMP/USDT:USDT',
-        'STX/USDT:USDT', 'FIL/USDT:USDT', 'TRX/USDT:USDT', 'BCH/USDT:USDT', 'ETC/USDT:USDT',
-        'XLM/USDT:USDT', 'UNI/USDT:USDT', 'ICP/USDT:USDT', 'ALGO/USDT:USDT', 'HBAR/USDT:USDT',
-        'MANA/USDT:USDT', 'SAND/USDT:USDT', 'AXS/USDT:USDT', 'JUP/USDT:USDT', 'PYTH/USDT:USDT',
-        'ONDO/USDT:USDT', 'STRK/USDT:USDT', 'DYM/USDT:USDT', '1000SATS/USDT:USDT'
+        'FET/USDT:USDT'
     ];
 
     try {
-        // We still fetch tickers but only filter by our whitelist to get current price/volume
-        const tickers = await exchange.fetchTickers(whitelist);
+        // Use direct HTTPS raw ticker fetch
+        const tickerMap = await binanceService.rawFuturesPublicTickers(isTestnet);
         
-        const pairs = Object.values(tickers)
-            .filter(t => (t.quoteVolume || 0) > 1_000_000) // Minimum 1M daily volume even for whitelist
-            .sort((a, b) => Math.abs(b.percentage || 0) - Math.abs(a.percentage || 0))
-            .slice(0, limit)
-            .map(t => ({
-                ccxtSymbol:   t.symbol,                                    // 'BTC/USDT:USDT'
-                displaySymbol: t.symbol.replace(':USDT', ''),              // 'BTC/USDT'
-                engineSymbol: t.symbol.split('/')[0] + '-USD',            // 'BTC-USD'
-                change24h:    t.percentage?.toFixed(2) || '0',
-                volume:       t.quoteVolume,
-                currentPrice: t.last
-            }));
+        const pairs = whitelist
+            .map(w => {
+                const apiSym = w.split('/')[0] + 'USDT';
+                const t = tickerMap[apiSym];
+                if (!t) return null;
+                return {
+                    ccxtSymbol:    w,
+                    displaySymbol: w.replace(':USDT', ''),
+                    engineSymbol:  w.split('/')[0] + '-USD',
+                    change24h:     parseFloat(t.priceChangePercent || 0).toFixed(2),
+                    volume:        parseFloat(t.quoteVolume || 0),
+                    currentPrice:  parseFloat(t.lastPrice || 0)
+                };
+            })
+            .filter(p => p !== null && p.volume > 1_000_000) // Minimum 1M daily volume
+            .sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h))
+            .slice(0, limit);
 
-        console.log(`[BotScanner] ${pairs.length} whitelisted futures pairs selected for analysis.`);
+        console.log(`[BotScanner] ${pairs.length} whitelisted futures pairs selected for analysis (isTestnet=${isTestnet}).`);
         return pairs;
     } catch (err) {
         console.warn('[BotScanner] Whitelist fetchTickers warning:', err.message);
@@ -203,8 +200,9 @@ class BotScannerService {
             return;
         }
 
-        const scanList = await getDynamicScanList(this._futuresExchange);
-        await this.log(userId, `🔍 [${activeType}] Piyasa taraması başladı. En aktif ${scanList.length} coin RSI+AI ile analiz ediliyor...`, 'info');
+        const isTestnet = !!config.isTestnet;
+        const scanList = await getDynamicScanList(TOP_COINS_TO_SCAN, isTestnet);
+        await this.log(userId, `🔍 [${activeType}] Piyasa taramasıladı (Testnet:${isTestnet}). En aktif ${scanList.length} coin analiz ediliyor...`, 'info');
 
         let signalsFound = 0;
         let testedCount  = 0;
@@ -218,8 +216,8 @@ class BotScannerService {
             }
 
             try {
-                // ── Step 2: Fast RSI-based technical signal (no AI call needed here) ──
-                const techSignal = await getTechnicalSignal(pair.ccxtSymbol, this._futuresExchange);
+                // ── Step 2: 100% Unauthenticated technical signal ──
+                const techSignal = await getTechnicalSignal(pair.ccxtSymbol, isTestnet);
                 testedCount++;
 
                 if (techSignal.direction === 'HOLD') continue;
@@ -228,9 +226,8 @@ class BotScannerService {
                     `📊 ${pair.ccxtSymbol}: RSI=${techSignal.rsi} → ${techSignal.direction} sinyali (%${techSignal.score}). Onay bekleniyor...`, 'info');
 
                 // ── Step 3: Confirmation — second RSI pass (a few seconds later) ──
-                // Small delay to get a slightly different snapshot
                 await new Promise(r => setTimeout(r, 2000));
-                const confirmSignal = await getTechnicalSignal(pair.ccxtSymbol, this._futuresExchange);
+                const confirmSignal = await getTechnicalSignal(pair.ccxtSymbol, isTestnet);
 
                 if (confirmSignal.direction !== techSignal.direction) {
                     await this.log(userId, `⚠️ ${pair.ccxtSymbol}: Sinyal çelişiyor (${techSignal.direction} vs ${confirmSignal.direction}). Atlandı.`, 'warning');

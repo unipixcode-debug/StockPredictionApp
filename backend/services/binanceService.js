@@ -127,6 +127,59 @@ function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true, timeOff
 }
 
 /**
+ * Fetches OHLCV directly via public HTTPS (Unauthenticated)
+ */
+function rawFuturesPublicOHLCV(symbol, timeframe = '5m', limit = 30, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const url = `https://${hostname}/fapi/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=${limit}`;
+        https.get(url, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.code) reject(new Error(`binance ${data}`));
+                    else resolve(parsed.map(c => [
+                        c[0], // open time
+                        parseFloat(c[1]), // open
+                        parseFloat(c[2]), // high
+                        parseFloat(c[3]), // low
+                        parseFloat(c[4]), // close
+                        parseFloat(c[5])  // volume
+                    ]));
+                } catch (e) { reject(e); }
+            });
+        }).on('error', reject);
+    });
+}
+
+/**
+ * Fetches all tickers directly via public HTTPS (Unauthenticated)
+ */
+function rawFuturesPublicTickers(isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const url = `https://${hostname}/fapi/v1/ticker/24hr`;
+        https.get(url, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.code) reject(new Error(`binance ${data}`));
+                    else {
+                        const tickerMap = {};
+                        parsed.forEach(t => { tickerMap[t.symbol] = t; });
+                        resolve(tickerMap);
+                    }
+                } catch (e) { reject(e); }
+            });
+        }).on('error', reject);
+    });
+}
+
+/**
  * Direct HTTPS GET for server time (public)
  */
 function rawFuturesTime(isTestnet = true) {
@@ -493,4 +546,13 @@ class BinanceService {
     }
 }
 
-module.exports = new BinanceService();
+const service = new BinanceService();
+service.rawFuturesOrder = rawFuturesOrder;
+service.rawFuturesBalance = rawFuturesBalance;
+service.rawFuturesLeverage = rawFuturesLeverage;
+service.rawFuturesPublicOHLCV = rawFuturesPublicOHLCV;
+service.rawFuturesPublicTickers = rawFuturesPublicTickers;
+service.rawFuturesTime = rawFuturesTime;
+service.rawFuturesMarkets = rawFuturesMarkets;
+
+module.exports = service;
