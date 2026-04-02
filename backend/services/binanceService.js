@@ -536,26 +536,30 @@ class BinanceService {
                 }
 
                 tradeRecord.exchangeOrderId = order.orderId || order.id;
-                tradeRecord.entryPrice = parseFloat(order.avgPrice || order.price || order.average || currentPrice);
-                await tradeRecord.save();
+                tradeRecord.entryPrice = parseFloat(order.avgPrice || order.price || order.average || currentPrice || 0);
 
-                // ── Step 5: Stop-Loss ─────────────────────────────────────────────────
-                if (signal.stopLossPct && marketType === 'FUTURES') {
+                // ── Step 5: SL & TP calculation ───────────────────────────────────────
+                if (marketType === 'FUTURES') {
+                    const ep = parseFloat(tradeRecord.entryPrice);
+                    const slPct = signal.stopLossPct || 0.02; // Default 2%
+                    const tpPct = slPct * 1.5; // Default 1.5x RR ratio (e.g. 3% if SL is 2%)
+
+                    tradeRecord.stopLossPrice = side === 'buy' ? ep * (1 - slPct) : ep * (1 + slPct);
+                    tradeRecord.targetPrice   = side === 'buy' ? ep * (1 + tpPct) : ep * (1 - tpPct);
+
                     try {
-                        const ep = parseFloat(tradeRecord.entryPrice) || currentPrice;
-                        const slPrice = side === 'buy' ? ep * (1 - signal.stopLossPct) : ep * (1 + signal.stopLossPct);
-                        
                         await rawFuturesOrder(apiKey, apiSecret, {
                             symbol: apiSymbol,
                             side: side === 'buy' ? 'SELL' : 'BUY',
                             type: 'STOP_MARKET',
-                            stopPrice: slPrice.toFixed(4),
+                            stopPrice: tradeRecord.stopLossPrice.toFixed(4),
                             closePosition: 'true'
                         }, isTestnet);
-                        console.log(`[Binance] SL placed at ${slPrice.toFixed(4)} for ${apiSymbol}`);
+                        console.log(`[Binance] SL placed at ${tradeRecord.stopLossPrice.toFixed(4)} for ${apiSymbol}`);
                     } catch (slErr) { console.warn(`[Binance] SL failed:`, slErr.message); }
                 }
 
+                await tradeRecord.save();
                 return tradeRecord;
 
             } catch (exchangeError) {

@@ -299,19 +299,31 @@ export default function BotDashboard() {
                                                                 }`}>{isLong ? 'LONG' : 'SHORT'}</span>
                                                                 <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{trade.type}</span>
                                                             </div>
-                                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                                Giriş: <span className="text-foreground font-bold">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span>
-                                                                {trade.currentPrice && (
-                                                                    <>
-                                                                        <span className="mx-2 opacity-30">→</span>
-                                                                        <span className={`font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                                            ${parseFloat(trade.currentPrice).toFixed(4)}
-                                                                        </span>
-                                                                    </>
+                                                            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-1.5 pt-1.5 border-t border-white/5">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-[10px] text-muted-foreground uppercase font-bold">Giriş:</span>
+                                                                    <span className="text-xs text-foreground font-black">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span>
+                                                                </div>
+                                                                
+                                                                {trade.stopLossPrice && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[10px] text-rose-400/70 uppercase font-bold">Stop:</span>
+                                                                        <span className="text-xs text-rose-400 font-black">${parseFloat(trade.stopLossPrice).toFixed(4)}</span>
+                                                                    </div>
                                                                 )}
-                                                                <span className="mx-2 opacity-30">·</span>
-                                                                Miktar: <span className="font-bold">{parseFloat(trade.amount || 0).toFixed(4)}</span>
-                                                            </p>
+                                                                
+                                                                {trade.targetPrice && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[10px] text-emerald-400/70 uppercase font-bold">Hedef:</span>
+                                                                        <span className="text-xs text-emerald-400 font-black">${parseFloat(trade.targetPrice).toFixed(4)}</span>
+                                                                    </div>
+                                                                )}
+                                                                
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-[10px] text-muted-foreground uppercase font-bold">Miktar:</span>
+                                                                    <span className="text-xs text-foreground/80 font-bold">{parseFloat(trade.amount || 0).toFixed(4)}</span>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-4 ml-auto">

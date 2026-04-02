@@ -51,6 +51,14 @@ const ExecutedTrade = sequelize.define('ExecutedTrade', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    stopLossPrice: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+    },
+    targetPrice: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+    },
     errorMessage: {
         type: DataTypes.TEXT,
         allowNull: true
