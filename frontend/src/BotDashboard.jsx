@@ -315,162 +315,201 @@ export default function BotDashboard() {
                         {(() => {
                             const openTrades = trades.filter(t => t.status === 'OPEN');
                             if (openTrades.length === 0) return null;
-                            return (
-                                <div className="glass-card p-6 border-amber-500/20 bg-amber-500/5">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <h3 className="text-lg font-black uppercase italic flex items-center gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"/>
-                                            Açık Pozisyonlar
-                                            <span className="text-xs font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
-                                                {openTrades.length}
-                                            </span>
-                                        </h3>
-                                        <button onClick={fetchData} className="text-muted-foreground hover:text-amber-400 transition-colors">
-                                            <RefreshCw size={14} />
-                                        </button>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {openTrades.map(trade => {
-                                            const isLong = trade.side === 'BUY';
-                                            const pnl = trade.unrealizedPnl ?? trade.pnl ?? 0;
-                                            const isClosing = closingTradeId === trade.id;
-                                            const isExpanded = expandedTradeId === trade.id;
+                            const spotTrades = openTrades.filter(t => t.type === 'SPOT');
+                            const futuresTrades = openTrades.filter(t => t.type === 'FUTURES');
 
-                                            return (
-                                                <div key={trade.id} className="space-y-2">
-                                                    <div 
-                                                        onClick={() => setExpandedTradeId(isExpanded ? null : trade.id)}
-                                                        className={`flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl border transition-all cursor-pointer group ${
-                                                            isLong ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40' : 'bg-rose-500/5 border-rose-500/20 hover:border-rose-500/40'
-                                                        }`}
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border text-sm font-black ${
-                                                                isLong ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                                                            }`}>
-                                                                {isLong ? '↑' : '↓'}
-                                                            </div>
-                                                            <div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-black text-base">{trade.symbol}</span>
-                                                                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                                                                        isLong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-                                                                    }`}>{isLong ? 'LONG' : 'SHORT'}</span>
-                                                                    {trade.type === 'FUTURES' && trade.leverage && (
-                                                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">{trade.leverage}x</span>
-                                                                    )}
-                                                                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{trade.type}</span>
-                                                                </div>
-                                                                <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-1.5 pt-1.5 border-t border-white/5">
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Giriş:</span>
-                                                                        <span className="text-xs text-foreground font-black">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span>
-                                                                    </div>
-                                                                    
-                                                                    {trade.stopLossPrice && (
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            <span className="text-[10px] text-rose-400/70 uppercase font-bold">Stop:</span>
-                                                                            <span className="text-xs text-rose-400 font-black">${parseFloat(trade.stopLossPrice).toFixed(4)}</span>
-                                                                        </div>
-                                                                    )}
-                                                                    
-                                                                    {trade.targetPrice && (
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            <span className="text-[10px] text-emerald-400/70 uppercase font-bold">Hedef:</span>
-                                                                            <span className="text-xs text-emerald-400 font-black">${parseFloat(trade.targetPrice).toFixed(4)}</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-4 ml-auto">
-                                                            <div className="text-right">
-                                                                <p className={`text-lg font-black ${
-                                                                    pnl > 0 ? 'text-emerald-400' : pnl < 0 ? 'text-rose-400' : 'text-muted-foreground'
-                                                                }`}>
-                                                                    {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}$
-                                                                </p>
-                                                                <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Anlık P&L</p>
-                                                            </div>
-                                                            <div className="flex flex-col gap-2">
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleClosePosition(trade.id);
-                                                                    }}
-                                                                    disabled={isClosing}
-                                                                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 min-w-20"
-                                                                >
-                                                                    {isClosing ? <RefreshCw size={12} className="animate-spin"/> : <X size={12}/>}
-                                                                    {isClosing ? '...' : 'Kapat'}
-                                                                </button>
-                                                                <button className="text-[9px] font-black uppercase text-muted-foreground/50 hover:text-primary transition-colors">
-                                                                    {isExpanded ? 'Grafiği Gizle' : 'Grafiği Gör'}
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                            const renderTradeCard = (trade) => {
+                                const isLong = trade.side === 'BUY';
+                                const pnl = trade.unrealizedPnl ?? trade.pnl ?? 0;
+                                const isClosing = closingTradeId === trade.id;
+                                const isExpanded = expandedTradeId === trade.id;
 
-                                                    <AnimatePresence>
-                                                        {isExpanded && (
-                                                            <motion.div
-                                                                initial={{ height: 0, opacity: 0 }}
-                                                                animate={{ height: 'auto', opacity: 1 }}
-                                                                exit={{ height: 0, opacity: 0 }}
-                                                                className="overflow-hidden bg-black/20 rounded-2xl border border-white/5"
-                                                            >
-                                                                <TradeLiveChart trade={trade} />
-                                                            </motion.div>
-                                                        )}
-                                                    </AnimatePresence>
+                                return (
+                                    <div key={trade.id} className="space-y-2">
+                                        <div 
+                                            onClick={() => setExpandedTradeId(isExpanded ? null : trade.id)}
+                                            className={`flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl border transition-all cursor-pointer group ${
+                                                isLong ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40' : 'bg-rose-500/5 border-rose-500/20 hover:border-rose-500/40'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border text-sm font-black ${
+                                                    isLong ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                                }`}>
+                                                    {isLong ? '↑' : '↓'}
                                                 </div>
-                                            );
-                                        })}
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-black text-base">{trade.symbol}</span>
+                                                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                            isLong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                                                        }`}>{isLong ? 'LONG' : 'SHORT'}</span>
+                                                        {trade.type === 'FUTURES' && trade.leverage && (
+                                                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">{trade.leverage}x</span>
+                                                        )}
+                                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{trade.type}</span>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-1.5 pt-1.5 border-t border-white/5">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[10px] text-muted-foreground uppercase font-bold">Giriş:</span>
+                                                            <span className="text-xs text-foreground font-black">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span>
+                                                        </div>
+                                                        {trade.stopLossPrice && (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-[10px] text-rose-400/70 uppercase font-bold">Stop:</span>
+                                                                <span className="text-xs text-rose-400 font-black">${parseFloat(trade.stopLossPrice).toFixed(4)}</span>
+                                                            </div>
+                                                        )}
+                                                        {trade.targetPrice && (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-[10px] text-emerald-400/70 uppercase font-bold">Hedef:</span>
+                                                                <span className="text-xs text-emerald-400 font-black">${parseFloat(trade.targetPrice).toFixed(4)}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 ml-auto">
+                                                <div className="text-right">
+                                                    <p className={`text-lg font-black ${
+                                                        pnl > 0 ? 'text-emerald-400' : pnl < 0 ? 'text-rose-400' : 'text-muted-foreground'
+                                                    }`}>
+                                                        {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}$
+                                                    </p>
+                                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Anlık P&L</p>
+                                                </div>
+                                                <div className="flex flex-col gap-2">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleClosePosition(trade.id);
+                                                        }}
+                                                        disabled={isClosing}
+                                                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 min-w-20"
+                                                    >
+                                                        {isClosing ? <RefreshCw size={12} className="animate-spin"/> : <X size={12}/>}
+                                                        {isClosing ? '...' : 'Kapat'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <AnimatePresence>
+                                            {isExpanded && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="overflow-hidden bg-black/20 rounded-2xl border border-white/5"
+                                                >
+                                                    <TradeLiveChart trade={trade} />
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
+                                );
+                            };
+
+                            return (
+                                <div className="space-y-6">
+                                    {spotTrades.length > 0 && (
+                                        <div className="glass-card p-6 border-emerald-500/20 bg-emerald-500/5">
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>
+                                                Spot İşlemler ({spotTrades.length})
+                                            </h3>
+                                            <div className="space-y-3">
+                                                {spotTrades.map(renderTradeCard)}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {futuresTrades.length > 0 && (
+                                        <div className="glass-card p-6 border-cyan-500/20 bg-cyan-500/5">
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-cyan-400 mb-4 flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"/>
+                                                Vadeli (Futures) İşlemler ({futuresTrades.length})
+                                            </h3>
+                                            <div className="space-y-3">
+                                                {futuresTrades.map(renderTradeCard)}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })()}
 
                         {/* Recent Trades (Closed only) */}
-                        <div className="glass-card p-6">
-                             <h3 className="text-lg font-black uppercase italic mb-6">Son İşlemler</h3>
-                             {trades.filter(t => t.status !== 'OPEN').length > 0 ? (
-                                 <div className="divide-y divide-border/30">
-                                     {trades.filter(t => t.status !== 'OPEN').map(trade => (
+                        <div className="space-y-6">
+                             {(() => {
+                                 const closedTrades = trades.filter(t => t.status !== 'OPEN');
+                                 if (closedTrades.length === 0) {
+                                     return (
+                                        <div className="glass-card p-6">
+                                            <h3 className="text-lg font-black uppercase italic mb-6">Son İşlemler</h3>
+                                            <p className="text-sm font-medium text-muted-foreground text-center py-10">Kapatılmış işlem kaydı bulunamadı.</p>
+                                        </div>
+                                     );
+                                 }
 
-                                         <div key={trade.id} className="py-4 flex flex-col md:flex-row justify-between md:items-center gap-4 group">
-                                             <div className="flex items-center space-x-4">
-                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${trade.side === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' : 'bg-rose-500/10 border-rose-500/30 text-rose-500'}`}>
-                                                    {trade.side === 'BUY' ? <TrendingUp /> : <TrendingDown />}
+                                 const spotHistory = closedTrades.filter(t => t.type === 'SPOT');
+                                 const futuresHistory = closedTrades.filter(t => t.type === 'FUTURES');
+
+                                 const renderClosedTrade = (trade) => (
+                                     <div key={trade.id} className="py-4 flex flex-col md:flex-row justify-between md:items-center gap-4 group">
+                                         <div className="flex items-center space-x-4">
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${trade.side === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' : 'bg-rose-500/10 border-rose-500/30 text-rose-500'}`}>
+                                                {trade.side === 'BUY' ? <TrendingUp /> : <TrendingDown />}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-black text-lg">{trade.symbol}</h4>
+                                                <div className="flex gap-2">
+                                                    {trade.type === 'FUTURES' && trade.leverage && (
+                                                        <span className="text-[10px] uppercase font-bold tracking-widest bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full">{trade.leverage}x</span>
+                                                    )}
+                                                    <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{trade.type}</span>
                                                 </div>
-                                                <div>
-                                                    <h4 className="font-black text-lg">{trade.symbol}</h4>
-                                                    <div className="flex gap-2">
-                                                        {trade.type === 'FUTURES' && trade.leverage && (
-                                                            <span className="text-[10px] uppercase font-bold tracking-widest bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full">{trade.leverage}x</span>
-                                                        )}
-                                                        <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{trade.type}</span>
-                                                    </div>
-                                                </div>
-                                             </div>
-                                             <div className="flex flex-col md:items-end text-sm font-medium">
-                                                 <span className="text-muted-foreground">Giriş: <span className="text-foreground">${trade.entryPrice}</span></span>
-                                                 {trade.exitPrice && <span>Çıkış: <span className="text-foreground">${trade.exitPrice}</span></span>}
-                                             </div>
-                                             <div className="flex flex-col md:items-end w-32">
-                                                 <span className={`text-lg font-black ${trade.pnl > 0 ? 'text-emerald-500' : trade.pnl < 0 ? 'text-rose-500' : 'text-muted-foreground'}`}>
-                                                     {trade.pnl > 0 ? '+' : ''}{trade.pnl.toFixed(2)}$
-                                                 </span>
-                                                 <span className={`text-[10px] font-black tracking-widest px-2 py-0.5 mt-1 rounded ${trade.status === 'OPEN' ? 'bg-amber-500/20 text-amber-500' : 'bg-primary/10 text-primary'}`}>
-                                                     {trade.status}
-                                                 </span>
-                                             </div>
+                                            </div>
                                          </div>
-                                     ))}
-                                 </div>
-                             ) : (
-                                <p className="text-sm font-medium text-muted-foreground text-center py-10">Kapatılmış işlem kaydı bulunamadı.</p>
-                             )}
+                                         <div className="flex flex-col md:items-end text-sm font-medium">
+                                             <span className="text-muted-foreground">Giriş: <span className="text-foreground">${trade.entryPrice}</span></span>
+                                             {trade.exitPrice && <span>Çıkış: <span className="text-foreground">${trade.exitPrice}</span></span>}
+                                         </div>
+                                         <div className="flex flex-col md:items-end w-32">
+                                             <span className={`text-lg font-black ${trade.pnl > 0 ? 'text-emerald-500' : trade.pnl < 0 ? 'text-rose-500' : 'text-muted-foreground'}`}>
+                                                 {trade.pnl > 0 ? '+' : ''}{trade.pnl.toFixed(2)}$
+                                             </span>
+                                             <span className={`text-[10px] font-black tracking-widest px-2 py-0.5 mt-1 rounded ${trade.status === 'OPEN' ? 'bg-amber-500/20 text-amber-500' : 'bg-primary/10 text-primary'}`}>
+                                                 {trade.status}
+                                             </span>
+                                         </div>
+                                     </div>
+                                 );
+
+                                 return (
+                                     <>
+                                        {spotHistory.length > 0 && (
+                                            <div className="glass-card p-6">
+                                                <h3 className="text-lg font-black uppercase italic mb-6 flex items-center gap-2">
+                                                    <TrendingUp size={18} className="text-emerald-500" /> Spot İşlem Geçmişi
+                                                </h3>
+                                                <div className="divide-y divide-border/30">
+                                                    {spotHistory.map(renderClosedTrade)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {futuresHistory.length > 0 && (
+                                            <div className="glass-card p-6">
+                                                <h3 className="text-lg font-black uppercase italic mb-6 flex items-center gap-2">
+                                                    <TrendingDown size={18} className="text-cyan-500" /> Vadeli İşlem Geçmişi
+                                                </h3>
+                                                <div className="divide-y divide-border/30">
+                                                    {futuresHistory.map(renderClosedTrade)}
+                                                </div>
+                                            </div>
+                                        )}
+                                     </>
+                                 );
+                             })()}
                         </div>
                     </motion.div>
                 ) : (
