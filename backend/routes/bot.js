@@ -210,4 +210,21 @@ router.get('/trades/:tradeId/chart', authCheck, async (req, res) => {
     }
 });
 
+// Local Sync (Health Check)
+router.post('/sync', authCheck, async (req, res) => {
+    try {
+        const result = await binanceService.syncTradesWithExchange(req.user.id);
+        if (result.success) {
+            await botScannerService.log(req.user.id, 
+                `🔄 Senkronizasyon Tamamlandı: ${result.closed} kapandı, ${result.updated} güncellendi, ${result.added} yeni eklendi.`, 
+                'info');
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

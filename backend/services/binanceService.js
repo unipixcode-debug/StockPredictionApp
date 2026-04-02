@@ -128,6 +128,64 @@ function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true) {
 }
 
 /**
+ * Direct HTTPS GET for Futures Account (Positions, Balances)
+ */
+function rawFuturesAccount(apiKey, apiSecret, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const timestamp = Date.now();
+        const query = querystring.stringify({ timestamp, recvWindow: 60000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
+        const path = `/fapi/v2/account?${query}&signature=${signature}`;
+
+        https.get({
+            hostname,
+            path,
+            headers: { 'X-MBX-APIKEY': apiKey }
+        }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.assets) resolve(parsed);
+                    else reject(new Error(`binance account ${data}`));
+                } catch { reject(new Error('Invalid JSON: ' + data)); }
+            });
+        }).on('error', reject);
+    });
+}
+
+/**
+ * Direct HTTPS GET for Futures Position Risk (Leverage, EntryPrice, Margin)
+ */
+function rawFuturesPositions(apiKey, apiSecret, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const timestamp = Date.now();
+        const query = querystring.stringify({ timestamp, recvWindow: 60000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
+        const path = `/fapi/v2/positionRisk?${query}&signature=${signature}`;
+
+        https.get({
+            hostname,
+            path,
+            headers: { 'X-MBX-APIKEY': apiKey }
+        }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (Array.isArray(parsed)) resolve(parsed);
+                    else reject(new Error(`binance positions ${data}`));
+                } catch { reject(new Error('Invalid JSON: ' + data)); }
+            });
+        }).on('error', reject);
+    });
+}
+
+/**
  * Fetches OHLCV directly via public HTTPS (Unauthenticated)
  */
 function rawFuturesPublicOHLCV(symbol, timeframe = '5m', limit = 30, isTestnet = true) {
@@ -394,11 +452,17 @@ class BinanceService {
             const apiSymbol = pair.split('/')[0].split('-')[0].split(':')[0].toUpperCase() + 'USDT';
 
             if (marketType === 'FUTURES') {
+                const markets = await rawFuturesMarkets(isTestnet);
+                const marketInfo = markets[apiSymbol];
+                const qtyPrecision = marketInfo ? marketInfo.precision.amount : 3;
+                const pricePrecision = marketInfo ? marketInfo.precision.price : 4;
+
                 if (leverage > 1) {
                     await rawFuturesLeverage(apiKey, apiSecret, { symbol: apiSymbol, leverage }, isTestnet);
                 }
-                const rawQty = parseFloat(amountValue.toFixed(3));
+                const rawQty = parseFloat(amountValue.toFixed(qtyPrecision));
                 order = await rawFuturesOrder(apiKey, apiSecret, { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty }, isTestnet);
+                newTrade.stopLossPricePrecision = pricePrecision; // Storing for SL/TP
             } else {
                 order = await exchange.createMarketOrder(pair, side, amountValue);
             }
@@ -439,14 +503,18 @@ class BinanceService {
                 newTrade.targetPrice = side === 'buy' ? ep * (1 + tpPct) : ep * (1 - tpPct);
                 
                 try {
+                    const markets = await rawFuturesMarkets(isTestnet);
+                    const marketInfo = markets[apiSymbol];
+                    const pricePrecision = marketInfo ? marketInfo.precision.price : 4;
+
                     await rawFuturesOrder(apiKey, apiSecret, { 
                         symbol: apiSymbol, 
                         side: side === 'buy' ? 'SELL' : 'BUY', 
                         type: 'STOP_MARKET', 
-                        stopPrice: newTrade.stopLossPrice.toFixed(4), 
+                        stopPrice: newTrade.stopLossPrice.toFixed(pricePrecision), 
                         closePosition: 'true' 
                     }, isTestnet);
-                    console.log(`[Binance] Dynamic SL (X-Aware) placed at ${newTrade.stopLossPrice.toFixed(4)} (${(slPct*100).toFixed(2)}%)`);
+                    console.log(`[Binance] Dynamic SL (Precision-Aware) placed at ${newTrade.stopLossPrice.toFixed(pricePrecision)} (${(slPct*100).toFixed(2)}%)`);
                 } catch (slErr) { console.warn('SL Failed:', slErr.message); }
                 await newTrade.save();
             }
@@ -460,12 +528,82 @@ class BinanceService {
             throw error;
         }
     }
+
+    async syncTradesWithExchange(userId) {
+        try {
+            const { config } = await this.getExchangeInstance(userId, 'FUTURES');
+            const apiKey = config.futuresApiKey?.trim();
+            const apiSecret = config.futuresApiSecret?.trim();
+            const isTestnet = !!config.isTestnet;
+
+            if (!apiKey || !apiSecret) return { success: false, error: 'FUTURES_API_KEYS_MISSING' };
+
+            // 1. Fetch current positions from Binance
+            const realPositions = await rawFuturesPositions(apiKey, apiSecret, isTestnet);
+            const activeReal = realPositions.filter(p => parseFloat(p.positionAmt) !== 0);
+
+            // 2. Fetch OPEN trades from DB
+            const dbOpenTrades = await ExecutedTrade.findAll({ where: { userId, status: 'OPEN', type: 'FUTURES' } });
+
+            const results = { closed: 0, updated: 0, added: 0 };
+
+            // 3. Mark DB trades as CLOSED if they don't exist on Binance
+            for (const dbTrade of dbOpenTrades) {
+                // Symbols in DB are like 'BTC/USDT', Binance uses 'BTCUSDT'
+                const binanceSymbol = dbTrade.symbol.replace('/', '');
+                const stillOpen = activeReal.find(p => p.symbol === binanceSymbol);
+
+                if (!stillOpen) {
+                    dbTrade.status = 'CLOSED';
+                    dbTrade.exitPrice = 0; // Unknown without more API calls
+                    await dbTrade.save();
+                    results.closed++;
+                } else {
+                    // Update leverage if different
+                    const realLev = parseInt(stillOpen.leverage);
+                    if (dbTrade.leverage !== realLev) {
+                        dbTrade.leverage = realLev;
+                        await dbTrade.save();
+                        results.updated++;
+                    }
+                }
+            }
+
+            // 4. (Optional) Detect new positions not in DB
+            for (const realPos of activeReal) {
+                const standardSymbol = realPos.symbol.replace('USDT', '/USDT');
+                const exists = dbOpenTrades.find(t => t.symbol === standardSymbol);
+
+                if (!exists) {
+                    await ExecutedTrade.create({
+                        userId,
+                        symbol: standardSymbol,
+                        side: parseFloat(realPos.positionAmt) > 0 ? 'BUY' : 'SELL',
+                        type: 'FUTURES',
+                        amount: Math.abs(parseFloat(realPos.positionAmt)),
+                        entryPrice: parseFloat(realPos.entryPrice),
+                        status: 'OPEN',
+                        leverage: parseInt(realPos.leverage),
+                        exchangeOrderId: 'DETECTED'
+                    });
+                    results.added++;
+                }
+            }
+
+            return { success: true, ...results };
+        } catch (err) {
+            console.error('[Sync Error]', err.message);
+            return { success: false, error: err.message };
+        }
+    }
 }
 
 const service = new BinanceService();
 service.rawFuturesOrder = rawFuturesOrder;
 service.rawFuturesBalance = rawFuturesBalance;
 service.rawFuturesLeverage = rawFuturesLeverage;
+service.rawFuturesAccount = rawFuturesAccount;
+service.rawFuturesPositions = rawFuturesPositions;
 service.rawFuturesPublicOHLCV = rawFuturesPublicOHLCV;
 service.rawFuturesPublicTickers = rawFuturesPublicTickers;
 service.rawFutures24hrTickers = rawFutures24hrTickers;

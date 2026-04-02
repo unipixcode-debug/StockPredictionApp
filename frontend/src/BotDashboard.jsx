@@ -102,6 +102,22 @@ export default function BotDashboard() {
         }
     };
 
+    const [isSyncing, setIsSyncing] = useState(false);
+    const handleSync = async () => {
+        setIsSyncing(true);
+        try {
+            const res = await api.post('/bot/sync');
+            fetchData(); // Refresh all data
+            alert(language === 'TR' 
+                ? `Senkronizasyon Başarılı: ${res.closed} kapandı, ${res.updated} güncellendi, ${res.added} yeni eklendi.` 
+                : `Sync Successful: ${res.closed} closed, ${res.updated} updated, ${res.added} new added.`);
+        } catch (error) {
+            alert('Sync Error: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     const handleClosePosition = async (tradeId) => {
         setClosingTradeId(tradeId);
         try {
@@ -425,10 +441,20 @@ export default function BotDashboard() {
 
                                     {futuresTrades.length > 0 && (
                                         <div className="glass-card p-6 border-cyan-500/20 bg-cyan-500/5">
-                                            <h3 className="text-sm font-black uppercase tracking-widest text-cyan-400 mb-4 flex items-center gap-2">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"/>
-                                                Vadeli (Futures) İşlemler ({futuresTrades.length})
-                                            </h3>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-sm font-black uppercase tracking-widest text-cyan-400 flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"/>
+                                                    Vadeli (Futures) İşlemler ({futuresTrades.length})
+                                                </h3>
+                                                <button
+                                                    onClick={handleSync}
+                                                    disabled={isSyncing}
+                                                    className="flex items-center gap-2 px-3 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 text-[10px] font-black uppercase transition-all disabled:opacity-50"
+                                                >
+                                                    <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                                                    {isSyncing ? (language === 'TR' ? 'Eşitleniyor...' : 'Syncing...') : (language === 'TR' ? 'Binance ile Eşitle' : 'Sync with Binance')}
+                                                </button>
+                                            </div>
                                             <div className="space-y-3">
                                                 {futuresTrades.map(renderTradeCard)}
                                             </div>
