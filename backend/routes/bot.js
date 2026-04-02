@@ -184,7 +184,7 @@ router.get('/trades/:tradeId/chart', authCheck, async (req, res) => {
         // Symbol cleanup (e.g. BTC/USDT:USDT -> BTCUSDT)
         const apiSymbol = trade.symbol.split(':')[0].replace('/', '');
         
-        const ohlcv = await binanceService.rawFuturesPublicOHLCV(apiSymbol, '1m', 100, isTestnet);
+        const ohlcv = await binanceService.rawFuturesPublicOHLCV(apiSymbol, '1m', 300, isTestnet);
         const formatted = ohlcv.map(item => ({
             time: item[0],
             open: item[1],

@@ -839,7 +839,7 @@ function TradeLiveChart({ trade }) {
         <div className="p-4 pt-2">
             <div className="h-[480px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 20, right: 100, left: 0, bottom: 0 }}>
+                    <AreaChart data={chartData} margin={{ top: 20, right: 100, left: 0, bottom: 30 }}>
                         <defs>
                             <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#00f2fe" stopOpacity={0.2}/>
@@ -847,7 +847,19 @@ function TradeLiveChart({ trade }) {
                             </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                        <XAxis dataKey="time" hide />
+                        <XAxis 
+                            dataKey="time" 
+                            hide={false}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: '#666', fontSize: 9, fontWeight: 'bold' }}
+                            minTickGap={30}
+                            tickFormatter={(val) => {
+                                const date = new Date(val);
+                                return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                            }}
+                            dy={10}
+                        />
                         <YAxis domain={yDomain} hide />
                         
                         <RechartsTooltip 

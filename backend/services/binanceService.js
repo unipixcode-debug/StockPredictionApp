@@ -3,6 +3,7 @@ const crypto      = require('crypto');
 const https       = require('https');
 const querystring = require('querystring');
 const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
+const marketDataService = require('./marketDataService');
 
 /**
  * Direct HTTPS POST to Binance Futures API (bypasses CCXT URL routing bugs for Demo Trading).
@@ -59,7 +60,6 @@ function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
 function rawFuturesBalance(apiKey, apiSecret, isTestnet = true) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
-        console.log(`[Binance] Raw Balance check for ${hostname} (Key prefix: ${apiKey?.substring(0, 4)})`);
         const timestamp = Date.now();
         const query = querystring.stringify({ timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
@@ -230,66 +230,18 @@ function rawFuturesMarkets(isTestnet = true) {
     });
 }
 
-// ── Demo-fapi symbol cache ────────────────────────────────────────────────────
-// CCXT loadMarkets() ignores URL overrides → fetches mainnet symbols.
-// We cache demo-fapi's own exchangeInfo via raw HTTPS to validate symbols correctly.
-let _demoSymbolCache = null;
-let _demoSymbolCacheTime = 0;
-const DEMO_CACHE_TTL = 60 * 60 * 1000; // 1 hour
-
-function getCachedDemoSymbols() {
-    if (_demoSymbolCache && Date.now() - _demoSymbolCacheTime < DEMO_CACHE_TTL) {
-        return Promise.resolve(_demoSymbolCache);
-    }
-    return new Promise((resolve) => {
-        const req = https.request({
-            hostname: 'demo-fapi.binance.com',
-            port: 443,
-            path: '/fapi/v1/exchangeInfo',
-            method: 'GET',
-        }, (res) => {
-            let data = '';
-            res.on('data', d => data += d);
-            res.on('end', () => {
-                try {
-                    const parsed = JSON.parse(data);
-                    const symbols = new Set(parsed.symbols.map(s => s.symbol));
-                    _demoSymbolCache = symbols;
-                    _demoSymbolCacheTime = Date.now();
-                    console.log(`[Binance] demo-fapi cache: ${symbols.size} available symbols.`);
-                    resolve(symbols);
-                } catch (err) {
-                    // Comprehensive Whitelist Fallback (Top 20 most liquid USDS-M Perpetual/Testnet pairs)
-                    resolve(new Set([
-                        'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
-                        'DOGEUSDT', 'ADAUSDT', 'AVAXUSDT', 'DOTUSDT', 'LINKUSDT',
-                        'POLUSDT', 'LTCUSDT', 'SHIBUSDT', 'NEARUSDT', 'TRXUSDT',
-                        'PEPEUSDT', 'WIFUSDT', 'SUIUSDT', 'APTUSDT', 'FETUSDT'
-                    ]));
-                }
-            });
-        });
-        req.on('error', () => resolve(new Set(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT'])));
-        req.end();
-    });
-}
-
 class BinanceService {
-    /**
-     * Initializes a ccxt binance instance for a user
-     * @param {string} userId
-     * @param {string} marketType - 'SPOT' or 'FUTURES'
-     */
+    constructor() {
+        this.activeProcessing = new Set();
+    }
+
     async getExchangeInstance(userId, marketType = 'SPOT') {
-        // If userId is null, it's a public request (e.g. from scanner)
-        // We use a strictly unauthenticated instance to avoid CCXT's broken auth routing.
         if (!userId) {
             const publicEx = new ccxt.binance({
                 apiKey: null,
                 secret: null,
                 options: { defaultType: marketType === 'FUTURES' ? 'future' : 'spot' }
             });
-            // Force Demo URL for public futures data in dev/test contexts
             if (marketType === 'FUTURES') {
                 publicEx.urls['api'] = { ...publicEx.urls['api'], 'fapiPublic': 'https://demo-fapi.binance.com/fapi/v1' };
                 publicEx.setSandboxMode(true);
@@ -311,28 +263,16 @@ class BinanceService {
             if (!apiKey || !apiSecret) throw new Error('BINANCE_SPOT_API_NOT_CONFIGURED');
         }
 
-        // Trim keys to remove any accidental spaces/newlines which cause -2008 errors
-        const trimmedKey = apiKey.trim();
-        const trimmedSecret = apiSecret.trim();
-
-        // Security-safe length log for debugging -2008 errors
-        console.log(`[Binance] Instance created for ${marketType}. Key length: ${trimmedKey.length}, Secret length: ${trimmedSecret.length}`);
-
         const exchange = new ccxt.binance({
-            apiKey: trimmedKey,
-            secret: trimmedSecret,
+            apiKey: apiKey.trim(),
+            secret: apiSecret.trim(),
             enableRateLimit: true,
-            options: {
-                defaultType: marketType === 'FUTURES' ? 'future' : 'spot',
-            }
+            options: { defaultType: marketType === 'FUTURES' ? 'future' : 'spot' }
         });
 
         if (config.isTestnet) {
             if (marketType === 'FUTURES') {
-                // IMPORTANT: Binance modern Demo Trading (v2) configuration
                 const demoUrl = 'https://demo-fapi.binance.com';
-                
-                // Comprehensive manual URL map for Demo Trading (to avoid CCXT internal errors)
                 exchange.urls['api'] = {
                     ...exchange.urls['api'],
                     'fapiPublic': `${demoUrl}/fapi/v1`,
@@ -343,12 +283,9 @@ class BinanceService {
                     'public': `${demoUrl}/fapi/v1`,
                     'private': `${demoUrl}/fapi/v1`
                 };
-                
-                // Critical options for Demo Trading authentication
                 exchange.options['adjustForTimeDifference'] = true;
                 exchange.options['recvWindow'] = 10000;
             } else {
-                // Standard sandbox mode still works fine for Spot
                 exchange.setSandboxMode(true);
             }
         }
@@ -356,22 +293,15 @@ class BinanceService {
         return { exchange, config };
     }
 
-    /**
-     * Tests connection for given userId and market
-     */
     async testConnection(userId, marketType = 'SPOT') {
         try {
             const { exchange } = await this.getExchangeInstance(userId, marketType);
-            
-            // Explicitly sync time with Binance server to avoid signature/-2008 errors
-            // (Uses /fapi/v1/time as suggested by the user's documentation)
             await exchange.loadTimeDifference();
             
             let freeUSDT = 0;
             let totalUSDT = 0;
 
             if (marketType === 'FUTURES') {
-                // IMPORTANT: Upgraded to V2 as V1 returned -5000 (Method GET invalid) on Demo
                 const balanceArray = await exchange.fapiPrivateV2GetBalance();
                 const usdtBalance = balanceArray.find(b => b.asset === 'USDT');
                 freeUSDT = parseFloat(usdtBalance?.withdrawAvailable || usdtBalance?.balance || 0);
@@ -381,42 +311,26 @@ class BinanceService {
                 freeUSDT = balance['USDT']?.free || 0;
                 totalUSDT = balance['USDT']?.total || 0;
             }
-
-            const currentUrl = exchange.urls.api.fapiPublic || exchange.urls.api.public;
-            const isTestnetEnv = currentUrl.includes('testnet') || currentUrl.includes('demo-fapi');
-
-            return {
-                success: true,
-                freeUSDT,
-                totalUSDT,
-                testnet: isTestnetEnv,
-                marketType
-            };
+            return { success: true, freeUSDT, totalUSDT, testnet: true, marketType };
         } catch (error) {
-            let errorMsg = error.message;
-            if (errorMsg.includes('-2008') || errorMsg.includes('Invalid API-key ID')) {
-                errorMsg = 'Hata (-2008): API Anahtarı geçersiz. Lütfen girdiğiniz anahtarların doğruluğunu ve "Testnet Modu" şalterinin anahtarlarla uyumlu (Spot Testnet & Mock Trading -> Açık, Mainnet/Real -> Kapalı) olduğunu kontrol edin.';
-            } else if (error.message.includes('404')) {
-                errorMsg = 'Hata (404): Binance sunucusuna bağlanılamadı. Lütfen "Testnet Modu" şalterinin anahtarlarınızla uyumlu olduğundan emin olun (Yenile düğmesine basıp deneyin).';
-            }
-            return { success: false, error: errorMsg, marketType };
+            return { success: false, error: error.message, marketType };
         }
     }
 
-    /**
-     * Executes a trade based on AI Signal
-     * @param {*} userId 
-     * @param {Object} signal - { symbol: 'BTC-USD', direction: 'BUY'|'SELL', market: 'CRYPTO', type: 'SPOT'|'FUTURES' }
-     */
     async executeTrade(userId, signal) {
         if (signal.market !== 'CRYPTO') return null;
         
-        // Map symbol format: BTC-USD → BTC/USDT (spot) or BTC/USDT:USDT (futures perpetual)
         const baseSymbol = signal.symbol.replace('-USD', '') + '/USDT';
         const marketType = signal.type || 'SPOT';
-        // Futures CCXT requires ':USDT' suffix for USDT-margined perpetuals
         const pair = marketType === 'FUTURES' ? baseSymbol + ':USDT' : baseSymbol;
         const side = signal.direction === 'BUY' ? 'buy' : 'sell';
+
+        const lockKey = `${userId}_${pair}`;
+        if (this.activeProcessing.has(lockKey)) {
+            console.warn(`[Binance] Already processing ${lockKey}.`);
+            return null;
+        }
+        this.activeProcessing.add(lockKey);
 
         try {
             const { exchange, config } = await this.getExchangeInstance(userId, marketType);
@@ -424,30 +338,19 @@ class BinanceService {
             const apiSecret = (marketType === 'FUTURES' ? config.futuresApiSecret : config.apiSecret)?.trim();
             const isTestnet = !!config.isTestnet;
 
-            if (marketType === 'SPOT' && !config.isSpotActive) return null;
-            if (marketType === 'FUTURES' && !config.isFuturesActive) return null;
-
-            // ── Step 1: Sync Environment & Markets ────────────────────────────────────
-            let timeOffset = 0;
-            let marketInfo = null;
-
-            if (marketType === 'FUTURES') {
-                try {
-                    const rawMarkets = await rawFuturesMarkets(isTestnet);
-                    const apiSymbol = pair.split('/')[0] + 'USDT';
-                    marketInfo = rawMarkets[apiSymbol];
-                    if (!marketInfo) throw new Error(`SYMBOL_NOT_FOUND_ON_ENGINE: ${apiSymbol} not in exchangeInfo.`);
-                } catch (rErr) {
-                    console.warn(`[Binance] Futures raw sync failed:`, rErr.message);
-                }
-            } else {
-                await exchange.loadMarkets();
-                if (!exchange.markets[pair]) {
-                    throw new Error(`SYMBOL_NOT_AVAILABLE: ${pair} not in spot exchange.`);
-                }
+            // Final Guard: Check DB for existing open trade
+            const existing = await ExecutedTrade.findOne({ where: { userId, symbol: pair, status: 'OPEN' } });
+            if (existing) {
+                console.warn(`[Binance] ${pair} already has open trade.`);
+                this.activeProcessing.delete(lockKey);
+                return null;
             }
 
-            // ── Step 2: Fetch Balance & Budget ────────────────────────────────────────
+            // Fetch Market Info & Price
+            const currentPrice = await marketDataService.fetchPrice(pair);
+            if (!currentPrice || currentPrice <= 0) throw new Error('COULD_NOT_FETCH_PRICE');
+
+            // Budget
             let freeUSDT = 0;
             if (marketType === 'FUTURES') {
                 const stats = await rawFuturesBalance(apiKey, apiSecret, isTestnet);
@@ -456,135 +359,53 @@ class BinanceService {
                 const balance = await exchange.fetchBalance();
                 freeUSDT = balance['USDT']?.free || 0;
             }
-
-            let tradeAmountUSDT = config.budgetMode === 'PERCENTAGE' 
-                ? (freeUSDT * config.budgetAmount) / 100
-                : config.budgetAmount;
-
+            let tradeAmountUSDT = config.budgetMode === 'PERCENTAGE' ? (freeUSDT * config.budgetAmount) / 100 : config.budgetAmount;
             tradeAmountUSDT = Math.min(tradeAmountUSDT, config.maxPerAsset || 1000);
-            if (tradeAmountUSDT < 5) throw new Error('INSUFFICIENT_BALANCE_FOR_MIN_ORDER');
-
-            let currentPrice = signal.currentPrice;
-            if (!currentPrice) {
-                try {
-                    if (marketType === 'FUTURES') {
-                        // Correctly extract the base symbol (e.g. BTC from BTC/USDT:USDT)
-                        const baseAsset = signal.symbol.split('/')[0].split('-')[0].split(':')[0].toUpperCase();
-                        const apiSymbol = baseAsset + 'USDT';
-                        const prices    = await rawFuturesPublicTickers(isTestnet, apiSymbol);
-                        currentPrice    = prices[apiSymbol] || 0;
-                    } else {
-                        const baseAsset = signal.symbol.split('/')[0].split('-')[0].split(':')[0].toUpperCase();
-                        const spotPair  = baseAsset + '/USDT';
-                        const t = await exchange.fetchTicker(spotPair);
-                        currentPrice = t.last;
-                    }
-                } catch (e) {
-                    console.warn(`[Binance] Price fetch failed for ${signal.symbol}:`, e.message);
-                    currentPrice = 0;
-                }
-            }
-            if (!currentPrice || currentPrice <= 0) throw new Error('COULD_NOT_FETCH_PRICE');
+            if (tradeAmountUSDT < 5) throw new Error('INSUFFICIENT_BALANCE');
 
             const leverage = config.defaultLeverage || 1;
             const notional = tradeAmountUSDT * leverage;
+            const amountValue = notional / currentPrice;
 
-            // ── Notional Minimum Check ────────────────────────────────────────────────
-            // On Binance Futures Testnet, BTCUSDT often requires > 100 USDT notional.
-            // Using 105 as safety margin.
-            if (marketType === 'FUTURES' && isTestnet) {
-                const apiSymbol = signal.symbol.split('/')[0].split('-')[0].split(':')[0].toUpperCase() + 'USDT';
-                if (apiSymbol.toUpperCase() === 'BTCUSDT' && notional < 105) {
-                    throw new Error(`NOTIONAL_TOO_LOW: BTCUSDT requires min 100 USDT notional. Current: ${notional.toFixed(2)} (Leverage:${leverage}x)`);
+            // Execute
+            console.log(`[Binance] Executing ${marketType} for ${pair}`);
+            let order;
+            const apiSymbol = pair.split('/')[0].split('-')[0].split(':')[0].toUpperCase() + 'USDT';
+
+            if (marketType === 'FUTURES') {
+                if (leverage > 1) {
+                    await rawFuturesLeverage(apiKey, apiSecret, { symbol: apiSymbol, leverage }, isTestnet);
                 }
+                const rawQty = parseFloat(amountValue.toFixed(3));
+                order = await rawFuturesOrder(apiKey, apiSecret, { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty }, isTestnet);
+            } else {
+                order = await exchange.createMarketOrder(pair, side, amountValue);
             }
 
-            const amount = notional / currentPrice;
+            const entryPrice = parseFloat(order.avgPrice || order.price || order.average || 0) || currentPrice;
+            
+            const newTrade = await ExecutedTrade.create({
+                userId, symbol: pair, side: signal.direction, type: marketType, amount: amountValue, entryPrice, status: 'OPEN', exchangeOrderId: order.orderId || order.id || 'N/A'
+            });
 
-            // ── Step 3: Check Limits ──────────────────────────────────────────────────
-            const openNow = await ExecutedTrade.count({ where: { userId, status: 'OPEN' } });
-            if (openNow >= config.maxPositions) throw new Error('MAX_POSITIONS_REACHED');
-
-            // ── Step 4: Execute Trade ─────────────────────────────────────────────────
-            console.log(`[Binance] Executing ${marketType} trade for key prefix: ${apiKey?.substring(0, 4)} (isTestnet: ${isTestnet})`);
-
-            try {
-                let order;
-                const apiSymbol = pair.split('/')[0] + 'USDT';
-
-                if (marketType === 'FUTURES') {
-                    if (leverage > 1) {
-                        try {
-                            await rawFuturesLeverage(apiKey, apiSecret, { symbol: apiSymbol, leverage }, isTestnet);
-                        } catch (lErr) { console.warn(`[Binance] Leverage set failed:`, lErr.message); }
-                    }
-
-                    const precision = marketInfo?.precision?.amount ?? 3;
-                    const rawQty = parseFloat(amount.toFixed(precision));
-
-                    console.log(`[Binance] Raw Order → ${apiSymbol} ${side.toUpperCase()} qty:${rawQty} testnet:${isTestnet}`);
-                    order = await rawFuturesOrder(
-                        apiKey, apiSecret,
-                        { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty },
-                        isTestnet
-                    );
-                } else {
-                    order = await exchange.createMarketOrder(pair, side, amount);
-                }
-
-                // Capture Execution Price
-                // Favor verified currentPrice if order response is empty or zero
-                const orderPrice = parseFloat(order.avgPrice || order.price || order.average || 0);
-                const entryPrice = (orderPrice > 0) ? orderPrice : (currentPrice > 0 ? currentPrice : 0);
-
-                if (entryPrice <= 0) {
-                    console.error(`[Binance] CRITICAL: Zero entry price for ${apiSymbol}. Aborting record.`);
-                    throw new Error('ZERO_ENTRY_PRICE_DETECTED');
-                }
-
-                const newTrade = await ExecutedTrade.create({
-                    userId,
-                    symbol:    pair,
-                    side:      signal.direction,
-                    type:      marketType,
-                    amount:    amount,
-                    entryPrice: entryPrice,
-                    status:    'OPEN',
-                    exchangeOrderId: order.orderId || order.id || 'N/A'
-                });
-
-                // ── Step 5: SL & TP calculation ───────────────────────────────────────
-                if (marketType === 'FUTURES') {
-                    const ep = parseFloat(newTrade.entryPrice);
-                    const slPct = signal.stopLossPct || 0.02; // Default 2%
-                    const tpPct = slPct * 1.5; // Default 1.5x RR ratio
-
-                    newTrade.stopLossPrice = side === 'buy' ? ep * (1 - slPct) : ep * (1 + slPct);
-                    newTrade.targetPrice   = side === 'buy' ? ep * (1 + tpPct) : ep * (1 - tpPct);
-
-                    try {
-                        await rawFuturesOrder(apiKey, apiSecret, {
-                            symbol: apiSymbol,
-                            side: side === 'buy' ? 'SELL' : 'BUY',
-                            type: 'STOP_MARKET',
-                            stopPrice: newTrade.stopLossPrice.toFixed(precision + 1), // Dynamic precision
-                            closePosition: 'true'
-                        }, isTestnet);
-                        console.log(`[Binance] SL placed at ${newTrade.stopLossPrice} for ${apiSymbol}`);
-                    } catch (slErr) { console.warn(`[Binance] SL failed:`, slErr.message); }
-                    
-                    await newTrade.save();
-                }
-
-                return newTrade;
-
-            } catch (exchangeError) {
-                console.error(`[Binance] Order Execution failed for user ${userId}:`, exchangeError.message);
-                throw exchangeError;
+            // SL/TP for Futures
+            if (marketType === 'FUTURES') {
+                const ep = parseFloat(newTrade.entryPrice);
+                const slPct = signal.stopLossPct || 0.02;
+                newTrade.stopLossPrice = side === 'buy' ? ep * (1 - slPct) : ep * (1 + slPct);
+                newTrade.targetPrice = side === 'buy' ? ep * (1 + (slPct * 1.5)) : ep * (1 - (slPct * 1.5));
+                try {
+                    await rawFuturesOrder(apiKey, apiSecret, { symbol: apiSymbol, side: side === 'buy' ? 'SELL' : 'BUY', type: 'STOP_MARKET', stopPrice: newTrade.stopLossPrice.toFixed(4), closePosition: 'true' }, isTestnet);
+                } catch (slErr) { console.warn('SL Failed:', slErr.message); }
+                await newTrade.save();
             }
+
+            this.activeProcessing.delete(lockKey);
+            return newTrade;
 
         } catch (error) {
-            console.error(`Binance bot error for user ${userId} (${marketType}):`, error.message);
+            this.activeProcessing.delete(lockKey);
+            console.error('Binance Bot Error:', error.message);
             throw error;
         }
     }
