@@ -261,9 +261,17 @@ class MarketDataService {
             if (isCrypto) {
                 const bSymbol = upperSymbol.endsWith('USDT') ? upperSymbol : upperSymbol + 'USDT';
                 try {
-                    const ticker = await binanceClient.dailyStats({ symbol: bSymbol });
-                    if (ticker && ticker.lastPrice) return parseFloat(ticker.lastPrice);
-                } catch (e) {}
+                    // Use our simulation-aware raw fetcher
+                    const binanceService = require('./binanceService');
+                    const tickers = await binanceService.rawFuturesPublicTickers(true, bSymbol);
+                    if (tickers && tickers[bSymbol]) return tickers[bSymbol];
+                } catch (e) {
+                    // Fallback to standard binance client
+                    try {
+                        const ticker = await binanceClient.dailyStats({ symbol: bSymbol });
+                        if (ticker && ticker.lastPrice) return parseFloat(ticker.lastPrice);
+                    } catch (ce) {}
+                }
             }
 
             try {

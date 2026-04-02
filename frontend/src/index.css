@@ -150,3 +150,12 @@
 .pulse-dot {
   animation: pulse-cyan 2s infinite ease-in-out;
 }
+
+.status-dot-small {
+  filter: drop-shadow(0 0 4px #3b82f6);
+}
+
+.neon-price-label {
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+  text-shadow: 0 0 5px rgba(59, 130, 246, 0.8);
+}

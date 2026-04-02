@@ -56,10 +56,20 @@ class PredictionEngine {
             else if (finalScore < 35) direction = 'SELL';
 
             // 4. Price & Chart Data
-            let currentPrice = Number(quote?.regularMarketPrice);
+            let currentPrice = 0;
+            
+            // For Crypto, ALWAYS prioritize our internal fetcher which is simulation-aware
+            if (market === 'CRYPTO') {
+                console.log(`Using simulation-aware fetcher for ${symbol}...`);
+                currentPrice = await marketDataService.fetchPrice(symbol);
+            }
+
+            if (!currentPrice || isNaN(currentPrice) || currentPrice <= 0) {
+                currentPrice = Number(quote?.regularMarketPrice);
+            }
+
             if (!currentPrice || isNaN(currentPrice) || currentPrice === 100) {
-                // Secondary fallback using our custom fetcher (likely Binance)
-                console.log(`Using custom price fetcher for ${symbol}...`);
+                // Secondary fallback
                 const fallbackPrice = await marketDataService.fetchPrice(symbol);
                 if (fallbackPrice) currentPrice = fallbackPrice;
                 else if (!currentPrice) currentPrice = 100; // Last resort mock

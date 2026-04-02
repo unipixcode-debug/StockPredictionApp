@@ -837,9 +837,9 @@ function TradeLiveChart({ trade }) {
 
     return (
         <div className="p-4 pt-2">
-            <div className="h-64 w-full">
+            <div className="h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 20, right: 80, left: 0, bottom: 0 }}>
+                    <AreaChart data={chartData} margin={{ top: 20, right: 100, left: 0, bottom: 0 }}>
                         <defs>
                             <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#00f2fe" stopOpacity={0.2}/>
@@ -917,17 +917,29 @@ function TradeLiveChart({ trade }) {
                         {lastPoint && (
                             <ReferenceLine
                                 y={lastPoint.close}
-                                stroke="#00f2fe"
+                                stroke="#3b82f6"
                                 strokeWidth={1}
-                                opacity={0.3}
+                                strokeDasharray="3 3"
+                                opacity={0.5}
                                 label={{
                                     position: 'right',
                                     value: `$${lastPoint.close.toFixed(4)}`,
-                                    fill: '#00f2fe',
-                                    fontSize: 11,
-                                    fontWeight: 'bold',
-                                    className: 'pulse-dot'
+                                    fill: '#3b82f6',
+                                    fontSize: 12,
+                                    fontWeight: '900',
+                                    className: 'neon-price-label',
+                                    dx: 10
                                 }}
+                            />
+                        )}
+                        {lastPoint && (
+                            <ReferenceDot 
+                                x={lastPoint.time} 
+                                y={lastPoint.close} 
+                                r={3} 
+                                fill="#3b82f6" 
+                                stroke="none"
+                                className="status-dot-small"
                             />
                         )}
                     </AreaChart>
