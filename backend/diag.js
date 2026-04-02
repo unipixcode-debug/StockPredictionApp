@@ -1,53 +1,28 @@
-const sequelize = require('./config/database');
-const DataSource = require('./models/DataSource');
-const NewsSummary = require('./models/NewsSummary');
-const DailyMarketInsight = require('./models/DailyMarketInsight');
-const marketDataService = require('./services/marketDataService');
+const binanceService = require('./services/binanceService');
+const { ExecutedTrade, BinanceBotConfig } = require('./models');
 
-async function diagnostic() {
+async function diag() {
     try {
-        await sequelize.authenticate();
-        console.log('--- 1. DataSources ---');
-        const sources = await DataSource.findAll({ where: { isActive: true } });
-        console.log(`Active sources: ${sources.length}`);
-        sources.forEach(s => console.log(`- ${s.name} (${s.type}): ${s.url}`));
+        const userId = 1;
+        const config = await BinanceBotConfig.findOne({ where: { userId } });
+        console.log('--- BINANCE POSITIONS ---');
+        const pos = await binanceService.rawFuturesPositions(config.apiKey, config.apiSecret, !!config.isTestnet);
+        const targets = pos.filter(p => ['CESSUSDT', 'PORT3USDT', 'OBOLUSDT', 'SKATEUSDT'].some(s => p.symbol.includes(s)));
+        console.log(JSON.stringify(targets.map(p => ({ sym: p.symbol, amt: p.positionAmt, entry: p.entryPrice })), null, 2));
 
-        console.log('\n--- 2. NewsSummary ---');
-        const newsCount = await NewsSummary.count();
-        const latestNews = await NewsSummary.findOne({ order: [['createdAt', 'DESC']] });
-        console.log(`Total news: ${newsCount}`);
-        if (latestNews) {
-            console.log(`Latest news: ${latestNews.titleEN || latestNews.titleTR} (${latestNews.createdAt})`);
-        } else {
-            console.log('No news found in DB.');
-        }
-
-        console.log('\n--- 3. Scraper Insights ---');
-        const insightsCount = await DailyMarketInsight.count();
-        const latestInsight = await DailyMarketInsight.findOne({ order: [['createdAt', 'DESC']] });
-        console.log(`Total insights: ${insightsCount}`);
-        if (latestInsight) {
-            console.log(`Latest insight: ${latestInsight.title} (${latestInsight.createdAt})`);
-        }
-
-        console.log('\n--- 4. Market Data (Investing Scrape) ---');
-        const indicators = await marketDataService.getGlobalIndicators();
-        console.log('Indicators keys:', Object.keys(indicators));
-        if (indicators.btc) {
-            console.log('BTC Data:', indicators.btc);
-        } else {
-            console.log('❌ BTC Data MISSING from Investing scrape.');
-        }
+        console.log('--- DB TRADES ---');
+        const trades = await ExecutedTrade.findAll({ where: { userId, status: 'OPEN' } });
+        console.log(JSON.stringify(trades.filter(t => t.symbol.includes('PORT') || t.symbol.includes('CESS') || t.symbol.includes('OBOL')).map(t => ({ 
+            sym: t.symbol, 
+            amt: t.amount, 
+            entry: t.entryPrice,
+            pnl_col: t.pnl
+        })), null, 2));
         
-        const mainKeys = ['vix','dxy','gold','silver','oil','sp500','nasdaq','us10y','us02y','eurusd','gbpusd','usdtry'];
-        const cryptoKeys = Object.keys(indicators).filter(k => !mainKeys.includes(k));
-        console.log('Crypto keys in indicators (subassets):', cryptoKeys);
-
         process.exit(0);
-    } catch (error) {
-        console.error('Diagnostic error:', error);
+    } catch (e) {
+        console.error(e);
         process.exit(1);
     }
 }
-
-diagnostic();
+diag();
