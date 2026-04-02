@@ -468,6 +468,7 @@ service.rawFuturesBalance = rawFuturesBalance;
 service.rawFuturesLeverage = rawFuturesLeverage;
 service.rawFuturesPublicOHLCV = rawFuturesPublicOHLCV;
 service.rawFuturesPublicTickers = rawFuturesPublicTickers;
+service.rawFutures24hrTickers = rawFutures24hrTickers;
 service.rawFuturesTime = rawFuturesTime;
 service.rawFuturesMarkets = rawFuturesMarkets;
 
