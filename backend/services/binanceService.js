@@ -223,6 +223,20 @@ class BinanceService {
      * @param {string} marketType - 'SPOT' or 'FUTURES'
      */
     async getExchangeInstance(userId, marketType = 'SPOT') {
+        // If userId is null, it's a public request (e.g. from scanner)
+        // We use a public-only instance to avoid CCXT's broken auth routing for Testnet.
+        if (!userId) {
+            const publicEx = new ccxt.binance({
+                options: { defaultType: marketType === 'FUTURES' ? 'future' : 'spot' }
+            });
+            // Force Demo URL for public futures data if in dev/test context
+            if (marketType === 'FUTURES') {
+                publicEx.urls['api'] = { ...publicEx.urls['api'], 'fapiPublic': 'https://demo-fapi.binance.com/fapi/v1' };
+                publicEx.setSandboxMode(true);
+            }
+            return { exchange: publicEx, config: { isTestnet: true } };
+        }
+
         const config = await BinanceBotConfig.findOne({ where: { userId } });
         if (!config) throw new Error('BINANCE_NOT_CONFIGURED');
 
