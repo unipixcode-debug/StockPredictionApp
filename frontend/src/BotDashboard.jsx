@@ -492,7 +492,7 @@ export default function BotDashboard() {
                                                 <h3 className="text-lg font-black uppercase italic mb-6 flex items-center gap-2">
                                                     <TrendingUp size={18} className="text-emerald-500" /> Spot İşlem Geçmişi
                                                 </h3>
-                                                <div className="divide-y divide-border/30">
+                                                <div className="divide-y divide-border/30 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                                     {spotHistory.map(renderClosedTrade)}
                                                 </div>
                                             </div>
@@ -502,7 +502,7 @@ export default function BotDashboard() {
                                                 <h3 className="text-lg font-black uppercase italic mb-6 flex items-center gap-2">
                                                     <TrendingDown size={18} className="text-cyan-500" /> Vadeli İşlem Geçmişi
                                                 </h3>
-                                                <div className="divide-y divide-border/30">
+                                                <div className="divide-y divide-border/30 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                                     {futuresHistory.map(renderClosedTrade)}
                                                 </div>
                                             </div>
