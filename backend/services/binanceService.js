@@ -463,14 +463,15 @@ class BinanceService {
                 try {
                     if (marketType === 'FUTURES') {
                         const prices = await rawFuturesPublicTickers(isTestnet);
-                        const sym    = pair.includes('-') ? pair.split('-')[0] + 'USDT' : pair.replace('/', '') + 'USDT';
+                        const sym    = signal.symbol.includes('-') ? signal.symbol.split('-')[0] + 'USDT' : signal.symbol.replace('/', '') + 'USDT';
                         currentPrice = prices[sym] || 0;
                     } else {
-                        const t = await exchange.fetchTicker(pair);
+                        const spotPair = signal.symbol.includes('/') ? signal.symbol : signal.symbol.replace('-USD', '/USDT');
+                        const t = await exchange.fetchTicker(spotPair);
                         currentPrice = t.last;
                     }
                 } catch (e) {
-                    console.warn(`[Binance] Price fetch failed for ${pair}:`, e.message);
+                    console.warn(`[Binance] Price fetch failed for ${signal.symbol}:`, e.message);
                     currentPrice = 0;
                 }
             }
