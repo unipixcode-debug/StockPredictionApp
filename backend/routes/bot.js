@@ -107,12 +107,20 @@ router.get('/trades', authCheck, async (req, res) => {
         const isBotActive = config ? (config.isSpotActive || config.isFuturesActive) : false;
 
         // ── Real-time P&L for OPEN positions ─────────────────────────────────
+        const config = await BinanceBotConfig.findOne({ where: { userId: 1 } }); // Assuming single user for now
+        const isTestnet = config ? config.isTestnet : true;
+
         const openTrades = trades.filter(t => t.status === 'OPEN' && t.entryPrice);
         if (openTrades.length > 0) {
             try {
                 const ccxt = require('ccxt');
                 const spotEx = new ccxt.binance({ enableRateLimit: true });
                 const futEx  = new ccxt.binanceusdm({ enableRateLimit: true });
+                
+                if (isTestnet) {
+                    spotEx.setSandboxMode(true);
+                    futEx.setSandboxMode(true);
+                }
                 
                 const uniqueSymbols = [...new Set(openTrades.map(t => t.symbol))];
                 const priceMap = {};
