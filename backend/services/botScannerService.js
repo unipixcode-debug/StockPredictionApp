@@ -1,5 +1,6 @@
 const { BinanceBotConfig, BotLog, ExecutedTrade } = require('../models');
 const binanceService = require('./binanceService');
+const emailService = require('./emailService');
 const ccxt = require('ccxt');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -189,6 +190,24 @@ class BotScannerService {
 
     async runScanForUser(config) {
         const userId     = config.userId;
+        
+        // ── Step 0: Check & Deduct Credits (0.01 per scan) ──
+        const User = require('../models/User');
+        const user = await User.findByPk(userId);
+
+        if (!user || parseFloat(user.credits) <= 0) {
+            if (user && !user.botStopAlertSent) {
+                await emailService.sendBotStoppedAlert(user.email, user.credits);
+                await user.update({ botStopAlertSent: true });
+            }
+            await this.log(userId, `⏸️ Yetersiz bakiye (${user?.credits || 0}). Tarama durduruldu.`, 'warning');
+            return;
+        }
+
+        // Deduct 0.01 and reset alert flag if they have money
+        const newCredits = Math.max(0, parseFloat(user.credits) - 0.01);
+        await user.update({ credits: newCredits, botStopAlertSent: false });
+
         const activeType = config.isSpotActive && config.isFuturesActive ? 'Spot+Futures'
             : config.isSpotActive ? 'Spot' : 'Futures';
 

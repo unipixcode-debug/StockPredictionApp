@@ -37,8 +37,8 @@ const User = sequelize.define('User', {
         defaultValue: 'FREE'
     },
     credits: {
-        type: DataTypes.INTEGER,
-        defaultValue: 50,  // New users start with 50 credits (configurable)
+        type: DataTypes.DECIMAL(10, 4),
+        defaultValue: 50.0000,
         allowNull: false
     },
     newsletterSubscribed: {
@@ -72,6 +72,10 @@ const User = sequelize.define('User', {
     bio: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    botStopAlertSent: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
     }
 }, {
     timestamps: true,

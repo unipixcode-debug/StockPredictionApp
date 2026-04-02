@@ -33,6 +33,14 @@ router.post('/config', authCheck, async (req, res) => {
         } = req.body;
 
         let config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
+        const user = await User.findByPk(req.user.id);
+
+        if ((isSpotActive || isFuturesActive) && (!config || (!config.isSpotActive && !config.isFuturesActive))) {
+            // Activating for the first time or from fully off
+            if (!user || user.credits < 2000) {
+                return res.status(400).json({ error: 'Botu aktif etmek için en az 2000 kredi bakiyeniz olmalıdır.' });
+            }
+        }
         if (!config) {
             config = await BinanceBotConfig.create({ userId: req.user.id });
         }
