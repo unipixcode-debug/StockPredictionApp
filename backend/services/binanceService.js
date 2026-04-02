@@ -464,9 +464,18 @@ class BinanceService {
             let currentPrice = signal.currentPrice;
             if (!currentPrice) {
                 try {
-                    const t = await exchange.fetchTicker(pair);
-                    currentPrice = t.last;
-                } catch { currentPrice = 0; }
+                    if (marketType === 'FUTURES') {
+                        const tickers = await rawFuturesPublicTickers(isTestnet);
+                        const sym = pair.split('/')[0] + 'USDT';
+                        currentPrice = parseFloat(tickers[sym]?.lastPrice || 0);
+                    } else {
+                        const t = await exchange.fetchTicker(pair);
+                        currentPrice = t.last;
+                    }
+                } catch (e) {
+                    console.warn(`[Binance] Price fetch failed for ${pair}:`, e.message);
+                    currentPrice = 0;
+                }
             }
             if (!currentPrice || currentPrice <= 0) throw new Error('COULD_NOT_FETCH_PRICE');
 
