@@ -154,12 +154,12 @@ function rawFuturesPublicOHLCV(symbol, timeframe = '5m', limit = 30, isTestnet =
 }
 
 /**
- * Fetches all current prices directly via public HTTPS (Unauthenticated)
+ * Fetches current price directly via public HTTPS (Unauthenticated)
  */
-function rawFuturesPublicTickers(isTestnet = true) {
+function rawFuturesPublicTickers(isTestnet = true, symbol = null) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
-        const url = `https://${hostname}/fapi/v1/ticker/price`;
+        const url = `https://${hostname}/fapi/v1/ticker/price` + (symbol ? `?symbol=${symbol}` : '');
         https.get(url, (res) => {
             let data = '';
             res.on('data', d => data += d);
@@ -169,7 +169,11 @@ function rawFuturesPublicTickers(isTestnet = true) {
                     if (parsed.code) reject(new Error(`binance ${data}`));
                     else {
                         const priceMap = {};
-                        parsed.forEach(t => { priceMap[t.symbol] = parseFloat(t.price); });
+                        if (Array.isArray(parsed)) {
+                            parsed.forEach(t => { priceMap[t.symbol] = parseFloat(t.price); });
+                        } else {
+                            priceMap[parsed.symbol] = parseFloat(parsed.price);
+                        }
                         resolve(priceMap);
                     }
                 } catch (e) { reject(e); }
@@ -462,8 +466,8 @@ class BinanceService {
             if (!currentPrice) {
                 try {
                     if (marketType === 'FUTURES') {
-                        const prices = await rawFuturesPublicTickers(isTestnet);
                         const sym    = signal.symbol.includes('-') ? signal.symbol.split('-')[0] + 'USDT' : signal.symbol.replace('/', '') + 'USDT';
+                        const prices = await rawFuturesPublicTickers(isTestnet, sym);
                         currentPrice = prices[sym] || 0;
                     } else {
                         const spotPair = signal.symbol.includes('/') ? signal.symbol : signal.symbol.replace('-USD', '/USDT');
