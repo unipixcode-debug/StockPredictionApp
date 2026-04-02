@@ -125,6 +125,52 @@ function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true, timeOff
     });
 }
 
+/**
+ * Direct HTTPS GET for server time (public)
+ */
+function rawFuturesTime(isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        https.get(`https://${hostname}/fapi/v1/time`, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    resolve(parsed.serverTime);
+                } catch { reject(new Error('Invalid JSON from time API')); }
+            });
+        }).on('error', reject);
+    });
+}
+
+/**
+ * Direct HTTPS GET for exchangeInfo (public)
+ */
+function rawFuturesMarkets(isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        https.get(`https://${hostname}/fapi/v1/exchangeInfo`, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    const marketMap = {};
+                    parsed.symbols.forEach(s => {
+                        const symbol = s.symbol; // e.g., 'BTCUSDT'
+                        marketMap[symbol] = {
+                            precision: { amount: s.quantityPrecision, price: s.pricePrecision },
+                            filters: s.filters
+                        };
+                    });
+                    resolve(marketMap);
+                } catch { reject(new Error('Invalid JSON from exchangeInfo')); }
+            });
+        }).on('error', reject);
+    });
+}
+
 // ── Demo-fapi symbol cache ────────────────────────────────────────────────────
 // CCXT loadMarkets() ignores URL overrides → fetches mainnet symbols.
 // We cache demo-fapi's own exchangeInfo via raw HTTPS to validate symbols correctly.
@@ -301,134 +347,88 @@ class BinanceService {
         const marketType = signal.type || 'SPOT';
         // Futures CCXT requires ':USDT' suffix for USDT-margined perpetuals
         const pair = marketType === 'FUTURES' ? baseSymbol + ':USDT' : baseSymbol;
+        const side = signal.direction === 'BUY' ? 'buy' : 'sell';
 
         try {
             const { exchange, config } = await this.getExchangeInstance(userId, marketType);
-
-            // Extract keys for raw HTTPS order (rawFuturesOrder bypasses CCXT URL routing)
             const apiKey    = (marketType === 'FUTURES' ? config.futuresApiKey    : config.apiKey)?.trim();
             const apiSecret = (marketType === 'FUTURES' ? config.futuresApiSecret : config.apiSecret)?.trim();
+            const isTestnet = !!config.isTestnet;
 
-            // Sync time before any signed request (critical for Demo Trading)
-            // IMPORTANT: loadTimeDifference() in CCXT for binanceusdm can hit authenticated endpoints.
-            // If URL routing is broken, it hits Mainnet with Testnet keys -> -2008.
-            // We bypass CCXT's time sync for Futures and rely on our own or trust the server.
-            let timeOffset = exchange.options['timeDifference'] || 0;
+            if (marketType === 'SPOT' && !config.isSpotActive) return null;
+            if (marketType === 'FUTURES' && !config.isFuturesActive) return null;
+
+            // ── Step 1: Sync Environment & Markets ────────────────────────────────────
+            let timeOffset = 0;
+            let marketInfo = null;
+
             if (marketType === 'FUTURES') {
                 try {
-                    // Try to get public time from Spot (it's the same server clock usually)
-                    const serverTime = await exchange.publicGetTime();
+                    const serverTime = await rawFuturesTime(isTestnet);
                     timeOffset = serverTime - Date.now();
-                    exchange.options['timeDifference'] = timeOffset;
-                } catch (tErr) {
-                    console.warn(`[Binance] Public time sync failed, using local time.`, tErr.message);
-                }
-            }
-
-            // Validate symbol is available in the target exchange environment
-            if (marketType === 'FUTURES' && config.isTestnet) {
-                // CCXT loadMarkets() ignores URL overrides and fetches mainnet - use raw HTTPS instead
-                const apiSymbol = pair.split('/')[0] + 'USDT'; // ENA/USDT:USDT → ENAUSDT
-                const demoSymbols = await getCachedDemoSymbols();
-                if (!demoSymbols.has(apiSymbol)) {
-                    throw new Error(`SYMBOL_NOT_ON_DEMO: ${apiSymbol} is not available on demo-fapi. Skipped.`);
+                    const rawMarkets = await rawFuturesMarkets(isTestnet);
+                    const apiSymbol = pair.split('/')[0] + 'USDT';
+                    marketInfo = rawMarkets[apiSymbol];
+                    if (!marketInfo) throw new Error(`SYMBOL_NOT_FOUND_ON_ENGINE: ${apiSymbol} not in exchangeInfo.`);
+                } catch (rErr) {
+                    console.warn(`[Binance] Futures raw sync failed:`, rErr.message);
                 }
             } else {
                 await exchange.loadMarkets();
                 if (!exchange.markets[pair]) {
-                    throw new Error(`SYMBOL_NOT_AVAILABLE: ${pair} is not listed in this exchange environment.`);
+                    throw new Error(`SYMBOL_NOT_AVAILABLE: ${pair} not in spot exchange.`);
                 }
             }
 
-            // Check specific activation
-            if (marketType === 'SPOT' && !config.isSpotActive) return null;
-            if (marketType === 'FUTURES' && !config.isFuturesActive) return null;
-
-            // Simple basic logic for execution
-            const ticker = await exchange.fetchTicker(pair);
-            const currentPrice = ticker.last;
-
-            // Decide budget
+            // ── Step 2: Fetch Balance & Budget ────────────────────────────────────────
             let freeUSDT = 0;
             if (marketType === 'FUTURES') {
-                // Use V2 balance endpoint (same as testConnection) for consistency
-                try {
-                    const balArray = await exchange.fapiPrivateV2GetBalance();
-                    const usdt = balArray.find(b => b.asset === 'USDT');
-                    freeUSDT = parseFloat(usdt?.withdrawAvailable || usdt?.balance || 0);
-                } catch { freeUSDT = 0; }
+                const stats = await rawFuturesBalance(apiKey, apiSecret, isTestnet, timeOffset);
+                freeUSDT = stats.free;
             } else {
                 const balance = await exchange.fetchBalance();
                 freeUSDT = balance['USDT']?.free || 0;
             }
 
-            let tradeAmountUSDT = 0;
-            if (config.budgetMode === 'PERCENTAGE') {
-                tradeAmountUSDT = (freeUSDT * config.budgetAmount) / 100;
-            } else {
-                tradeAmountUSDT = config.budgetAmount;
-            }
+            let tradeAmountUSDT = config.budgetMode === 'PERCENTAGE' 
+                ? (freeUSDT * config.budgetAmount) / 100
+                : config.budgetAmount;
 
-            // Cap at maxPerAsset
-            if (tradeAmountUSDT > config.maxPerAsset) {
-                tradeAmountUSDT = config.maxPerAsset;
-            }
+            tradeAmountUSDT = Math.min(tradeAmountUSDT, config.maxPerAsset || 1000);
+            if (tradeAmountUSDT < 5) throw new Error('INSUFFICIENT_BALANCE_FOR_MIN_ORDER');
 
-            // If we don't have enough balance, fallback
-            if (tradeAmountUSDT > freeUSDT) {
-                tradeAmountUSDT = freeUSDT;
-            }
+            const currentPrice = signal.currentPrice || (await exchange.fetchTicker(pair)).last;
+            const leverage = config.defaultLeverage || 1;
+            const amount = (tradeAmountUSDT * leverage) / currentPrice;
 
-            // Min order size check
-            if (tradeAmountUSDT < 5) {
-                throw new Error('INSUFFICIENT_BALANCE_FOR_MIN_ORDER');
-            }
+            // ── Step 3: Check Limits ──────────────────────────────────────────────────
+            const openNow = await ExecutedTrade.count({ where: { userId, status: 'OPEN' } });
+            if (openNow >= config.maxPositions) throw new Error('MAX_POSITIONS_REACHED');
 
-            // Calculate coin amount
-            const amount = tradeAmountUSDT / currentPrice;
-            // BUY = LONG on Spot or Futures, SELL = SHORT on Futures
-            const side = signal.direction === 'BUY' ? 'buy' : 'sell';
-            
-            // Max positions applies to both LONG and SHORT
-            let activeOpenPositions = await ExecutedTrade.count({
-                where: { userId, status: 'OPEN' }
-            });
-
-            if (activeOpenPositions >= config.maxPositions) {
-                throw new Error('MAX_POSITIONS_REACHED');
-            }
-
-            // Create record
+            // ── Step 4: Execute Trade ─────────────────────────────────────────────────
             const tradeRecord = await ExecutedTrade.create({
-                userId,
-                symbol: pair,
-                side: signal.direction,
-                type: marketType,
-                amount: amount,
-                status: 'OPEN'
+                userId, symbol: pair, side: signal.direction, type: marketType, amount, status: 'OPEN'
             });
 
             try {
                 let order;
+                const apiSymbol = pair.split('/')[0] + 'USDT';
 
                 if (marketType === 'FUTURES') {
-                    // Use raw HTTPS directly — CCXT URL overrides don't propagate reliably to POST.
-                    // Raw HTTPS works and avoids the fork between demo and mainnet routing.
-                    const apiSymbol = pair.split('/')[0] + 'USDT'; // BTC/USDT:USDT → BTCUSDT
-                    const timeOffset = exchange.options['timeDifference'] || 0;
+                    if (leverage > 1) {
+                        try {
+                            await rawFuturesLeverage(apiKey, apiSecret, { symbol: apiSymbol, leverage }, isTestnet, timeOffset);
+                        } catch (lErr) { console.warn(`[Binance] Leverage set failed:`, lErr.message); }
+                    }
 
-                    // Ensure quantity precision is within Binance limits (3dp for most futures)
-                    const markets = Object.keys(exchange.markets || {}).length > 0 ? exchange.markets : {};
-                    const market  = markets[pair];
-                    const precision = market?.precision?.amount ?? 3;
+                    const precision = marketInfo?.precision?.amount ?? 3;
                     const rawQty = parseFloat(amount.toFixed(precision));
 
-                    console.log(`[Binance] Raw HTTPS order → ${apiSymbol} ${side.toUpperCase()} qty:${rawQty} testnet:${!!config.isTestnet} (offset:${timeOffset})`);
-
+                    console.log(`[Binance] Raw Order → ${apiSymbol} ${side.toUpperCase()} qty:${rawQty} testnet:${isTestnet}`);
                     order = await rawFuturesOrder(
-                        apiKey.trim(), apiSecret.trim(),
+                        apiKey, apiSecret,
                         { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty },
-                        !!config.isTestnet,
+                        isTestnet,
                         timeOffset
                     );
                 } else {
@@ -439,32 +439,21 @@ class BinanceService {
                 tradeRecord.entryPrice = order.avgPrice || order.price || order.average || currentPrice;
                 await tradeRecord.save();
 
-                // ── Stop-Loss order after entry ───────────────────────────────────────────
+                // ── Step 5: Stop-Loss ─────────────────────────────────────────────────
                 if (signal.stopLossPct && marketType === 'FUTURES') {
                     try {
-                        const ep       = parseFloat(tradeRecord.entryPrice) || currentPrice;
-                        const slPrice  = side === 'buy'
-                            ? ep * (1 - signal.stopLossPct)
-                            : ep * (1 + signal.stopLossPct);
-                        const apiSymbol = pair.split('/')[0] + 'USDT';
-                        const timeOffset = exchange.options['timeDifference'] || 0;
-
-                        await rawFuturesOrder(
-                            apiKey.trim(), apiSecret.trim(),
-                            {
-                                symbol:       apiSymbol,
-                                side:         side === 'buy' ? 'SELL' : 'BUY',
-                                type:         'STOP_MARKET',
-                                stopPrice:    slPrice.toFixed(4),
-                                closePosition: 'true',
-                            },
-                            !!config.isTestnet,
-                            timeOffset
-                        );
-                        console.log(`[Binance] Stop-loss placed at ${slPrice.toFixed(4)} for ${apiSymbol}`);
-                    } catch (slErr) {
-                        console.warn(`[Binance] Stop-loss order failed for ${pair}:`, slErr.message);
-                    }
+                        const ep = parseFloat(tradeRecord.entryPrice) || currentPrice;
+                        const slPrice = side === 'buy' ? ep * (1 - signal.stopLossPct) : ep * (1 + signal.stopLossPct);
+                        
+                        await rawFuturesOrder(apiKey, apiSecret, {
+                            symbol: apiSymbol,
+                            side: side === 'buy' ? 'SELL' : 'BUY',
+                            type: 'STOP_MARKET',
+                            stopPrice: slPrice.toFixed(4),
+                            closePosition: 'true'
+                        }, isTestnet, timeOffset);
+                        console.log(`[Binance] SL placed at ${slPrice.toFixed(4)} for ${apiSymbol}`);
+                    } catch (slErr) { console.warn(`[Binance] SL failed:`, slErr.message); }
                 }
 
                 return tradeRecord;
