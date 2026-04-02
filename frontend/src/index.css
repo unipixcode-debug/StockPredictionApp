@@ -139,3 +139,14 @@
 .italic-shadow {
   text-shadow: 2px 2px 0px hsla(var(--primary), 0.2);
 }
+
+/* Neon Pulse Animation for Chart Dot */
+@keyframes pulse-cyan {
+  0% { transform: scale(1); opacity: 1; stroke-width: 2; }
+  50% { transform: scale(1.5); opacity: 0.7; stroke-width: 4; }
+  100% { transform: scale(1); opacity: 1; stroke-width: 2; }
+}
+
+.pulse-dot {
+  animation: pulse-cyan 2s infinite ease-in-out;
+}

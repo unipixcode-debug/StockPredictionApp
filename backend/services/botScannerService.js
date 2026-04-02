@@ -215,6 +215,13 @@ class BotScannerService {
             }
 
             try {
+                // ── Check if already in position for this symbol ──
+                const existing = await ExecutedTrade.findOne({ where: { userId, symbol: pair.engineSymbol, status: 'OPEN' } });
+                if (existing) {
+                    // console.log(`[BotScanner] ${pair.engineSymbol} is already open. Skipping.`);
+                    continue;
+                }
+
                 // ── Step 2: 100% Unauthenticated technical signal ──
                 const techSignal = await getTechnicalSignal(pair.ccxtSymbol, isTestnet);
                 testedCount++;

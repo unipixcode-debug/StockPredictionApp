@@ -767,11 +767,27 @@ function TradeLiveChart({ trade }) {
         );
     }
 
+    // ── Dynamic Y Domain Calculation ──────────────────────────────────────────────────
+    const prices = chartData.map(d => d.close);
+    const levels = [
+        parseFloat(trade.entryPrice || 0),
+        parseFloat(trade.targetPrice || 0),
+        parseFloat(trade.stopLossPrice || 0)
+    ].filter(l => l > 0);
+
+    const allValues = [...prices, ...levels];
+    const minVal = Math.min(...allValues);
+    const maxVal = Math.max(...allValues);
+    const margin = (maxVal - minVal) * 0.15; // %15 margin
+    const yDomain = [minVal - margin, maxVal + margin];
+    
+    const lastPoint = chartData[chartData.length - 1];
+
     return (
         <div className="p-4 pt-2">
-            <div className="h-56 w-full">
+            <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData}>
+                    <AreaChart data={chartData} margin={{ top: 20, right: 80, left: 0, bottom: 0 }}>
                         <defs>
                             <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#00f2fe" stopOpacity={0.2}/>
@@ -779,19 +795,15 @@ function TradeLiveChart({ trade }) {
                             </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                        <XAxis 
-                            dataKey="time" 
-                            hide 
-                        />
-                        <YAxis 
-                            domain={['auto', 'auto']} 
-                            hide
-                        />
+                        <XAxis dataKey="time" hide />
+                        <YAxis domain={yDomain} hide />
+                        
                         <RechartsTooltip 
                             contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px', fontSize: '10px' }}
                             itemStyle={{ color: '#00f2fe' }}
                             labelFormatter={(val) => new Date(val).toLocaleTimeString()}
                         />
+                        
                         <Area 
                             type="monotone" 
                             dataKey="close" 
@@ -800,31 +812,70 @@ function TradeLiveChart({ trade }) {
                             fillOpacity={1} 
                             fill="url(#priceGradient)" 
                             animationDuration={1000}
+                            isAnimationActive={false}
                         />
 
-                        {/* Trade Levels */}
-                        {trade.entryPrice && (
+                        {/* Trade Levels with Right Labels */}
+                        {trade.entryPrice && parseFloat(trade.entryPrice) > 0 && (
                             <ReferenceLine 
                                 y={parseFloat(trade.entryPrice)} 
                                 stroke="#3b82f6" 
-                                strokeWidth={2}
-                                label={{ position: 'left', value: 'GİRİŞ', fill: '#3b82f6', fontSize: 8, fontWeight: 'black', offset: 10 }} 
+                                strokeWidth={1}
+                                strokeDasharray="3 3"
+                                label={{ 
+                                    position: 'right', 
+                                    value: `Giriş: $${parseFloat(trade.entryPrice).toFixed(4)}`, 
+                                    fill: '#3b82f6', 
+                                    fontSize: 9, 
+                                    fontWeight: '900',
+                                    className: 'italic'
+                                }} 
                             />
                         )}
-                        {trade.targetPrice && (
+                        {trade.targetPrice && parseFloat(trade.targetPrice) > 0 && (
                             <ReferenceLine 
                                 y={parseFloat(trade.targetPrice)} 
                                 stroke="#10b981" 
                                 strokeDasharray="5 5" 
-                                label={{ position: 'right', value: `HEDEF: ${parseFloat(trade.targetPrice).toFixed(2)}`, fill: '#10b981', fontSize: 8, fontWeight: 'black' }} 
+                                label={{ 
+                                    position: 'right', 
+                                    value: `Hedef: $${parseFloat(trade.targetPrice).toFixed(4)}`, 
+                                    fill: '#10b981', 
+                                    fontSize: 9, 
+                                    fontWeight: '900' 
+                                }} 
                             />
                         )}
-                        {trade.stopLossPrice && (
+                        {trade.stopLossPrice && parseFloat(trade.stopLossPrice) > 0 && (
                             <ReferenceLine 
                                 y={parseFloat(trade.stopLossPrice)} 
                                 stroke="#ef4444" 
                                 strokeDasharray="5 5" 
-                                label={{ position: 'right', value: `STOP: ${parseFloat(trade.stopLossPrice).toFixed(2)}`, fill: '#ef4444', fontSize: 8, fontWeight: 'black' }} 
+                                label={{ 
+                                    position: 'right', 
+                                    value: `Stop: $${parseFloat(trade.stopLossPrice).toFixed(4)}`, 
+                                    fill: '#ef4444', 
+                                    fontSize: 9, 
+                                    fontWeight: '900' 
+                                }} 
+                            />
+                        )}
+
+                        {/* Blinking Pulse Dot for Current Price */}
+                        {lastPoint && (
+                            <ReferenceLine
+                                y={lastPoint.close}
+                                stroke="#00f2fe"
+                                strokeWidth={1}
+                                opacity={0.3}
+                                label={{
+                                    position: 'right',
+                                    value: `$${lastPoint.close.toFixed(4)}`,
+                                    fill: '#00f2fe',
+                                    fontSize: 11,
+                                    fontWeight: 'bold',
+                                    className: 'pulse-dot'
+                                }}
                             />
                         )}
                     </AreaChart>
@@ -834,9 +885,12 @@ function TradeLiveChart({ trade }) {
                 <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest italic flex items-center gap-1">
                     <RefreshCw size={8} className="animate-spin text-primary"/> Canlı 1D Veri (Binance)
                 </span>
-                <span className="text-[8px] font-black uppercase text-primary tracking-widest italic">
-                    {trade.symbol}
-                </span>
+                <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    <span className="text-[8px] font-black uppercase text-primary tracking-widest italic">
+                        {trade.symbol} • {lastPoint ? `$${lastPoint.close.toFixed(4)}` : '...'}
+                    </span>
+                </div>
             </div>
         </div>
     );
