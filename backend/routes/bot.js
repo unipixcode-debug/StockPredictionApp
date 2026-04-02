@@ -154,14 +154,8 @@ router.post('/trade/:tradeId/close', authCheck, async (req, res) => {
         });
         if (!trade) return res.status(404).json({ error: 'Open trade not found.' });
 
-        // Dummy close logic for testing UI (assuming it fetches current price to close)
-        trade.status = 'CLOSED';
-        trade.exitPrice = trade.entryPrice * (1 + (Math.random() * 0.1 - 0.05)); // +/- 5% random
-        trade.pnl = (trade.exitPrice - trade.entryPrice) * trade.amount;
-        trade.pnlPercentage = ((trade.exitPrice - trade.entryPrice) / trade.entryPrice) * 100;
-        
-        await trade.save();
-        res.json({ message: 'Trade closed.', trade });
+        const updatedTrade = await binanceService.closePosition(req.user.id, req.params.tradeId);
+        res.json({ message: 'Trade closed on exchange.', trade: updatedTrade });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

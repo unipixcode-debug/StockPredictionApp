@@ -477,55 +477,26 @@ class BinanceService {
             }
 
             const entryPrice = parseFloat(order.avgPrice || order.price || order.average || 0) || currentPrice;
-            
-            const standardSymbol = apiSymbol.replace('USDT', '/USDT');
-
             const newTrade = await ExecutedTrade.create({
-                userId, 
-                symbol: standardSymbol, 
-                side: signal.direction, 
-                type: marketType, 
-                amount: amountValue, 
-                entryPrice, 
-                status: 'OPEN', 
-                leverage: leverage,
-                exchangeOrderId: order.orderId || order.id || 'N/A'
+                userId,
+                symbol: pair,
+                side: side.toUpperCase(),
+                type: marketType,
+                amount: amountValue,
+                entryPrice,
+                status: 'OPEN',
+                leverage,
+                exchangeOrderId: order.id || order.orderId || 'N/A',
+                stopLossPrice: stopLoss,
+                targetPrice: target
             });
 
-            // SL/TP for Futures
             if (marketType === 'FUTURES') {
-                const ep = parseFloat(newTrade.entryPrice);
-                
-                // Dynamic SL based on leverage & riskLevel
-                // Conservative: 1.5% margin risk, Moderate: 3%, Aggressive: 5%
-                let baseRisk = 0.03; // Default moderate
-                if (config.riskLevel === 'CONSERVATIVE') baseRisk = 0.015;
-                if (config.riskLevel === 'AGGRESSIVE') baseRisk = 0.05;
-
-                let slPct = baseRisk / leverage;
-                // Floor at 0.15% to avoid noise stop-outs
-                if (slPct < 0.0015) slPct = 0.0015;
-                
-                const tpPct = slPct * 2; // Better R:R ratio
-
-                newTrade.stopLossPrice = side === 'buy' ? ep * (1 - slPct) : ep * (1 + slPct);
-                newTrade.targetPrice = side === 'buy' ? ep * (1 + tpPct) : ep * (1 - tpPct);
-                
                 try {
-                    const markets = await rawFuturesMarkets(isTestnet);
-                    const marketInfo = markets[apiSymbol];
-                    const pricePrecision = marketInfo ? marketInfo.precision.price : 4;
-
-                    await rawFuturesOrder(apiKey, apiSecret, { 
-                        symbol: apiSymbol, 
-                        side: side === 'buy' ? 'SELL' : 'BUY', 
-                        type: 'STOP_MARKET', 
-                        stopPrice: newTrade.stopLossPrice.toFixed(pricePrecision), 
-                        closePosition: 'true' 
-                    }, isTestnet);
-                    console.log(`[Binance] Dynamic SL (Precision-Aware) placed at ${newTrade.stopLossPrice.toFixed(pricePrecision)} (${(slPct*100).toFixed(2)}%)`);
-                } catch (slErr) { console.warn('SL Failed:', slErr.message); }
-                await newTrade.save();
+                    await this.setExchangeTPSL(userId, newTrade.id);
+                } catch (tpslErr) {
+                    console.warn('[TPSL Execution Error]', tpslErr.message);
+                }
             }
 
             this.activeProcessing.delete(lockKey);
@@ -547,60 +518,56 @@ class BinanceService {
 
             if (!apiKey || !apiSecret) return { success: false, error: 'FUTURES_API_KEYS_MISSING' };
 
-            // 1. Fetch current positions from Binance
             const realPositions = await rawFuturesPositions(apiKey, apiSecret, isTestnet);
             const activeReal = realPositions.filter(p => parseFloat(p.positionAmt) !== 0);
-
-            // 2. Fetch OPEN trades from DB
             const dbOpenTrades = await ExecutedTrade.findAll({ where: { userId, status: 'OPEN', type: 'FUTURES' } });
 
             const results = { closed: 0, updated: 0, added: 0 };
 
-            // 3. Mark DB trades as CLOSED if they don't exist on Binance
             for (const dbTrade of dbOpenTrades) {
-                // Symbols in DB are like 'BTC/USDT', Binance uses 'BTCUSDT'
-                const binanceSymbol = dbTrade.symbol.replace('/', '');
-                const stillOpen = activeReal.find(p => p.symbol === binanceSymbol);
+                const apiSymbol = dbTrade.symbol.replace('/', '').replace(':USDT', '');
+                const stillOpen = activeReal.find(p => p.symbol === apiSymbol && Math.abs(parseFloat(p.positionAmt)) > 0);
 
                 if (!stillOpen) {
                     dbTrade.status = 'CLOSED';
                     dbTrade.closedAt = new Date();
-                    dbTrade.exitPrice = 0; // Unknown without more API calls
+                    dbTrade.exitPrice = 0;
                     await dbTrade.save();
                     results.closed++;
                 } else {
-                    // Update leverage if different
-                    const realLev = parseInt(stillOpen.leverage);
-                    if (dbTrade.leverage !== realLev) {
-                        dbTrade.leverage = realLev;
+                    if (dbTrade.leverage !== parseInt(stillOpen.leverage)) {
+                        dbTrade.leverage = parseInt(stillOpen.leverage);
                         await dbTrade.save();
                         results.updated++;
                     }
                 }
             }
 
-            // 4. Detect new positions not in DB
+            const allDbTrades = await ExecutedTrade.findAll({ where: { userId } });
             for (const realPos of activeReal) {
-                const standardSymbol = realPos.symbol.replace('USDT', '/USDT');
-                const exists = dbOpenTrades.find(t => t.symbol === standardSymbol);
+                const apiSymbol = realPos.symbol;
+                const standardSymbol = apiSymbol.replace('USDT', '/USDT') + ':USDT';
+                const openExists = dbOpenTrades.find(t => t.symbol === standardSymbol);
+                if (openExists) continue;
 
-                if (!exists) {
-                    const amount = Math.abs(parseFloat(realPos.positionAmt));
-                    const entryPrice = parseFloat(realPos.entryPrice);
-                    const notional = amount * entryPrice;
+                const amount = Math.abs(parseFloat(realPos.positionAmt));
+                const entryPrice = parseFloat(realPos.entryPrice);
+                const notional = amount * entryPrice;
+                if (notional < 5.0) continue;
 
-                    // Dust Filter: don't sync positions smaller than 5.0 USDT to avoid bloat
-                    if (notional < 5.0) {
-                        console.log(`[Sync] Skipping dust position: ${realPos.symbol} ($${notional.toFixed(2)})`);
-                        continue;
-                    }
+                const closedMatch = allDbTrades.find(t => t.symbol === standardSymbol && t.status === 'CLOSED');
+                const isBuy = parseFloat(realPos.positionAmt) > 0;
 
-                    const isBuy = parseFloat(realPos.positionAmt) > 0;
-                    
-                    // Create basic TP/SL for detected trades (3% SL, 6% TP as backup)
+                if (closedMatch) {
+                    closedMatch.status = 'OPEN';
+                    closedMatch.amount = amount;
+                    closedMatch.entryPrice = entryPrice;
+                    closedMatch.closedAt = null;
+                    await closedMatch.save();
+                    results.updated++;
+                } else {
                     const slPrice = isBuy ? entryPrice * 0.97 : entryPrice * 1.03;
                     const tpPrice = isBuy ? entryPrice * 1.06 : entryPrice * 0.94;
-
                     await ExecutedTrade.create({
                         userId,
                         symbol: standardSymbol,
@@ -617,11 +584,88 @@ class BinanceService {
                     results.added++;
                 }
             }
-
             return { success: true, ...results };
         } catch (err) {
-            console.error('[Sync Error]', err.message);
+            console.error('[Sync Trades] Overall failure:', err);
             return { success: false, error: err.message };
+        }
+    }
+
+    async closePosition(userId, tradeId) {
+        const config = await BinanceBotConfig.findOne({ where: { userId } });
+        const trade = await ExecutedTrade.findOne({ where: { id: tradeId, userId, status: 'OPEN' } });
+        if (!trade || !config) throw new Error('Trade or Config not found.');
+
+        const isTestnet = config.isTestnet;
+        const apiKey = config.futuresApiKey;
+        const apiSecret = config.futuresApiSecret;
+        const apiSymbol = trade.symbol.replace('/', '').replace(':USDT', '');
+
+        let order;
+        if (trade.type === 'FUTURES') {
+            const side = trade.side === 'BUY' ? 'SELL' : 'BUY';
+            order = await rawFuturesOrder(apiKey, apiSecret, {
+                symbol: apiSymbol,
+                side,
+                type: 'MARKET',
+                quantity: trade.amount,
+                reduceOnly: 'true'
+            }, isTestnet);
+        } else {
+             const { exchange } = await this.getExchangeInstance(userId, 'SPOT');
+             const side = trade.side === 'BUY' ? 'sell' : 'buy';
+             order = await exchange.createMarketOrder(trade.symbol, side, trade.amount);
+        }
+
+        trade.status = 'CLOSED';
+        trade.closedAt = new Date();
+        trade.exitPrice = parseFloat(order.avgPrice || order.price || order.average || 0);
+        trade.pnl = (trade.side === 'BUY' 
+            ? (trade.exitPrice - trade.entryPrice) 
+            : (trade.entryPrice - trade.exitPrice)) * trade.amount;
+        
+        await trade.save();
+        return trade;
+    }
+
+    async setExchangeTPSL(userId, tradeId) {
+        const config = await BinanceBotConfig.findOne({ where: { userId } });
+        const trade = await ExecutedTrade.findOne({ where: { id: tradeId, userId } });
+        if (!trade || !config) throw new Error('Trade or Config not found.');
+
+        if (trade.type !== 'FUTURES') return;
+
+        const isTestnet = config.isTestnet;
+        const apiKey = config.futuresApiKey;
+        const apiSecret = config.futuresApiSecret;
+        const apiSymbol = trade.symbol.replace('/', '').replace(':USDT', '');
+        
+        const closeSide = trade.side === 'BUY' ? 'SELL' : 'BUY';
+
+        const markets = await rawFuturesMarkets(isTestnet);
+        const mInfo = markets[apiSymbol];
+        const pricePrec = mInfo ? mInfo.precision.price : 4;
+
+        if (trade.stopLossPrice) {
+            const stopPrice = parseFloat(trade.stopLossPrice.toFixed(pricePrec));
+            await rawFuturesOrder(apiKey, apiSecret, {
+                symbol: apiSymbol,
+                side: closeSide,
+                type: 'STOP_MARKET',
+                stopPrice,
+                closePosition: 'true'
+            }, isTestnet);
+        }
+
+        if (trade.targetPrice) {
+            const targetPrice = parseFloat(trade.targetPrice.toFixed(pricePrec));
+            await rawFuturesOrder(apiKey, apiSecret, {
+                symbol: apiSymbol,
+                side: closeSide,
+                type: 'TAKE_PROFIT_MARKET',
+                stopPrice: targetPrice,
+                closePosition: 'true'
+            }, isTestnet);
         }
     }
 }
