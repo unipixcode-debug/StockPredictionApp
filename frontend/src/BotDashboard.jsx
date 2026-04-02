@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Settings, TrendingUp, TrendingDown, RefreshCw, Bot, AlertTriangle, ShieldCheck, Zap, X } from 'lucide-react';
+import { Activity, Settings, TrendingUp, TrendingDown, RefreshCw, Bot, AlertTriangle, ShieldCheck, Zap, X, Database } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine, ReferenceDot, CartesianGrid } from 'recharts';
 import api from './api';
 import { useAuth } from './AuthContext';
@@ -170,6 +170,14 @@ export default function BotDashboard() {
                         className={`px-6 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all ${activeTab === 'dashboard' ? 'bg-primary/20 text-primary border-primary/40' : 'bg-secondary/50 text-muted-foreground border-transparent hover:border-border'}`}
                     >
                         Panel
+                    </button>
+                    <button 
+                        onClick={handleSync}
+                        disabled={isSyncing}
+                        className={`px-6 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all flex items-center gap-2 ${isSyncing ? 'bg-amber-500/20 text-amber-500 border-amber-500/40' : 'bg-secondary/50 text-emerald-400 border-emerald-500/20 hover:border-emerald-500/40'}`}
+                    >
+                        {isSyncing ? <RefreshCw size={14} className="animate-spin" /> : <Database size={14} />} 
+                        {isSyncing ? 'Senkronize Ediliyor...' : 'Binance ile Eşitle'}
                     </button>
                     <button 
                         onClick={() => setActiveTab('settings')}
