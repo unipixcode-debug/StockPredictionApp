@@ -8,14 +8,13 @@ const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
  * Direct HTTPS POST to Binance Futures API (bypasses CCXT URL routing bugs for Demo Trading).
  * Works for both testnet (demo-fapi) and mainnet (fapi).
  */
-function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true, timeOffset = 0) {
+function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
         const path     = '/fapi/v1/order';
 
-        // Synchronize with server time using CCXT's calculated offset
-        const timestamp = Date.now() + timeOffset;
-        const body      = querystring.stringify({ ...params, timestamp, recvWindow: 10000 });
+        const timestamp = Date.now();
+        const body      = querystring.stringify({ ...params, timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
         const fullBody  = body + '&signature=' + signature;
 
@@ -56,12 +55,12 @@ function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true, timeOffset
 /**
  * Direct HTTPS GET for balance (bypasses CCXT URL routing)
  */
-function rawFuturesBalance(apiKey, apiSecret, isTestnet = true, timeOffset = 0) {
+function rawFuturesBalance(apiKey, apiSecret, isTestnet = true) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
         console.log(`[Binance] Raw Balance check for ${hostname} (Key prefix: ${apiKey?.substring(0, 4)})`);
-        const timestamp = Date.now() + timeOffset;
-        const query = querystring.stringify({ timestamp, recvWindow: 10000 });
+        const timestamp = Date.now();
+        const query = querystring.stringify({ timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
         const path = `/fapi/v2/account?${query}&signature=${signature}`;
 
@@ -92,11 +91,11 @@ function rawFuturesBalance(apiKey, apiSecret, isTestnet = true, timeOffset = 0) 
 /**
  * Direct HTTPS POST for leverage
  */
-function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true, timeOffset = 0) {
+function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
-        const timestamp = Date.now() + timeOffset;
-        const body = querystring.stringify({ ...params, timestamp, recvWindow: 10000 });
+        const timestamp = Date.now();
+        const body = querystring.stringify({ ...params, timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
         const fullBody = body + '&signature=' + signature;
 
@@ -155,12 +154,12 @@ function rawFuturesPublicOHLCV(symbol, timeframe = '5m', limit = 30, isTestnet =
 }
 
 /**
- * Fetches all tickers directly via public HTTPS (Unauthenticated)
+ * Fetches all current prices directly via public HTTPS (Unauthenticated)
  */
 function rawFuturesPublicTickers(isTestnet = true) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
-        const url = `https://${hostname}/fapi/v1/ticker/24hr`;
+        const url = `https://${hostname}/fapi/v1/ticker/price`;
         https.get(url, (res) => {
             let data = '';
             res.on('data', d => data += d);
@@ -169,9 +168,9 @@ function rawFuturesPublicTickers(isTestnet = true) {
                     const parsed = JSON.parse(data);
                     if (parsed.code) reject(new Error(`binance ${data}`));
                     else {
-                        const tickerMap = {};
-                        parsed.forEach(t => { tickerMap[t.symbol] = t; });
-                        resolve(tickerMap);
+                        const priceMap = {};
+                        parsed.forEach(t => { priceMap[t.symbol] = parseFloat(t.price); });
+                        resolve(priceMap);
                     }
                 } catch (e) { reject(e); }
             });
@@ -428,8 +427,6 @@ class BinanceService {
 
             if (marketType === 'FUTURES') {
                 try {
-                    const serverTime = await rawFuturesTime(isTestnet);
-                    timeOffset = serverTime - Date.now();
                     const rawMarkets = await rawFuturesMarkets(isTestnet);
                     const apiSymbol = pair.split('/')[0] + 'USDT';
                     marketInfo = rawMarkets[apiSymbol];
@@ -447,7 +444,7 @@ class BinanceService {
             // ── Step 2: Fetch Balance & Budget ────────────────────────────────────────
             let freeUSDT = 0;
             if (marketType === 'FUTURES') {
-                const stats = await rawFuturesBalance(apiKey, apiSecret, isTestnet, timeOffset);
+                const stats = await rawFuturesBalance(apiKey, apiSecret, isTestnet);
                 freeUSDT = stats.free;
             } else {
                 const balance = await exchange.fetchBalance();
@@ -465,9 +462,9 @@ class BinanceService {
             if (!currentPrice) {
                 try {
                     if (marketType === 'FUTURES') {
-                        const tickers = await rawFuturesPublicTickers(isTestnet);
+                        const prices = await rawFuturesPublicTickers(isTestnet);
                         const sym = pair.split('/')[0] + 'USDT';
-                        currentPrice = parseFloat(tickers[sym]?.lastPrice || 0);
+                        currentPrice = prices[sym] || 0;
                     } else {
                         const t = await exchange.fetchTicker(pair);
                         currentPrice = t.last;
@@ -500,7 +497,7 @@ class BinanceService {
                 if (marketType === 'FUTURES') {
                     if (leverage > 1) {
                         try {
-                            await rawFuturesLeverage(apiKey, apiSecret, { symbol: apiSymbol, leverage }, isTestnet, timeOffset);
+                            await rawFuturesLeverage(apiKey, apiSecret, { symbol: apiSymbol, leverage }, isTestnet);
                         } catch (lErr) { console.warn(`[Binance] Leverage set failed:`, lErr.message); }
                     }
 
@@ -511,8 +508,7 @@ class BinanceService {
                     order = await rawFuturesOrder(
                         apiKey, apiSecret,
                         { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty },
-                        isTestnet,
-                        timeOffset
+                        isTestnet
                     );
                 } else {
                     order = await exchange.createMarketOrder(pair, side, amount);
@@ -534,7 +530,7 @@ class BinanceService {
                             type: 'STOP_MARKET',
                             stopPrice: slPrice.toFixed(4),
                             closePosition: 'true'
-                        }, isTestnet, timeOffset);
+                        }, isTestnet);
                         console.log(`[Binance] SL placed at ${slPrice.toFixed(4)} for ${apiSymbol}`);
                     } catch (slErr) { console.warn(`[Binance] SL failed:`, slErr.message); }
                 }

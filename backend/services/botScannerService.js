@@ -79,25 +79,24 @@ async function getDynamicScanList(limit = TOP_COINS_TO_SCAN, isTestnet = true) {
     ];
 
     try {
-        // Use direct HTTPS raw ticker fetch
-        const tickerMap = await binanceService.rawFuturesPublicTickers(isTestnet);
+        // Use direct HTTPS raw price fetch
+        const priceMap = await binanceService.rawFuturesPublicTickers(isTestnet);
         
         const pairs = whitelist
             .map(w => {
                 const apiSym = w.split('/')[0] + 'USDT';
-                const t = tickerMap[apiSym];
-                if (!t) return null;
+                const currentPrice = priceMap[apiSym];
+                if (!currentPrice) return null;
                 return {
                     ccxtSymbol:    w,
                     displaySymbol: w.replace(':USDT', ''),
                     engineSymbol:  w.split('/')[0] + '-USD',
-                    change24h:     parseFloat(t.priceChangePercent || 0).toFixed(2),
-                    volume:        parseFloat(t.quoteVolume || 0),
-                    currentPrice:  parseFloat(t.lastPrice || 0)
+                    change24h:     '0.00', // price/ticker doesn't have change, but we prioritized price for executeTrade
+                    volume:        100_000_000, // Placeholder volume for whitelisted assets
+                    currentPrice:  currentPrice
                 };
             })
-            .filter(p => p !== null && p.volume > 1_000_000) // Minimum 1M daily volume
-            .sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h))
+            .filter(p => p !== null)
             .slice(0, limit);
 
         console.log(`[BotScanner] ${pairs.length} whitelisted futures pairs selected for analysis (isTestnet=${isTestnet}).`);
