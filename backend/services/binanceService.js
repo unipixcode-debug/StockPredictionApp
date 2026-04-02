@@ -508,10 +508,6 @@ class BinanceService {
             // ── Step 4: Execute Trade ─────────────────────────────────────────────────
             console.log(`[Binance] Executing ${marketType} trade for key prefix: ${apiKey?.substring(0, 4)} (isTestnet: ${isTestnet})`);
 
-            const tradeRecord = await ExecutedTrade.create({
-                userId, symbol: pair, side: signal.direction, type: marketType, amount, status: 'OPEN'
-            });
-
             try {
                 let order;
                 const apiSymbol = pair.split('/')[0] + 'USDT';
@@ -533,48 +529,54 @@ class BinanceService {
                         isTestnet
                     );
                 } else {
-                    order = await exchange.createMarketOrder(pair, side, quantity);
+                    order = await exchange.createMarketOrder(pair, side, amount);
                 }
 
                 // Capture Execution Price
                 // Favor verified currentPrice if order response is empty or zero
                 const orderPrice = parseFloat(order.avgPrice || order.price || order.average || 0);
-                const entryPrice = orderPrice > 0 ? orderPrice : currentPrice;
+                const entryPrice = (orderPrice > 0) ? orderPrice : (currentPrice > 0 ? currentPrice : 0);
 
-                const tradeRecord = await ExecutedTrade.create({
+                if (entryPrice <= 0) {
+                    console.error(`[Binance] CRITICAL: Zero entry price for ${apiSymbol}. Aborting record.`);
+                    throw new Error('ZERO_ENTRY_PRICE_DETECTED');
+                }
+
+                const newTrade = await ExecutedTrade.create({
                     userId,
                     symbol:    pair,
                     side:      signal.direction,
                     type:      marketType,
-                    amount:    quantity,
+                    amount:    amount,
                     entryPrice: entryPrice,
                     status:    'OPEN',
-                    exchangeOrderId: order.orderId || order.id
+                    exchangeOrderId: order.orderId || order.id || 'N/A'
                 });
 
                 // ── Step 5: SL & TP calculation ───────────────────────────────────────
                 if (marketType === 'FUTURES') {
-                    const ep = parseFloat(tradeRecord.entryPrice);
+                    const ep = parseFloat(newTrade.entryPrice);
                     const slPct = signal.stopLossPct || 0.02; // Default 2%
-                    const tpPct = slPct * 1.5; // Default 1.5x RR ratio (e.g. 3% if SL is 2%)
+                    const tpPct = slPct * 1.5; // Default 1.5x RR ratio
 
-                    tradeRecord.stopLossPrice = side === 'buy' ? ep * (1 - slPct) : ep * (1 + slPct);
-                    tradeRecord.targetPrice   = side === 'buy' ? ep * (1 + tpPct) : ep * (1 - tpPct);
+                    newTrade.stopLossPrice = side === 'buy' ? ep * (1 - slPct) : ep * (1 + slPct);
+                    newTrade.targetPrice   = side === 'buy' ? ep * (1 + tpPct) : ep * (1 - tpPct);
 
                     try {
                         await rawFuturesOrder(apiKey, apiSecret, {
                             symbol: apiSymbol,
                             side: side === 'buy' ? 'SELL' : 'BUY',
                             type: 'STOP_MARKET',
-                            stopPrice: tradeRecord.stopLossPrice.toFixed(4),
+                            stopPrice: newTrade.stopLossPrice.toFixed(precision + 1), // Dynamic precision
                             closePosition: 'true'
                         }, isTestnet);
-                        console.log(`[Binance] SL placed at ${tradeRecord.stopLossPrice.toFixed(4)} for ${apiSymbol}`);
+                        console.log(`[Binance] SL placed at ${newTrade.stopLossPrice} for ${apiSymbol}`);
                     } catch (slErr) { console.warn(`[Binance] SL failed:`, slErr.message); }
+                    
+                    await newTrade.save();
                 }
 
-                await tradeRecord.save();
-                return tradeRecord;
+                return newTrade;
 
             } catch (exchangeError) {
                 console.error(`[Binance] Order Execution failed for user ${userId}:`, exchangeError.message);

@@ -837,7 +837,7 @@ function TradeLiveChart({ trade }) {
 
     return (
         <div className="p-4 pt-2">
-            <div className="h-80 w-full">
+            <div className="h-[480px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 20, right: 100, left: 0, bottom: 0 }}>
                         <defs>
