@@ -19,6 +19,7 @@ export default function BotDashboard() {
 
     const [testResult, setTestResult] = useState(null);
     const [isTesting, setIsTesting] = useState(false);
+    const [closingTradeId, setClosingTradeId] = useState(null);
     
     // Terminal Logs State
     const [logs, setLogs] = useState([]);
@@ -97,6 +98,18 @@ export default function BotDashboard() {
             setTestResult({ success: false, error: error.message });
         } finally {
             setIsTesting(false);
+        }
+    };
+
+    const handleClosePosition = async (tradeId) => {
+        setClosingTradeId(tradeId);
+        try {
+            await api.post(`/bot/trade/${tradeId}/close`);
+            await fetchData(); // Refresh all data after close
+        } catch (error) {
+            alert('Pozisyon kapatılamadı: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setClosingTradeId(null);
         }
     };
 
@@ -245,12 +258,87 @@ export default function BotDashboard() {
                             </div>
                         </div>
 
-                        {/* Actions List */}
+                        {/* Open Positions */}
+                        {(() => {
+                            const openTrades = trades.filter(t => t.status === 'OPEN');
+                            if (openTrades.length === 0) return null;
+                            return (
+                                <div className="glass-card p-6 border-amber-500/20 bg-amber-500/5">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h3 className="text-lg font-black uppercase italic flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"/>
+                                            Açık Pozisyonlar
+                                            <span className="text-xs font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">
+                                                {openTrades.length}
+                                            </span>
+                                        </h3>
+                                        <button onClick={fetchData} className="text-muted-foreground hover:text-amber-400 transition-colors">
+                                            <RefreshCw size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {openTrades.map(trade => {
+                                            const isLong = trade.side === 'BUY';
+                                            const pnl = trade.pnl || 0;
+                                            const isClosing = closingTradeId === trade.id;
+                                            return (
+                                                <div key={trade.id} className={`flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl border transition-all ${
+                                                    isLong ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'
+                                                }`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border text-sm font-black ${
+                                                            isLong ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                                        }`}>
+                                                            {isLong ? '↑' : '↓'}
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-black text-base">{trade.symbol}</span>
+                                                                <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                                                    isLong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                                                                }`}>{isLong ? 'LONG' : 'SHORT'}</span>
+                                                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{trade.type}</span>
+                                                            </div>
+                                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                                                Giriş: <span className="text-foreground font-bold">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span>
+                                                                <span className="mx-2 opacity-30">·</span>
+                                                                Miktar: <span className="font-bold">{parseFloat(trade.amount || 0).toFixed(4)}</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 ml-auto">
+                                                        <div className="text-right">
+                                                            <p className={`text-lg font-black ${
+                                                                pnl > 0 ? 'text-emerald-400' : pnl < 0 ? 'text-rose-400' : 'text-muted-foreground'
+                                                            }`}>
+                                                                {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}$
+                                                            </p>
+                                                            <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Gerçekleşmemiş P&L</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleClosePosition(trade.id)}
+                                                            disabled={isClosing}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50"
+                                                        >
+                                                            {isClosing ? <RefreshCw size={12} className="animate-spin"/> : <X size={12}/>}
+                                                            {isClosing ? 'Kapatılıyor' : 'Kapat'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Recent Trades (Closed only) */}
                         <div className="glass-card p-6">
                              <h3 className="text-lg font-black uppercase italic mb-6">Son İşlemler</h3>
-                             {trades.length > 0 ? (
+                             {trades.filter(t => t.status !== 'OPEN').length > 0 ? (
                                  <div className="divide-y divide-border/30">
-                                     {trades.map(trade => (
+                                     {trades.filter(t => t.status !== 'OPEN').map(trade => (
+
                                          <div key={trade.id} className="py-4 flex flex-col md:flex-row justify-between md:items-center gap-4 group">
                                              <div className="flex items-center space-x-4">
                                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${trade.side === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' : 'bg-rose-500/10 border-rose-500/30 text-rose-500'}`}>
@@ -277,7 +365,7 @@ export default function BotDashboard() {
                                      ))}
                                  </div>
                              ) : (
-                                <p className="text-sm font-medium text-muted-foreground text-center py-10">İşlem kaydı bulunamadı.</p>
+                                <p className="text-sm font-medium text-muted-foreground text-center py-10">Kapatılmış işlem kaydı bulunamadı.</p>
                              )}
                         </div>
                     </motion.div>
@@ -526,7 +614,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                              </div>
 
                              <div className="space-y-2">
-                                <label className="text-xs font-black uppercase text-muted-foreground tracking-widest pl-2 font-black text-amber-500">Tarama Aralığı (Saniye)</label>
+                                <label className="text-xs font-black uppercase text-amber-500 tracking-widest pl-2">Tarama Aralığı (Saniye)</label>
                                 <input 
                                     type="number" name="scanInterval" value={formData.scanInterval} onChange={handleChange}
                                     placeholder="Örn: 300 (5 dk)"
