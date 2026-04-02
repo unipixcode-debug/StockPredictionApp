@@ -210,11 +210,11 @@ class BotScannerService {
             }
 
             try {
-                // ── Check if already in position for this symbol ──
-                const existing = await ExecutedTrade.findOne({ where: { userId, symbol: pair.engineSymbol, status: 'OPEN' } });
-                if (existing) {
-                    // console.log(`[BotScanner] ${pair.engineSymbol} is already open. Skipping.`);
-                    continue;
+                // ── Double check max positions JUST BEFORE signal processing ──
+                const currentOpenCount = await ExecutedTrade.count({ where: { userId, status: 'OPEN' } });
+                if (currentOpenCount >= config.maxPositions) {
+                    await this.log(userId, `⏸️ Limit doldu (${currentOpenCount}/${config.maxPositions}). Yeni sinyal aranmıyor.`, 'warning');
+                    break;
                 }
 
                 // ── Step 2: 100% Unauthenticated technical signal ──
@@ -283,7 +283,16 @@ class BotScannerService {
 
             } catch (err) {
                 console.error(`[BotScanner] ${pair.ccxtSymbol} error:`, err.message);
-                await this.log(userId, `❌ ${pair.ccxtSymbol}: ${err.message.substring(0, 120)}`, 'error');
+                
+                // Special handling for common errors to make them user-friendly
+                let userMsg = err.message;
+                if (err.message.includes('-2019')) {
+                    userMsg = "Bakiye yetersiz (Margin insufficient). Mevcut pozisyonların teminatı bakiyeyi tüketmiş olabilir.";
+                } else if (err.message.includes('-1111')) {
+                    userMsg = "Hassasiyet hatası (Precision error). Gönderilen miktar borsa standartlarına uygun değil.";
+                }
+                
+                await this.log(userId, `❌ ${pair.ccxtSymbol}: ${userMsg.substring(0, 150)}`, 'error');
             }
         }
 

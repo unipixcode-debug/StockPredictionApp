@@ -463,7 +463,17 @@ class BinanceService {
                 const rawQty = parseFloat(amountValue.toFixed(qtyPrecision));
                 order = await rawFuturesOrder(apiKey, apiSecret, { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty }, isTestnet);
             } else {
-                order = await exchange.createMarketOrder(pair, side, amountValue);
+                // Better Spot execution logic with optional precision check if possible
+                // Currently Spot uses CCXT directly. Let's ensure it handles the amountValue safely.
+                try {
+                    await exchange.loadMarkets();
+                    const market = exchange.market(pair);
+                    const amount = exchange.amountToPrecision(pair, amountValue);
+                    order = await exchange.createMarketOrder(pair, side, amount);
+                } catch (spotErr) {
+                    console.error('[Spot Execute Error]', spotErr.message);
+                    throw spotErr;
+                }
             }
 
             const entryPrice = parseFloat(order.avgPrice || order.price || order.average || 0) || currentPrice;
@@ -554,6 +564,7 @@ class BinanceService {
 
                 if (!stillOpen) {
                     dbTrade.status = 'CLOSED';
+                    dbTrade.closedAt = new Date();
                     dbTrade.exitPrice = 0; // Unknown without more API calls
                     await dbTrade.save();
                     results.closed++;
@@ -568,22 +579,40 @@ class BinanceService {
                 }
             }
 
-            // 4. (Optional) Detect new positions not in DB
+            // 4. Detect new positions not in DB
             for (const realPos of activeReal) {
                 const standardSymbol = realPos.symbol.replace('USDT', '/USDT');
                 const exists = dbOpenTrades.find(t => t.symbol === standardSymbol);
 
                 if (!exists) {
+                    const amount = Math.abs(parseFloat(realPos.positionAmt));
+                    const entryPrice = parseFloat(realPos.entryPrice);
+                    const notional = amount * entryPrice;
+
+                    // Dust Filter: don't sync positions smaller than 5.0 USDT to avoid bloat
+                    if (notional < 5.0) {
+                        console.log(`[Sync] Skipping dust position: ${realPos.symbol} ($${notional.toFixed(2)})`);
+                        continue;
+                    }
+
+                    const isBuy = parseFloat(realPos.positionAmt) > 0;
+                    
+                    // Create basic TP/SL for detected trades (3% SL, 6% TP as backup)
+                    const slPrice = isBuy ? entryPrice * 0.97 : entryPrice * 1.03;
+                    const tpPrice = isBuy ? entryPrice * 1.06 : entryPrice * 0.94;
+
                     await ExecutedTrade.create({
                         userId,
                         symbol: standardSymbol,
-                        side: parseFloat(realPos.positionAmt) > 0 ? 'BUY' : 'SELL',
+                        side: isBuy ? 'BUY' : 'SELL',
                         type: 'FUTURES',
-                        amount: Math.abs(parseFloat(realPos.positionAmt)),
-                        entryPrice: parseFloat(realPos.entryPrice),
+                        amount,
+                        entryPrice,
                         status: 'OPEN',
                         leverage: parseInt(realPos.leverage),
-                        exchangeOrderId: 'DETECTED'
+                        exchangeOrderId: 'DETECTED',
+                        stopLossPrice: slPrice,
+                        targetPrice: tpPrice
                     });
                     results.added++;
                 }

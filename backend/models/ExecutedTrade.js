@@ -66,6 +66,10 @@ const ExecutedTrade = sequelize.define('ExecutedTrade', {
     errorMessage: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    closedAt: {
+        type: DataTypes.DATE,
+        allowNull: true
     }
 }, {
     timestamps: true,
