@@ -254,28 +254,29 @@ class MarketDataService {
 
     async fetchPrice(symbol) {
         try {
-            const upperSymbol = (symbol || '').toUpperCase();
-            if (!upperSymbol) return 0;
+            const rawSymbol = (symbol || '').toUpperCase();
+            if (!rawSymbol) return 0;
             
-            const isCrypto = upperSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(upperSymbol);
+            // Clean symbol for Binance (remove /, :, -USD etc)
+            const bSymbol = rawSymbol.replace(/[:/]/g, '').replace('-USD', 'USDT');
+            const isCrypto = bSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(bSymbol.replace('USDT',''));
+
             if (isCrypto) {
-                const bSymbol = upperSymbol.endsWith('USDT') ? upperSymbol : upperSymbol + 'USDT';
+                const finalBSymbol = bSymbol.endsWith('USDT') ? bSymbol : bSymbol + 'USDT';
                 try {
-                    // Use our simulation-aware raw fetcher
                     const binanceService = require('./binanceService');
-                    const tickers = await binanceService.rawFuturesPublicTickers(true, bSymbol);
-                    if (tickers && tickers[bSymbol]) return tickers[bSymbol];
+                    const tickers = await binanceService.rawFuturesPublicTickers(true, finalBSymbol);
+                    if (tickers && tickers[finalBSymbol]) return tickers[finalBSymbol];
                 } catch (e) {
-                    // Fallback to standard binance client
                     try {
-                        const ticker = await binanceClient.dailyStats({ symbol: bSymbol });
+                        const ticker = await binanceClient.dailyStats({ symbol: finalBSymbol });
                         if (ticker && ticker.lastPrice) return parseFloat(ticker.lastPrice);
                     } catch (ce) {}
                 }
             }
 
             try {
-                const quote = await yahooFinance.quote(upperSymbol);
+                const quote = await yahooFinance.quote(rawSymbol);
                 if (quote && quote.regularMarketPrice) return quote.regularMarketPrice;
             } catch (e) {}
 
@@ -291,14 +292,16 @@ class MarketDataService {
 
     async getHistoricalData(symbol, timeframe = '1D', limit = 100) {
         try {
-            const upperSymbol = symbol.toUpperCase();
+            const rawSymbol = symbol.toUpperCase();
             const intervalMap = { '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w', '1M': '1m' };
             const interval = intervalMap[timeframe] || '1d';
-            const isCrypto = upperSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(upperSymbol);
+            
+            const bSymbol = rawSymbol.replace(/[:/]/g, '').replace('-USD', 'USDT');
+            const isCrypto = bSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(bSymbol.replace('USDT',''));
             
             if (isCrypto) {
-                const bSymbol = upperSymbol.endsWith('USDT') ? upperSymbol : upperSymbol + 'USDT';
-                const candles = await binanceClient.candles({ symbol: bSymbol, interval, limit: parseInt(limit) || 50 });
+                const finalBSymbol = bSymbol.endsWith('USDT') ? bSymbol : bSymbol + 'USDT';
+                const candles = await binanceClient.candles({ symbol: finalBSymbol, interval, limit: parseInt(limit) || 50 });
                 return candles.map(c => ({
                     time: Math.floor(c.openTime / 1000),
                     open: parseFloat(c.open),
@@ -309,7 +312,7 @@ class MarketDataService {
             } else {
                 const period1Date = new Date();
                 period1Date.setMonth(period1Date.getMonth() - 2); 
-                const result = await yahooFinance.chart(upperSymbol, {
+                const result = await yahooFinance.chart(rawSymbol, {
                     period1: Math.floor(period1Date.getTime() / 1000),
                     interval: interval === '1d' ? '1d' : interval
                 });

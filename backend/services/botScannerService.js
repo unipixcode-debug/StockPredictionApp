@@ -4,7 +4,7 @@ const emailService = require('./emailService');
 const ccxt = require('ccxt');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-const TOP_COINS_TO_SCAN  = 50;   // Top N volatile coins from Binance
+const TOP_COINS_TO_SCAN  = 60;   // Top N volatile coins from Binance
 const RSI_PERIOD         = 14;
 const RSI_OVERSOLD       = 35;   // BUY below this
 const RSI_OVERBOUGHT     = 65;   // SELL above this
@@ -243,37 +243,42 @@ class BotScannerService {
 
                 // ── Step 4: Market type routing ──
                 const isBuy = techSignal.direction === 'BUY';
-                let targetMarket = null;
-                if (isBuy  && config.isFuturesActive) targetMarket = 'FUTURES';
-                else if (isBuy && config.isSpotActive) targetMarket = 'SPOT';
-                else if (!isBuy && config.isFuturesActive) targetMarket = 'FUTURES'; // SHORT
+                const marketsToTry = [];
+                if (config.isFuturesActive) marketsToTry.push('FUTURES');
+                if (isBuy && config.isSpotActive) marketsToTry.push('SPOT');
 
-                if (!targetMarket) {
+                if (marketsToTry.length === 0) {
                     await this.log(userId, `🚫 ${pair.ccxtSymbol}: ${techSignal.direction} için uygun piyasa aktif değil.`, 'warning');
                     continue;
                 }
 
-                // ── Step 5: Execute trade with stop-loss ──
-                const posLabel = isBuy ? 'LONG' : 'SHORT';
-                await this.log(userId,
-                    `🚀 ${pair.ccxtSymbol}: ${posLabel} açılıyor. RSI=${techSignal.rsi}, Güven=%${avgScore}, Piyasa=${targetMarket}`, 'info');
+                for (const targetMarket of marketsToTry) {
+                    // Check max positions again for each sub-trade
+                    const midOpen = await ExecutedTrade.count({ where: { userId, status: 'OPEN' } });
+                    if (midOpen >= config.maxPositions) break;
 
-                const tradeResult = await binanceService.executeTrade(userId, {
-                    symbol:    pair.engineSymbol,
-                    direction: techSignal.direction,
-                    market:    'CRYPTO',
-                    type:      targetMarket,
-                    currentPrice: techSignal.currentPrice || pair.currentPrice, // Pass the price we just verified
-                    stopLossPct: STOP_LOSS_PCT // Pass SL% to executeTrade
-                });
-
-                if (tradeResult) {
-                    const priceVal = parseFloat(tradeResult.entryPrice);
-                    const formattedPrice = !isNaN(priceVal) ? priceVal.toFixed(4) : 'N/A';
+                    // ── Step 5: Execute trade with stop-loss ──
+                    const posLabel = targetMarket === 'FUTURES' ? (isBuy ? 'LONG' : 'SHORT') : 'SPOT BUY';
                     await this.log(userId,
-                        `✅ ${pair.ccxtSymbol}: ${posLabel} açıldı! Giriş≈$${formattedPrice}, SL=%${(STOP_LOSS_PCT * 100).toFixed(1)} (${isBuy ? '↑' : '↓'} ${techSignal.rsi})`,
-                        'success');
-                    signalsFound++;
+                        `🚀 ${pair.ccxtSymbol}: ${posLabel} açılıyor. RSI=${techSignal.rsi}, Güven=%${avgScore}, Piyasa=${targetMarket}`, 'info');
+
+                    const tradeResult = await binanceService.executeTrade(userId, {
+                        symbol:    pair.engineSymbol,
+                        direction: techSignal.direction,
+                        market:    'CRYPTO',
+                        type:      targetMarket,
+                        currentPrice: techSignal.currentPrice || pair.currentPrice,
+                        stopLossPct: STOP_LOSS_PCT
+                    });
+
+                    if (tradeResult) {
+                        const priceVal = parseFloat(tradeResult.entryPrice);
+                        const formattedPrice = !isNaN(priceVal) ? priceVal.toFixed(4) : 'N/A';
+                        await this.log(userId,
+                            `✅ ${pair.ccxtSymbol}: ${posLabel} açıldı! Giriş≈$${formattedPrice}, SL=%${(STOP_LOSS_PCT * 100).toFixed(1)} (${isBuy ? '↑' : '↓'} ${techSignal.rsi})`,
+                            'success');
+                        signalsFound++;
+                    }
                 }
 
             } catch (err) {
