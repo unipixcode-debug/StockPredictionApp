@@ -33,6 +33,8 @@ ExecutedTrade.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(BotLog, { foreignKey: 'userId' });
 BotLog.belongsTo(User, { foreignKey: 'userId' });
 
+const sequelize = require('../config/database');
+
 module.exports = {
     User,
     Prediction,
@@ -48,5 +50,6 @@ module.exports = {
     AIPortfolio,
     BinanceBotConfig,
     ExecutedTrade,
-    BotLog
+    BotLog,
+    sequelize
 };

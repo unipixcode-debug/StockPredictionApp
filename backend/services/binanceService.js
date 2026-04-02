@@ -368,7 +368,7 @@ class BinanceService {
             const amountValue = notional / currentPrice;
 
             // Execute
-            console.log(`[Binance] Executing ${marketType} for ${pair}`);
+            console.log(`[Binance] Executing ${marketType} for ${pair} with ${leverage}x leverage`);
             let order;
             const apiSymbol = pair.split('/')[0].split('-')[0].split(':')[0].toUpperCase() + 'USDT';
 
@@ -385,17 +385,45 @@ class BinanceService {
             const entryPrice = parseFloat(order.avgPrice || order.price || order.average || 0) || currentPrice;
             
             const newTrade = await ExecutedTrade.create({
-                userId, symbol: pair, side: signal.direction, type: marketType, amount: amountValue, entryPrice, status: 'OPEN', exchangeOrderId: order.orderId || order.id || 'N/A'
+                userId, 
+                symbol: pair, 
+                side: signal.direction, 
+                type: marketType, 
+                amount: amountValue, 
+                entryPrice, 
+                status: 'OPEN', 
+                leverage: leverage,
+                exchangeOrderId: order.orderId || order.id || 'N/A'
             });
 
             // SL/TP for Futures
             if (marketType === 'FUTURES') {
                 const ep = parseFloat(newTrade.entryPrice);
-                const slPct = signal.stopLossPct || 0.02;
+                
+                // Dynamic SL based on leverage & riskLevel
+                // Conservative: 1.5% margin risk, Moderate: 3%, Aggressive: 5%
+                let baseRisk = 0.03; // Default moderate
+                if (config.riskLevel === 'CONSERVATIVE') baseRisk = 0.015;
+                if (config.riskLevel === 'AGGRESSIVE') baseRisk = 0.05;
+
+                let slPct = baseRisk / leverage;
+                // Floor at 0.15% to avoid noise stop-outs
+                if (slPct < 0.0015) slPct = 0.0015;
+                
+                const tpPct = slPct * 2; // Better R:R ratio
+
                 newTrade.stopLossPrice = side === 'buy' ? ep * (1 - slPct) : ep * (1 + slPct);
-                newTrade.targetPrice = side === 'buy' ? ep * (1 + (slPct * 1.5)) : ep * (1 - (slPct * 1.5));
+                newTrade.targetPrice = side === 'buy' ? ep * (1 + tpPct) : ep * (1 - tpPct);
+                
                 try {
-                    await rawFuturesOrder(apiKey, apiSecret, { symbol: apiSymbol, side: side === 'buy' ? 'SELL' : 'BUY', type: 'STOP_MARKET', stopPrice: newTrade.stopLossPrice.toFixed(4), closePosition: 'true' }, isTestnet);
+                    await rawFuturesOrder(apiKey, apiSecret, { 
+                        symbol: apiSymbol, 
+                        side: side === 'buy' ? 'SELL' : 'BUY', 
+                        type: 'STOP_MARKET', 
+                        stopPrice: newTrade.stopLossPrice.toFixed(4), 
+                        closePosition: 'true' 
+                    }, isTestnet);
+                    console.log(`[Binance] Dynamic SL (X-Aware) placed at ${newTrade.stopLossPrice.toFixed(4)} (${(slPct*100).toFixed(2)}%)`);
                 } catch (slErr) { console.warn('SL Failed:', slErr.message); }
                 await newTrade.save();
             }

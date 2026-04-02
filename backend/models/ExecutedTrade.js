@@ -59,6 +59,10 @@ const ExecutedTrade = sequelize.define('ExecutedTrade', {
         type: DataTypes.FLOAT,
         allowNull: true
     },
+    leverage: {
+        type: DataTypes.INTEGER,
+        defaultValue: 1
+    },
     errorMessage: {
         type: DataTypes.TEXT,
         allowNull: true

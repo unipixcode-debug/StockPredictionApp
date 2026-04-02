@@ -28,7 +28,8 @@ router.post('/config', authCheck, async (req, res) => {
             isSpotActive, isFuturesActive,
             budgetMode, budgetAmount, 
             maxPositions, maxPerAsset, 
-            isTestnet, scanInterval
+            isTestnet, scanInterval,
+            defaultLeverage
         } = req.body;
 
         let config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
@@ -65,6 +66,7 @@ router.post('/config', authCheck, async (req, res) => {
         if (maxPerAsset !== undefined) config.maxPerAsset = maxPerAsset;
         if (isTestnet !== undefined) config.isTestnet = isTestnet;
         if (scanInterval !== undefined) config.scanInterval = parseInt(scanInterval) || 300;
+        if (defaultLeverage !== undefined) config.defaultLeverage = parseInt(defaultLeverage) || 1;
 
         await config.save();
         res.json({ message: 'Bot configuration updated successfully', config });

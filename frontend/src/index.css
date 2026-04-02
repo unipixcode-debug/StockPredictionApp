@@ -151,11 +151,13 @@
   animation: pulse-cyan 2s infinite ease-in-out;
 }
 
-.status-dot-small {
-  filter: drop-shadow(0 0 4px #3b82f6);
+@keyframes neon-breathing {
+  0% { filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.3)); text-shadow: 0 0 2px rgba(59, 130, 246, 0.4); }
+  50% { filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.8)); text-shadow: 0 0 8px rgba(59, 130, 246, 1); }
+  100% { filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.3)); text-shadow: 0 0 2px rgba(59, 130, 246, 0.4); }
 }
 
-.neon-price-label {
-  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
-  text-shadow: 0 0 5px rgba(59, 130, 246, 0.8);
+.neon-price-label-animated {
+  animation: neon-breathing 3s infinite ease-in-out;
+  font-family: 'Inter', sans-serif;
 }

@@ -356,6 +356,9 @@ export default function BotDashboard() {
                                                                     <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
                                                                         isLong ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
                                                                     }`}>{isLong ? 'LONG' : 'SHORT'}</span>
+                                                                    {trade.type === 'FUTURES' && trade.leverage && (
+                                                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400">{trade.leverage}x</span>
+                                                                    )}
                                                                     <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{trade.type}</span>
                                                                 </div>
                                                                 <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-1.5 pt-1.5 border-t border-white/5">
@@ -442,7 +445,12 @@ export default function BotDashboard() {
                                                 </div>
                                                 <div>
                                                     <h4 className="font-black text-lg">{trade.symbol}</h4>
-                                                    <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{trade.type}</span>
+                                                    <div className="flex gap-2">
+                                                        {trade.type === 'FUTURES' && trade.leverage && (
+                                                            <span className="text-[10px] uppercase font-bold tracking-widest bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full">{trade.leverage}x</span>
+                                                        )}
+                                                        <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{trade.type}</span>
+                                                    </div>
                                                 </div>
                                              </div>
                                              <div className="flex flex-col md:items-end text-sm font-medium">
@@ -518,7 +526,8 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
         budgetAmount: 10,
         maxPositions: 3,
         maxPerAsset: 50,
-        scanInterval: 300
+        scanInterval: 300,
+        defaultLeverage: 1
     });
 
     const [testMarket, setTestMarket] = useState('SPOT');
@@ -538,7 +547,8 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                 budgetAmount: config.budgetAmount || 10,
                 maxPositions: config.maxPositions || 3,
                 maxPerAsset: config.maxPerAsset || 50,
-                scanInterval: config.scanInterval || 300
+                scanInterval: config.scanInterval || 300,
+                defaultLeverage: config.defaultLeverage || 1
             });
         }
     }, [config]);
@@ -707,6 +717,18 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                     type="number" name="maxPositions" value={formData.maxPositions} onChange={handleChange}
                                     className="w-full bg-secondary/30 border border-border p-4 rounded-2xl focus:border-primary/50 text-foreground"
                                 />
+                             </div>
+
+                             <div className="space-y-2">
+                                <label className="text-xs font-black uppercase text-cyan-500 tracking-widest pl-2">Maksimum Kaldıraç (Futures İçin)</label>
+                                <div className="flex items-center gap-4 bg-cyan-500/5 border border-cyan-500/20 p-4 rounded-2xl">
+                                    <input 
+                                        type="range" name="defaultLeverage" min="1" max="50" step="1" 
+                                        value={formData.defaultLeverage} onChange={handleChange}
+                                        className="flex-1 h-1.5 bg-black/40 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                                    />
+                                    <span className="w-12 text-center text-cyan-400 font-black text-lg">{formData.defaultLeverage}x</span>
+                                </div>
                              </div>
 
                              <div className="space-y-2">
@@ -937,9 +959,9 @@ function TradeLiveChart({ trade }) {
                                     position: 'right',
                                     value: `$${lastPoint.close.toFixed(4)}`,
                                     fill: '#3b82f6',
-                                    fontSize: 12,
+                                    fontSize: 14,
                                     fontWeight: '900',
-                                    className: 'neon-price-label',
+                                    className: 'neon-price-label-animated',
                                     dx: 10
                                 }}
                             />
