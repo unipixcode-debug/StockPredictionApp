@@ -210,35 +210,50 @@ class BinanceService {
             });
 
             try {
-                // For Futures, pass positionSide to support both hedge and one-way mode
-                const orderParams = {};
+                let order;
+
                 if (marketType === 'FUTURES') {
-                    orderParams.positionSide = side === 'buy' ? 'LONG' : 'SHORT';
+                    // Use raw fapiPrivatePostOrder to avoid CCXT symbol processing issues.
+                    // Demo Trading runs in ONE_WAY mode — do NOT send positionSide.
+                    // Raw Binance API expects symbol as 'BTCUSDT', not 'BTC/USDT:USDT'
+                    const apiSymbol = pair.split('/')[0] + 'USDT'; // BTC/USDT:USDT → BTCUSDT
+                    const precision = 3; // safe default; most futures allow 3 decimal places
+                    const rawQty = parseFloat(amount.toFixed(precision));
+
+                    console.log(`[Binance] Raw order → symbol:${apiSymbol} side:${side.toUpperCase()} qty:${rawQty}`);
+
+                    order = await exchange.fapiPrivatePostOrder({
+                        symbol: apiSymbol,
+                        side: side.toUpperCase(),
+                        type: 'MARKET',
+                        quantity: rawQty,
+                    });
+                } else {
+                    order = await exchange.createMarketOrder(pair, side, amount);
                 }
 
-                const order = await exchange.createMarketOrder(pair, side, amount, orderParams);
-                
-                tradeRecord.exchangeOrderId = order.id;
-                tradeRecord.entryPrice = order.average || order.price || currentPrice;
+                tradeRecord.exchangeOrderId = order.id || order.orderId;
+                tradeRecord.entryPrice = order.avgPrice || order.price || order.average || currentPrice;
                 await tradeRecord.save();
 
-                // ── Place Stop-Loss order immediately after entry ──────────────────
+                // ── Stop-Loss order after entry (Futures only, also using raw API) ──
                 if (signal.stopLossPct && marketType === 'FUTURES') {
                     try {
-                        const ep = tradeRecord.entryPrice;
+                        const ep = parseFloat(tradeRecord.entryPrice) || currentPrice;
                         const slPrice = side === 'buy'
                             ? ep * (1 - signal.stopLossPct)
                             : ep * (1 + signal.stopLossPct);
-                        const slParams = {
-                            stopPrice: exchange.priceToPrecision(pair, slPrice),
-                            reduceOnly: true,
-                        };
-                        if (orderParams.positionSide) slParams.positionSide = orderParams.positionSide;
+                        const apiSymbol = pair.split('/')[0] + 'USDT';
 
-                        await exchange.createOrder(pair, 'STOP_MARKET', side === 'buy' ? 'sell' : 'buy', amount, undefined, slParams);
-                        console.log(`[Binance] Stop-loss placed at ${slPrice.toFixed(4)} for ${pair}`);
+                        await exchange.fapiPrivatePostOrder({
+                            symbol: apiSymbol,
+                            side: side === 'buy' ? 'SELL' : 'BUY',
+                            type: 'STOP_MARKET',
+                            stopPrice: slPrice.toFixed(4),
+                            closePosition: 'true',
+                        });
+                        console.log(`[Binance] Stop-loss placed at ${slPrice.toFixed(4)} for ${apiSymbol}`);
                     } catch (slErr) {
-                        // SL failure is non-fatal — log it but don't abort the trade
                         console.warn(`[Binance] Stop-loss order failed for ${pair}:`, slErr.message);
                     }
                 }
