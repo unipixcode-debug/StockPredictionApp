@@ -108,11 +108,23 @@ async function getDynamicScanList(exchange, limit = TOP_COINS_TO_SCAN) {
     } catch (err) {
         console.warn('[BotScanner] Whitelist fetchTickers warning:', err.message);
         // Minimum fallback
+        // Whitelist Fallback (Major coins valid for both Testnet & Mainnet)
         return [
             { ccxtSymbol: 'BTC/USDT:USDT', displaySymbol: 'BTC/USDT', engineSymbol: 'BTC-USD' },
             { ccxtSymbol: 'ETH/USDT:USDT', displaySymbol: 'ETH/USDT', engineSymbol: 'ETH-USD' },
             { ccxtSymbol: 'SOL/USDT:USDT', displaySymbol: 'SOL/USDT', engineSymbol: 'SOL-USD' },
             { ccxtSymbol: 'BNB/USDT:USDT', displaySymbol: 'BNB/USDT', engineSymbol: 'BNB-USD' },
+            { ccxtSymbol: 'XRP/USDT:USDT', displaySymbol: 'XRP/USDT', engineSymbol: 'XRP-USD' },
+            { ccxtSymbol: 'DOGE/USDT:USDT', displaySymbol: 'DOGE/USDT', engineSymbol: 'DOGE-USD' },
+            { ccxtSymbol: 'ADA/USDT:USDT', displaySymbol: 'ADA/USDT', engineSymbol: 'ADA-USD' },
+            { ccxtSymbol: 'AVAX/USDT:USDT', displaySymbol: 'AVAX/USDT', engineSymbol: 'AVAX-USD' },
+            { ccxtSymbol: 'DOT/USDT:USDT', displaySymbol: 'DOT/USDT', engineSymbol: 'DOT-USD' },
+            { ccxtSymbol: 'LINK/USDT:USDT', displaySymbol: 'LINK/USDT', engineSymbol: 'LINK-USD' },
+            { ccxtSymbol: 'POL/USDT:USDT', displaySymbol: 'POL/USDT', engineSymbol: 'POL-USD' },
+            { ccxtSymbol: 'LTC/USDT:USDT', displaySymbol: 'LTC/USDT', engineSymbol: 'LTC-USD' },
+            { ccxtSymbol: 'SHIB/USDT:USDT', displaySymbol: 'SHIB/USDT', engineSymbol: 'SHIB-USD' },
+            { ccxtSymbol: 'NEAR/USDT:USDT', displaySymbol: 'NEAR/USDT', engineSymbol: 'NEAR-USD' },
+            { ccxtSymbol: 'TRX/USDT:USDT', displaySymbol: 'TRX/USDT', engineSymbol: 'TRX-USD' }
         ];
     }
 }

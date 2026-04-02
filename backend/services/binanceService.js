@@ -199,19 +199,12 @@ function getCachedDemoSymbols() {
                     _demoSymbolCacheTime = Date.now();
                     console.log(`[Binance] demo-fapi cache: ${symbols.size} available symbols.`);
                     resolve(symbols);
-                } catch {
+                    } catch (err) {
+                    // Fallback to a standard list if the endpoint fails
                     resolve(new Set([
                         'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
                         'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'LINKUSDT',
-                        'POLUSDT', 'LTCUSDT', 'SHIBUSDT', 'NEARUSDT', 'OPUSDT',
-                        'ARBUSDT', 'SUIUSDT', 'TIAUSDT', 'INJUSDT', 'APTUSDT',
-                        'ORDIUSDT', 'PEPEUSDT', 'WIFUSDT', 'BONKUSDT', 'SEIUSDT',
-                        'FETUSDT', 'RNDRUSDT', 'IOUSDT', 'GALAUSDT', 'IMXUSDT',
-                        'LDOUSDT', 'AAVEUSDT', 'CRVUSDT', 'MKRUSDT', 'COMPUSDT',
-                        'STXUSDT', 'FILUSDT', 'TRXUSDT', 'BCHUSDT', 'ETCUSDT',
-                        'XLMUSDT', 'UNIUSDT', 'ICPUSDT', 'ALGOUSDT', 'HBARUSDT',
-                        'MANAUSDT', 'SANDUSDT', 'AXSUSDT', 'JUPUSDT', 'PYTHUSDT',
-                        'ONDOUSDT', 'STRKUSDT', 'DYMUSDT', '1000SATSUSDT'
+                        'POLUSDT', 'LTCUSDT', 'SHIBUSDT', 'NEARUSDT', 'TRXUSDT'
                     ]));
                 }
             });
@@ -397,7 +390,15 @@ class BinanceService {
             tradeAmountUSDT = Math.min(tradeAmountUSDT, config.maxPerAsset || 1000);
             if (tradeAmountUSDT < 5) throw new Error('INSUFFICIENT_BALANCE_FOR_MIN_ORDER');
 
-            const currentPrice = signal.currentPrice || (await exchange.fetchTicker(pair)).last;
+            let currentPrice = signal.currentPrice;
+            if (!currentPrice) {
+                try {
+                    const t = await exchange.fetchTicker(pair);
+                    currentPrice = t.last;
+                } catch { currentPrice = 0; }
+            }
+            if (!currentPrice || currentPrice <= 0) throw new Error('COULD_NOT_FETCH_PRICE');
+
             const leverage = config.defaultLeverage || 1;
             const amount = (tradeAmountUSDT * leverage) / currentPrice;
 
@@ -406,6 +407,8 @@ class BinanceService {
             if (openNow >= config.maxPositions) throw new Error('MAX_POSITIONS_REACHED');
 
             // ── Step 4: Execute Trade ─────────────────────────────────────────────────
+            console.log(`[Binance] Executing ${marketType} trade for key prefix: ${apiKey?.substring(0, 4)} (isTestnet: ${isTestnet})`);
+
             const tradeRecord = await ExecutedTrade.create({
                 userId, symbol: pair, side: signal.direction, type: marketType, amount, status: 'OPEN'
             });
