@@ -266,8 +266,10 @@ class BotScannerService {
                 });
 
                 if (tradeResult) {
+                    const priceVal = parseFloat(tradeResult.entryPrice);
+                    const formattedPrice = !isNaN(priceVal) ? priceVal.toFixed(4) : 'N/A';
                     await this.log(userId,
-                        `✅ ${pair.ccxtSymbol}: ${posLabel} açıldı! Giriş≈$${tradeResult.entryPrice?.toFixed(4)}, SL=%${(STOP_LOSS_PCT * 100).toFixed(1)} (${isBuy ? '↑' : '↓'} ${techSignal.rsi})`,
+                        `✅ ${pair.ccxtSymbol}: ${posLabel} açıldı! Giriş≈$${formattedPrice}, SL=%${(STOP_LOSS_PCT * 100).toFixed(1)} (${isBuy ? '↑' : '↓'} ${techSignal.rsi})`,
                         'success');
                     signalsFound++;
                 }

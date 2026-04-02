@@ -486,7 +486,19 @@ class BinanceService {
             if (!currentPrice || currentPrice <= 0) throw new Error('COULD_NOT_FETCH_PRICE');
 
             const leverage = config.defaultLeverage || 1;
-            const amount = (tradeAmountUSDT * leverage) / currentPrice;
+            const notional = tradeAmountUSDT * leverage;
+
+            // ── Notional Minimum Check ────────────────────────────────────────────────
+            // On Binance Futures Testnet, BTCUSDT often requires > 100 USDT notional.
+            // Using 105 as safety margin.
+            if (marketType === 'FUTURES' && isTestnet) {
+                const apiSymbol = signal.symbol.includes('-') ? signal.symbol.split('-')[0] + 'USDT' : signal.symbol.replace('/', '') + 'USDT';
+                if (apiSymbol.toUpperCase() === 'BTCUSDT' && notional < 105) {
+                    throw new Error(`NOTIONAL_TOO_LOW: BTCUSDT requires min 100 USDT notional. Current: ${notional.toFixed(2)} (Leverage:${leverage}x)`);
+                }
+            }
+
+            const amount = notional / currentPrice;
 
             // ── Step 3: Check Limits ──────────────────────────────────────────────────
             const openNow = await ExecutedTrade.count({ where: { userId, status: 'OPEN' } });
@@ -524,7 +536,7 @@ class BinanceService {
                 }
 
                 tradeRecord.exchangeOrderId = order.orderId || order.id;
-                tradeRecord.entryPrice = order.avgPrice || order.price || order.average || currentPrice;
+                tradeRecord.entryPrice = parseFloat(order.avgPrice || order.price || order.average || currentPrice);
                 await tradeRecord.save();
 
                 // ── Step 5: Stop-Loss ─────────────────────────────────────────────────
