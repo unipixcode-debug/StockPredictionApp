@@ -257,9 +257,10 @@ class MarketDataService {
             const rawSymbol = (symbol || '').toUpperCase();
             if (!rawSymbol) return 0;
             
-            // Clean symbol for Binance (remove /, :, -USD etc)
-            const bSymbol = rawSymbol.replace(/[:/]/g, '').replace('-USD', 'USDT');
-            const isCrypto = bSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(bSymbol.replace('USDT',''));
+            // Clean symbol for Binance (e.g. ONT/USDT:USDT => ONTUSDT)
+            let base = rawSymbol.split(/[:/]/)[0].replace('USDT', '').replace('-USD', '');
+            const bSymbol = base + 'USDT';
+            const isCrypto = ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(base) || bSymbol.length > 3;
 
             if (isCrypto) {
                 const finalBSymbol = bSymbol.endsWith('USDT') ? bSymbol : bSymbol + 'USDT';
@@ -296,8 +297,9 @@ class MarketDataService {
             const intervalMap = { '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w', '1M': '1m' };
             const interval = intervalMap[timeframe] || '1d';
             
-            const bSymbol = rawSymbol.replace(/[:/]/g, '').replace('-USD', 'USDT');
-            const isCrypto = bSymbol.endsWith('USDT') || ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(bSymbol.replace('USDT',''));
+            let base = rawSymbol.split(/[:/]/)[0].replace('USDT', '').replace('-USD', '');
+            const bSymbol = base + 'USDT';
+            const isCrypto = ['BTC', 'ETH', 'XRP', 'SOL', 'AVAX', 'BNB', 'DOGE', 'ADA', 'TRX', 'DOT'].includes(base) || bSymbol.length > 3;
             
             if (isCrypto) {
                 const finalBSymbol = bSymbol.endsWith('USDT') ? bSymbol : bSymbol + 'USDT';
