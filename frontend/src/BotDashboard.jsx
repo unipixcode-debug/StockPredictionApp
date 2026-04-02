@@ -230,32 +230,84 @@ export default function BotDashboard() {
                         <div className="glass-card p-6 border-border/50">
                             <h3 className="text-lg font-black uppercase italic mb-6">P&L Büyüme Grafiği</h3>
                             <div className="h-[300px] w-full">
-                                {trades.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={[...trades].reverse().map((t, i) => ({ 
-                                            name: `İşlem ${i+1}`, 
-                                            pnl: t.pnl 
-                                        }))}>
-                                            <defs>
-                                                <linearGradient id="pnlColor" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#00f2fe" stopOpacity={0.8}/>
-                                                    <stop offset="95%" stopColor="#00f2fe" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <XAxis dataKey="name" stroke="#888888" fontSize={10} tickLine={false} axisLine={false} />
-                                            <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
-                                            <RechartsTooltip 
-                                                contentStyle={{ backgroundColor: 'rgba(5,5,5,0.8)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '1rem' }}
-                                                itemStyle={{ color: '#00f2fe', fontWeight: '900' }}
-                                            />
-                                            <Area type="monotone" dataKey="pnl" stroke="#00f2fe" fillOpacity={1} fill="url(#pnlColor)" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-full flex items-center justify-center border-2 border-dashed border-border rounded-3xl">
-                                        <p className="text-xs font-black uppercase text-muted-foreground opacity-50 tracking-widest">Henüz işlem geçmişi yok</p>
-                                    </div>
-                                )}
+                                {(() => {
+                                    if (trades.length === 0) {
+                                        return (
+                                            <div className="h-full flex items-center justify-center border-2 border-dashed border-border rounded-3xl">
+                                                <p className="text-xs font-black uppercase text-muted-foreground opacity-50 tracking-widest">Henüz işlem geçmişi yok</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    // ── Kümülatif P&L Hesaplama ───────────────────────────────────────
+                                    // Tarihe göre sırala (Eskiden Yeniye)
+                                    const sortedTrades = [...trades]
+                                        .sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt))
+                                        .slice(-50); // Son 50 işlem
+
+                                    let cumulative = 0;
+                                    const chartData = sortedTrades.map((t, i) => {
+                                        const tradePnl = t.status === 'CLOSED' ? (t.pnl || 0) : (t.unrealizedPnl || 0);
+                                        cumulative += tradePnl;
+                                        
+                                        return {
+                                            name: `İşlem ${i+1}`,
+                                            fullPnl: cumulative,
+                                            realized: t.status === 'CLOSED' ? cumulative : null,
+                                            unrealized: t.status === 'OPEN' ? cumulative : null,
+                                            isClosed: t.status === 'CLOSED'
+                                        };
+                                    });
+
+                                    // "Bridges" realized to unrealized for a continuous line
+                                    for (let i = 0; i < chartData.length - 1; i++) {
+                                        if (chartData[i].isClosed && !chartData[i+1].isClosed) {
+                                            chartData[i+1].realized = chartData[i+1].fullPnl; // Connect the gap
+                                        }
+                                    }
+
+                                    return (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={chartData}>
+                                                <defs>
+                                                    <linearGradient id="realizedColor" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                    <linearGradient id="unrealizedColor" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8}/>
+                                                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <XAxis dataKey="name" stroke="#888888" fontSize={10} tickLine={false} axisLine={false} />
+                                                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
+                                                <RechartsTooltip 
+                                                    contentStyle={{ backgroundColor: 'rgba(5,5,5,0.8)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '1rem' }}
+                                                    itemStyle={{ color: '#00f2fe', fontWeight: '900' }}
+                                                    formatter={(value) => [`$${value.toFixed(2)}`, 'Kümülatif P&L']}
+                                                />
+                                                <Area 
+                                                    type="monotone" 
+                                                    dataKey="realized" 
+                                                    stroke="#10b981" 
+                                                    fillOpacity={1} 
+                                                    fill="url(#realizedColor)" 
+                                                    strokeWidth={3}
+                                                    connectNulls={false}
+                                                />
+                                                <Area 
+                                                    type="monotone" 
+                                                    dataKey="unrealized" 
+                                                    stroke="#f59e0b" 
+                                                    fillOpacity={1} 
+                                                    fill="url(#unrealizedColor)" 
+                                                    strokeWidth={3}
+                                                    connectNulls={true}
+                                                />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    );
+                                })()}
                             </div>
                         </div>
 
