@@ -156,6 +156,27 @@ function rawFuturesPublicOHLCV(symbol, timeframe = '5m', limit = 30, isTestnet =
 }
 
 /**
+ * Fetches 24hr ticker data (including volume) directly via public HTTPS (Unauthenticated)
+ */
+function rawFutures24hrTickers(isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const url = `https://${hostname}/fapi/v1/ticker/24hr`;
+        https.get(url, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.code) reject(new Error(`binance ${data}`));
+                    else resolve(parsed); // Returns array of tickers
+                } catch (e) { reject(e); }
+            });
+        }).on('error', reject);
+    });
+}
+
+/**
  * Fetches current price directly via public HTTPS (Unauthenticated)
  */
 function rawFuturesPublicTickers(isTestnet = true, symbol = null) {
@@ -384,9 +405,11 @@ class BinanceService {
 
             const entryPrice = parseFloat(order.avgPrice || order.price || order.average || 0) || currentPrice;
             
+            const standardSymbol = apiSymbol.replace('USDT', '/USDT');
+
             const newTrade = await ExecutedTrade.create({
                 userId, 
-                symbol: pair, 
+                symbol: standardSymbol, 
                 side: signal.direction, 
                 type: marketType, 
                 amount: amountValue, 

@@ -73,7 +73,7 @@ function AppLayout() {
             </div>
           </div>
 
-          <nav className="flex-1 space-y-4">
+          <nav className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
             <SidebarLink to="/" icon={<LayoutDashboard size={22} />} label={t('Dashboard')} />
             <SidebarLink to="/news" icon={<Newspaper size={22} />} label={t('News')} />
             <SidebarLink to="/flow" icon={<Receipt size={22} />} label={t('MoneyFlow')} />

@@ -69,65 +69,41 @@ async function getTechnicalSignal(ccxtSymbol, isTestnet = true) {
 }
 
 // ─── Dynamic Scan List ───────────────────────────────────────────────────────
+// ─── Dynamic Scan List ───────────────────────────────────────────────────────
 async function getDynamicScanList(limit = TOP_COINS_TO_SCAN, isTestnet = true) {
-    const whitelist = [
-        'BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT',
-        'ADA/USDT:USDT', 'AVAX/USDT:USDT', 'DOGE/USDT:USDT', 'DOT/USDT:USDT', 'LINK/USDT:USDT',
-        'POL/USDT:USDT', 'LTC/USDT:USDT', 'SHIB/USDT:USDT', 'NEAR/USDT:USDT', 'OP/USDT:USDT',
-        'ARB/USDT:USDT', 'SUI/USDT:USDT', 'TIA/USDT:USDT', 'INJ/USDT:USDT', 'APT/USDT:USDT',
-        'ORDI/USDT:USDT', 'PEPE/USDT:USDT', 'WIF/USDT:USDT', 'BONK/USDT:USDT', 'SEI/USDT:USDT',
-        'FET/USDT:USDT'
-    ];
-
     try {
-        // Use direct HTTPS raw price fetch
-        const priceMap = await binanceService.rawFuturesPublicTickers(isTestnet);
-        
-        const pairs = whitelist
-            .map(w => {
-                const apiSym = w.split('/')[0] + 'USDT';
-                const currentPrice = priceMap[apiSym];
-                if (!currentPrice) return null;
-                return {
-                    ccxtSymbol:    w,
-                    displaySymbol: w.replace(':USDT', ''),
-                    engineSymbol:  w.split('/')[0] + '-USD',
-                    change24h:     '0.00', // price/ticker doesn't have change, but we prioritized price for executeTrade
-                    volume:        100_000_000, // Placeholder volume for whitelisted assets
-                    currentPrice:  currentPrice
-                };
-            })
-            .filter(p => p !== null)
+        // Use 24hr ticker data to get volume
+        const tickers = await binanceService.rawFutures24hrTickers(isTestnet);
+        if (!Array.isArray(tickers)) throw new Error('INVALID_TICKERS_RESPONSE');
+
+        // Filter for USDT pairs only and sort by quoteVolume (USDT volume)
+        const topPairs = tickers
+            .filter(t => t.symbol.endsWith('USDT'))
+            .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
             .slice(0, limit);
 
-        console.log(`[BotScanner] ${pairs.length} whitelisted futures pairs selected for analysis (isTestnet=${isTestnet}).`);
+        const pairs = topPairs.map(t => ({
+            ccxtSymbol:    t.symbol.replace('USDT', '/USDT:USDT'),
+            displaySymbol: t.symbol.replace('USDT', '/USDT'),
+            engineSymbol:  t.symbol.replace('USDT', '/USDT'),
+            change24h:     t.priceChangePercent,
+            volume:        parseFloat(t.quoteVolume),
+            currentPrice:  parseFloat(t.lastPrice)
+        }));
+
+        console.log(`[BotScanner] ${pairs.length} top-volume futures pairs selected (isTestnet=${isTestnet}).`);
         return pairs;
     } catch (err) {
-        console.warn('[BotScanner] Whitelist fetchTickers warning:', err.message);
-        // Minimum fallback
-        // Whitelist Fallback (Top 20 most liquid USDS-M Perpetual/Testnet pairs)
-        return [
-            { ccxtSymbol: 'BTC/USDT:USDT', displaySymbol: 'BTC/USDT', engineSymbol: 'BTC-USD' },
-            { ccxtSymbol: 'ETH/USDT:USDT', displaySymbol: 'ETH/USDT', engineSymbol: 'ETH-USD' },
-            { ccxtSymbol: 'SOL/USDT:USDT', displaySymbol: 'SOL/USDT', engineSymbol: 'SOL-USD' },
-            { ccxtSymbol: 'BNB/USDT:USDT', displaySymbol: 'BNB/USDT', engineSymbol: 'BNB-USD' },
-            { ccxtSymbol: 'XRP/USDT:USDT', displaySymbol: 'XRP/USDT', engineSymbol: 'XRP-USD' },
-            { ccxtSymbol: 'DOGE/USDT:USDT', displaySymbol: 'DOGE/USDT', engineSymbol: 'DOGE-USD' },
-            { ccxtSymbol: 'ADA/USDT:USDT', displaySymbol: 'ADA/USDT', engineSymbol: 'ADA-USD' },
-            { ccxtSymbol: 'AVAX/USDT:USDT', displaySymbol: 'AVAX/USDT', engineSymbol: 'AVAX-USD' },
-            { ccxtSymbol: 'DOT/USDT:USDT', displaySymbol: 'DOT/USDT', engineSymbol: 'DOT-USD' },
-            { ccxtSymbol: 'LINK/USDT:USDT', displaySymbol: 'LINK/USDT', engineSymbol: 'LINK-USD' },
-            { ccxtSymbol: 'POL/USDT:USDT', displaySymbol: 'POL/USDT', engineSymbol: 'POL-USD' },
-            { ccxtSymbol: 'LTC/USDT:USDT', displaySymbol: 'LTC/USDT', engineSymbol: 'LTC-USD' },
-            { ccxtSymbol: 'SHIB/USDT:USDT', displaySymbol: 'SHIB/USDT', engineSymbol: 'SHIB-USD' },
-            { ccxtSymbol: 'NEAR/USDT:USDT', displaySymbol: 'NEAR/USDT', engineSymbol: 'NEAR-USD' },
-            { ccxtSymbol: 'TRX/USDT:USDT', displaySymbol: 'TRX/USDT', engineSymbol: 'TRX-USD' },
-            { ccxtSymbol: 'PEPE/USDT:USDT', displaySymbol: 'PEPE/USDT', engineSymbol: 'PEPE-USD' },
-            { ccxtSymbol: 'WIF/USDT:USDT', displaySymbol: 'WIF/USDT', engineSymbol: 'WIF-USD' },
-            { ccxtSymbol: 'SUI/USDT:USDT', displaySymbol: 'SUI/USDT', engineSymbol: 'SUI-USD' },
-            { ccxtSymbol: 'APT/USDT:USDT', displaySymbol: 'APT/USDT', engineSymbol: 'APT-USD' },
-            { ccxtSymbol: 'FET/USDT:USDT', displaySymbol: 'FET/USDT', engineSymbol: 'FET-USD' }
-        ];
+        console.warn('[BotScanner] Dynamic fetch error, falling back to whitelist:', err.message);
+        const whitelist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'LINKUSDT'];
+        return whitelist.map(sym => ({
+            ccxtSymbol:    sym.replace('USDT', '/USDT:USDT'),
+            displaySymbol: sym.replace('USDT', '/USDT'),
+            engineSymbol:  sym.replace('USDT', '/USDT'),
+            change24h:     '0.00',
+            volume:        100000000,
+            currentPrice:  0
+        }));
     }
 }
 

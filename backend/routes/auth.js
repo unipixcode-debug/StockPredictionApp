@@ -22,6 +22,9 @@ router.get('/google/callback',
 // Check Auth Status
 router.get('/current_user', (req, res) => {
   if (req.user) {
+    if (req.user.credits !== undefined) {
+      req.user.credits = Number(req.user.credits);
+    }
     console.log(`--- DEBUG: current_user (API) for ${req.user.email} | Credits: ${req.user.credits} | Role: ${req.user.role}`);
   }
   res.send(req.user);
@@ -52,9 +55,9 @@ router.post('/add-credits', async (req, res) => {
     await user.save();
     
     // Update session user
-    req.user.credits = user.credits;
+    req.user.credits = Number(user.credits);
     
-    res.json({ success: true, newCredits: user.credits });
+    res.json({ success: true, newCredits: Number(user.credits) });
   } catch (error) {
     console.error('Add credits error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -114,7 +117,7 @@ router.post('/toggle-subscription', async (req, res) => {
         req.user[featureKey] = user[featureKey];
 
         res.json({ success: true, user: { 
-            credits: user.credits, 
+            credits: Number(user.credits), 
             newsletterSubscribed: user.newsletterSubscribed,
             moneyFlowSubscribed: user.moneyFlowSubscribed,
             autoPredictionSubscribed: user.autoPredictionSubscribed
@@ -152,7 +155,7 @@ router.put('/profile', async (req, res) => {
       email: user.email,
       phone: user.phone,
       bio: user.bio,
-      credits: user.credits,
+      credits: Number(user.credits),
       role: user.role
     }});
   } catch (error) {
