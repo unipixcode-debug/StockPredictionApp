@@ -1,23 +1,33 @@
-const { BinanceBotConfig, BotLog, User } = require('../models');
+const { BinanceBotConfig, BotLog, ExecutedTrade } = require('../models');
+const predictionEngine = require('./predictionEngine');
+const binanceService = require('./binanceService');
+
+// Coin pairs to scan (in prediction engine format)
+const SCAN_PAIRS = [
+    { symbol: 'BTC-USD', market: 'CRYPTO' },
+    { symbol: 'ETH-USD', market: 'CRYPTO' },
+    { symbol: 'SOL-USD', market: 'CRYPTO' },
+    { symbol: 'AVAX-USD', market: 'CRYPTO' },
+    { symbol: 'LINK-USD', market: 'CRYPTO' },
+    { symbol: 'XRP-USD', market: 'CRYPTO' },
+    { symbol: 'BNB-USD', market: 'CRYPTO' },
+    { symbol: 'DOGE-USD', market: 'CRYPTO' },
+];
+
+// Minimum score threshold to act on a signal
+const MIN_SCORE_THRESHOLD = 68;
+// Minimum score from second confirmation to proceed
+const MIN_CONFIRM_THRESHOLD = 65;
 
 class BotScannerService {
     constructor() {
-        this.interval = 10000; // Fast global loop (10s) to check custom user intervals
-        this.coinPairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT', 'LINK/USDT', 'XRP/USDT'];
-        this.messages = [
-            "AI sinyal eşiği henüz karşılanmadı. Bekleniyor...",
-            "Piyasa hacmi analiz ediliyor. İşlem koşulları stabil.",
-            "Teknik indikatörlerde belirgin bir kırılım yok. Takip ediliyor.",
-            "Güçlü AL/SAT sinyali tespit edilmedi. Pozisyon korunuyor.",
-            "Risk algoritmaları devrede. Herhangi bir anomali yok."
-        ];
+        this.globalInterval = 10000; // Check user intervals every 10s
+        this.activeScanners = new Set(); // Prevent overlapping scans per user
     }
 
-    // Logging helper
     async log(userId, message, type = 'info') {
         try {
             await BotLog.create({ userId, message, type });
-            // Clean up old logs per user to avoid bloated DB (> 50 logs per user)
             const count = await BotLog.count({ where: { userId } });
             if (count > 50) {
                 const oldestLogs = await BotLog.findAll({
@@ -25,9 +35,7 @@ class BotScannerService {
                     order: [['createdAt', 'ASC']],
                     limit: count - 50
                 });
-                for (const log of oldestLogs) {
-                    await log.destroy();
-                }
+                for (const log of oldestLogs) await log.destroy();
             }
         } catch (error) {
             console.error('BotLog Create Error:', error);
@@ -35,24 +43,20 @@ class BotScannerService {
     }
 
     startBackgroundTasks() {
-        console.log('🤖 Bot Scanner background tasks started (10s sync)...');
-        
-        setInterval(() => {
-            this.scanMarkets();
-        }, this.interval);
+        console.log('🤖 Bot Scanner (AI-Powered) started (10s sync loop)...');
+        setInterval(() => this.checkUserIntervals(), this.globalInterval);
     }
 
-    async scanMarkets() {
+    async checkUserIntervals() {
         try {
             const now = new Date();
-            // Find configs where at least one bot is active
-            const activeConfigs = await BinanceBotConfig.findAll({ 
-                where: { 
+            const activeConfigs = await BinanceBotConfig.findAll({
+                where: {
                     [require('sequelize').Op.or]: [
                         { isSpotActive: true },
                         { isFuturesActive: true }
                     ]
-                } 
+                }
             });
 
             if (activeConfigs.length === 0) return;
@@ -62,22 +66,122 @@ class BotScannerService {
                 const lastScan = config.lastScanAt ? new Date(config.lastScanAt).getTime() : 0;
 
                 if (now.getTime() - lastScan >= intervalMs) {
-                    // Update lastScanAt immediately so we don't double-trigger if logic takes time
                     await config.update({ lastScanAt: now });
 
-                    const randomCoin = this.coinPairs[Math.floor(Math.random() * this.coinPairs.length)];
-                    const randomMsg = this.messages[Math.floor(Math.random() * this.messages.length)];
-                    
-                    let activeType = '';
-                    if (config.isSpotActive && config.isFuturesActive) activeType = 'Spot+Futures';
-                    else if (config.isSpotActive) activeType = 'Spot';
-                    else activeType = 'Futures';
+                    // Prevent overlapping scans for same user
+                    if (this.activeScanners.has(config.userId)) {
+                        console.log(`[Bot] Scan already in progress for user ${config.userId}, skipping.`);
+                        continue;
+                    }
 
-                    await this.log(config.userId, `[Tarama - ${activeType}] ${randomCoin} incelendi. ${randomMsg}`, 'info');
+                    this.activeScanners.add(config.userId);
+                    this.runScanForUser(config).finally(() => {
+                        this.activeScanners.delete(config.userId);
+                    });
                 }
             }
         } catch (error) {
-            console.error('Error in bot scanner service:', error);
+            console.error('[BotScanner] Interval check error:', error);
+        }
+    }
+
+    async runScanForUser(config) {
+        const userId = config.userId;
+        const activeType = config.isSpotActive && config.isFuturesActive ? 'Spot+Futures'
+            : config.isSpotActive ? 'Spot' : 'Futures';
+
+        await this.log(userId, `🔍 [${activeType}] Piyasa taraması başladı. ${SCAN_PAIRS.length} coin analiz ediliyor...`, 'info');
+
+        let signalsFound = 0;
+
+        for (const pair of SCAN_PAIRS) {
+            try {
+                // --- Step 1: First-pass AI Analysis ---
+                const firstAnalysis = await predictionEngine.generatePrediction(pair.symbol, pair.market, userId);
+
+                if (!firstAnalysis || firstAnalysis.direction === 'HOLD') {
+                    continue; // No signal, move on
+                }
+
+                const firstScore = firstAnalysis.score || 50;
+                const firstDirection = firstAnalysis.direction; // 'BUY' or 'SELL'
+
+                // Only continue if score meets threshold
+                if (firstScore < MIN_SCORE_THRESHOLD) {
+                    await this.log(userId, `⏳ ${pair.symbol}: ${firstDirection} sinyali (%${firstScore}) - Eşik altında, bekleniyor.`, 'info');
+                    continue;
+                }
+
+                await this.log(userId, `📊 ${pair.symbol}: Güçlü ${firstDirection} sinyali (%${firstScore}). İkinci analiz başlatılıyor...`, 'info');
+
+                // --- Step 2: Second-pass Confirmation Analysis ---
+                const confirmAnalysis = await predictionEngine.generatePrediction(pair.symbol, pair.market, userId);
+
+                if (!confirmAnalysis) continue;
+
+                const confirmScore = confirmAnalysis.score || 50;
+                const confirmDirection = confirmAnalysis.direction;
+
+                // Both analyses must agree on direction
+                if (firstDirection !== confirmDirection) {
+                    await this.log(userId, `⚠️ ${pair.symbol}: Analizler çelişiyor (${firstDirection} vs ${confirmDirection}). Giriş yapılmadı.`, 'warning');
+                    continue;
+                }
+
+                // Average score from both passes
+                const avgScore = Math.round((firstScore + confirmScore) / 2);
+
+                if (avgScore < MIN_CONFIRM_THRESHOLD) {
+                    await this.log(userId, `⏳ ${pair.symbol}: Onay skoru yetersiz (%${avgScore}). Giriş yapılmadı.`, 'info');
+                    continue;
+                }
+
+                // --- Step 3: Determine market type and check if allowed ---
+                // SELL signals → only valid for FUTURES (SHORT)
+                // BUY signals → valid for SPOT or FUTURES (LONG)
+                const isBuy = firstDirection === 'BUY';
+                const isSell = firstDirection === 'SELL';
+
+                let targetMarket = null;
+                if (isBuy && config.isSpotActive) targetMarket = 'SPOT';
+                if (isBuy && config.isFuturesActive) targetMarket = 'FUTURES'; // Futures takes priority for LONG too
+                if (isSell && config.isFuturesActive) targetMarket = 'FUTURES'; // SHORT only on Futures
+
+                if (!targetMarket) {
+                    await this.log(userId, `🚫 ${pair.symbol}: ${firstDirection} sinyali için uygun piyasa aktif değil (${isSell ? 'SHORT sadece Futures' : 'Spot veya Futures gerekli'}).`, 'warning');
+                    continue;
+                }
+
+                // --- Step 4: Check max positions ---
+                const openPositions = await ExecutedTrade.count({ where: { userId, status: 'OPEN' } });
+                if (openPositions >= config.maxPositions) {
+                    await this.log(userId, `🚫 Maksimum açık pozisyon sayısına ulaşıldı (${openPositions}/${config.maxPositions}). ${pair.symbol} atlandı.`, 'warning');
+                    continue;
+                }
+
+                // --- Step 5: Execute Trade ---
+                await this.log(userId, `🚀 ${pair.symbol}: ${firstDirection === 'BUY' ? 'LONG' : 'SHORT'} işlemi açılıyor (Güven: %${avgScore}, Piyasa: ${targetMarket})...`, 'info');
+
+                await binanceService.executeTrade(userId, {
+                    symbol: pair.symbol,
+                    direction: firstDirection, // 'BUY' or 'SELL'
+                    market: pair.market,
+                    type: targetMarket // 'SPOT' or 'FUTURES'
+                });
+
+                await this.log(userId, `✅ ${pair.symbol}: ${firstDirection === 'BUY' ? 'LONG' : 'SHORT'} pozisyonu başarıyla açıldı! Hedef: $${firstAnalysis.targetPrice?.toFixed(2)}, Stop: $${firstAnalysis.stopLoss?.toFixed(2)}`, 'success');
+                signalsFound++;
+
+            } catch (pairError) {
+                console.error(`[BotScanner] Error scanning ${pair.symbol} for user ${userId}:`, pairError.message);
+                await this.log(userId, `❌ ${pair.symbol} taranırken hata: ${pairError.message}`, 'error');
+            }
+        }
+
+        if (signalsFound === 0) {
+            await this.log(userId, `📋 [${activeType}] Tarama tamamlandı. Giriş kriteri karşılayan sinyal bulunamadı.`, 'info');
+        } else {
+            await this.log(userId, `📋 [${activeType}] Tarama tamamlandı. ${signalsFound} yeni pozisyon açıldı.`, 'success');
         }
     }
 }

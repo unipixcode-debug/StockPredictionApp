@@ -165,14 +165,16 @@ class BinanceService {
 
             // Calculate coin amount
             const amount = tradeAmountUSDT / currentPrice;
-            const side = signal.direction.toLowerCase(); // 'buy' or 'sell'
+            // BUY = LONG on Spot or Futures, SELL = SHORT on Futures
+            const side = signal.direction === 'BUY' ? 'buy' : 'sell';
             
+            // Max positions applies to both LONG and SHORT
             let activeOpenPositions = await ExecutedTrade.count({
                 where: { userId, status: 'OPEN' }
             });
 
-            if (side === 'buy' && activeOpenPositions >= config.maxPositions) {
-                 throw new Error('MAX_POSITIONS_REACHED');
+            if (activeOpenPositions >= config.maxPositions) {
+                throw new Error('MAX_POSITIONS_REACHED');
             }
 
             // Create record
@@ -186,7 +188,13 @@ class BinanceService {
             });
 
             try {
-                const order = await exchange.createMarketOrder(pair, side, amount);
+                // For Futures, pass positionSide to support both hedge and one-way mode
+                const orderParams = {};
+                if (marketType === 'FUTURES') {
+                    orderParams.positionSide = side === 'buy' ? 'LONG' : 'SHORT';
+                }
+
+                const order = await exchange.createMarketOrder(pair, side, amount, orderParams);
                 
                 tradeRecord.exchangeOrderId = order.id;
                 tradeRecord.entryPrice = order.average || order.price || currentPrice;
