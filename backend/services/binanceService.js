@@ -468,10 +468,11 @@ class BinanceService {
             if (!currentPrice) {
                 try {
                     if (marketType === 'FUTURES') {
+                        // Correctly extract the base symbol (e.g. BTC from BTC/USDT:USDT)
                         const baseAsset = signal.symbol.split('/')[0].split('-')[0].split(':')[0].toUpperCase();
-                        const sym       = baseAsset + 'USDT';
-                        const prices    = await rawFuturesPublicTickers(isTestnet, sym);
-                        currentPrice    = prices[sym] || 0;
+                        const apiSymbol = baseAsset + 'USDT';
+                        const prices    = await rawFuturesPublicTickers(isTestnet, apiSymbol);
+                        currentPrice    = prices[apiSymbol] || 0;
                     } else {
                         const baseAsset = signal.symbol.split('/')[0].split('-')[0].split(':')[0].toUpperCase();
                         const spotPair  = baseAsset + '/USDT';
@@ -492,7 +493,7 @@ class BinanceService {
             // On Binance Futures Testnet, BTCUSDT often requires > 100 USDT notional.
             // Using 105 as safety margin.
             if (marketType === 'FUTURES' && isTestnet) {
-                const apiSymbol = signal.symbol.includes('-') ? signal.symbol.split('-')[0] + 'USDT' : signal.symbol.replace('/', '') + 'USDT';
+                const apiSymbol = signal.symbol.split('/')[0].split('-')[0].split(':')[0].toUpperCase() + 'USDT';
                 if (apiSymbol.toUpperCase() === 'BTCUSDT' && notional < 105) {
                     throw new Error(`NOTIONAL_TOO_LOW: BTCUSDT requires min 100 USDT notional. Current: ${notional.toFixed(2)} (Leverage:${leverage}x)`);
                 }
@@ -532,11 +533,24 @@ class BinanceService {
                         isTestnet
                     );
                 } else {
-                    order = await exchange.createMarketOrder(pair, side, amount);
+                    order = await exchange.createMarketOrder(pair, side, quantity);
                 }
 
-                tradeRecord.exchangeOrderId = order.orderId || order.id;
-                tradeRecord.entryPrice = parseFloat(order.avgPrice || order.price || order.average || currentPrice || 0);
+                // Capture Execution Price
+                // Favor verified currentPrice if order response is empty or zero
+                const orderPrice = parseFloat(order.avgPrice || order.price || order.average || 0);
+                const entryPrice = orderPrice > 0 ? orderPrice : currentPrice;
+
+                const tradeRecord = await ExecutedTrade.create({
+                    userId,
+                    symbol:    pair,
+                    side:      signal.direction,
+                    type:      marketType,
+                    amount:    quantity,
+                    entryPrice: entryPrice,
+                    status:    'OPEN',
+                    exchangeOrderId: order.orderId || order.id
+                });
 
                 // ── Step 5: SL & TP calculation ───────────────────────────────────────
                 if (marketType === 'FUTURES') {
@@ -563,9 +577,7 @@ class BinanceService {
                 return tradeRecord;
 
             } catch (exchangeError) {
-                tradeRecord.status = 'FAILED';
-                tradeRecord.errorMessage = exchangeError.message;
-                await tradeRecord.save();
+                console.error(`[Binance] Order Execution failed for user ${userId}:`, exchangeError.message);
                 throw exchangeError;
             }
 
