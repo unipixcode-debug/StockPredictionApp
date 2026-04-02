@@ -110,24 +110,29 @@ router.get('/trades', authCheck, async (req, res) => {
         const openTrades = trades.filter(t => t.status === 'OPEN' && t.entryPrice);
         if (openTrades.length > 0) {
             try {
-                const publicExchange = new (require('ccxt')).binance({ enableRateLimit: true });
-                // Fetch unique symbols (batch approach)
+                const ccxt = require('ccxt');
+                const spotEx = new ccxt.binance({ enableRateLimit: true });
+                const futEx  = new ccxt.binanceusdm({ enableRateLimit: true });
+                
                 const uniqueSymbols = [...new Set(openTrades.map(t => t.symbol))];
                 const priceMap = {};
+
                 for (const sym of uniqueSymbols) {
                     try {
-                        const ticker = await publicExchange.fetchTicker(sym);
+                        const isFut = sym.includes(':USDT');
+                        const ticker = await (isFut ? futEx : spotEx).fetchTicker(sym);
                         priceMap[sym] = ticker.last;
-                    } catch { /* symbol not fetchable, skip */ }
+                    } catch { /* skip */ }
                 }
-                // Attach unrealizedPnl to each open trade
+
                 for (const trade of openTrades) {
                     const currentPrice = priceMap[trade.symbol];
                     if (currentPrice && trade.entryPrice) {
                         const isLong = trade.side === 'BUY';
                         const priceDiff = currentPrice - parseFloat(trade.entryPrice);
-                        trade.dataValues.unrealizedPnl = (isLong ? priceDiff : -priceDiff) * parseFloat(trade.amount || 0);
-                        trade.dataValues.currentPrice  = currentPrice;
+                        const amount = parseFloat(trade.amount || 0);
+                        trade.dataValues.unrealizedPnl = (isLong ? priceDiff : -priceDiff) * amount;
+                        trade.dataValues.currentPrice = currentPrice;
                     }
                 }
             } catch (priceErr) {
