@@ -468,11 +468,13 @@ class BinanceService {
             if (!currentPrice) {
                 try {
                     if (marketType === 'FUTURES') {
-                        const sym    = (signal.symbol.includes('-') ? signal.symbol.split('-')[0] + 'USDT' : signal.symbol.replace('/', '') + 'USDT').toUpperCase();
-                        const prices = await rawFuturesPublicTickers(isTestnet, sym);
-                        currentPrice = prices[sym] || 0;
+                        const baseAsset = signal.symbol.split('/')[0].split('-')[0].split(':')[0].toUpperCase();
+                        const sym       = baseAsset + 'USDT';
+                        const prices    = await rawFuturesPublicTickers(isTestnet, sym);
+                        currentPrice    = prices[sym] || 0;
                     } else {
-                        const spotPair = (signal.symbol.includes('/') ? signal.symbol : signal.symbol.replace('-USD', '/USDT')).toUpperCase();
+                        const baseAsset = signal.symbol.split('/')[0].split('-')[0].split(':')[0].toUpperCase();
+                        const spotPair  = baseAsset + '/USDT';
                         const t = await exchange.fetchTicker(spotPair);
                         currentPrice = t.last;
                     }
