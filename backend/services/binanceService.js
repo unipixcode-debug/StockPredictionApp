@@ -59,6 +59,7 @@ function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true, timeOffset
 function rawFuturesBalance(apiKey, apiSecret, isTestnet = true, timeOffset = 0) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        console.log(`[Binance] Raw Balance check for ${hostname} (Key prefix: ${apiKey?.substring(0, 4)})`);
         const timestamp = Date.now() + timeOffset;
         const query = querystring.stringify({ timestamp, recvWindow: 10000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
@@ -199,12 +200,13 @@ function getCachedDemoSymbols() {
                     _demoSymbolCacheTime = Date.now();
                     console.log(`[Binance] demo-fapi cache: ${symbols.size} available symbols.`);
                     resolve(symbols);
-                    } catch (err) {
-                    // Fallback to a standard list if the endpoint fails
+                } catch (err) {
+                    // Comprehensive Whitelist Fallback (Top 20 most liquid USDS-M Perpetual/Testnet pairs)
                     resolve(new Set([
                         'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
-                        'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'LINKUSDT',
-                        'POLUSDT', 'LTCUSDT', 'SHIBUSDT', 'NEARUSDT', 'TRXUSDT'
+                        'DOGEUSDT', 'ADAUSDT', 'AVAXUSDT', 'DOTUSDT', 'LINKUSDT',
+                        'POLUSDT', 'LTCUSDT', 'SHIBUSDT', 'NEARUSDT', 'TRXUSDT',
+                        'PEPEUSDT', 'WIFUSDT', 'SUIUSDT', 'APTUSDT', 'FETUSDT'
                     ]));
                 }
             });
