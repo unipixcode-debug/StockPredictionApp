@@ -523,7 +523,7 @@ class BinanceService {
             const dbOpenTrades = await ExecutedTrade.findAll({ where: { userId, status: 'OPEN', type: 'FUTURES' } });
 
             const results = { closed: 0, updated: 0, added: 0 };
-
+            // 3. Update existing OPEN trades and ensure TP/SL is sent
             for (const dbTrade of dbOpenTrades) {
                 const apiSymbol = dbTrade.symbol.replace('/', '').replace(':USDT', '');
                 const stillOpen = activeReal.find(p => p.symbol === apiSymbol && Math.abs(parseFloat(p.positionAmt)) > 0);
@@ -535,6 +535,11 @@ class BinanceService {
                     await dbTrade.save();
                     results.closed++;
                 } else {
+                    // Always try to push TP/SL if missing on exchange
+                    try {
+                        await this.setExchangeTPSL(userId, dbTrade.id);
+                    } catch (e) { /* sync-tpsl log if needed */ }
+
                     if (dbTrade.leverage !== parseInt(stillOpen.leverage)) {
                         dbTrade.leverage = parseInt(stillOpen.leverage);
                         await dbTrade.save();

@@ -136,9 +136,16 @@ router.get('/trades', authCheck, async (req, res) => {
         }
 
         const allTrades = trades.map(t => ({ ...t.dataValues }));
-        const totalPnl  = allTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
-        const winCount  = allTrades.filter(t => t.pnl > 0).length;
-        const lossCount = allTrades.filter(t => t.pnl < 0).length;
+        
+        // Sum closed P&L and unrealized P&L for a total overview
+        const totalPnl = allTrades.reduce((sum, t) => {
+            const realized = t.pnl || 0;
+            const unrealized = t.unrealizedPnl || 0;
+            return sum + realized + unrealized;
+        }, 0);
+
+        const winCount = allTrades.filter(t => (t.pnl || t.unrealizedPnl) > 0).length;
+        const lossCount = allTrades.filter(t => (t.pnl || t.unrealizedPnl) < 0).length;
         
         res.json({ isBotActive, trades: allTrades, stats: { totalPnl, winCount, lossCount } });
     } catch (error) {
