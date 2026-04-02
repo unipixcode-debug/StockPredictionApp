@@ -462,7 +462,6 @@ class BinanceService {
                 }
                 const rawQty = parseFloat(amountValue.toFixed(qtyPrecision));
                 order = await rawFuturesOrder(apiKey, apiSecret, { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty }, isTestnet);
-                newTrade.stopLossPricePrecision = pricePrecision; // Storing for SL/TP
             } else {
                 order = await exchange.createMarketOrder(pair, side, amountValue);
             }
