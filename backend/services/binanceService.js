@@ -565,10 +565,16 @@ class BinanceService {
                     closedMatch.closedAt = null;
                     await closedMatch.save();
                     results.updated++;
+                    
+                    // Push TP/SL if missing on exchange
+                    try {
+                        await this.setExchangeTPSL(userId, closedMatch.id);
+                    } catch (e) { console.warn('[Sync-TPSL] Re-open error:', e.message); }
                 } else {
+                    // Create new DETECTED
                     const slPrice = isBuy ? entryPrice * 0.97 : entryPrice * 1.03;
                     const tpPrice = isBuy ? entryPrice * 1.06 : entryPrice * 0.94;
-                    await ExecutedTrade.create({
+                    const newDet = await ExecutedTrade.create({
                         userId,
                         symbol: standardSymbol,
                         side: isBuy ? 'BUY' : 'SELL',
@@ -582,6 +588,11 @@ class BinanceService {
                         targetPrice: tpPrice
                     });
                     results.added++;
+                    
+                    // Push TP/SL newly detected
+                    try {
+                        await this.setExchangeTPSL(userId, newDet.id);
+                    } catch (e) { console.warn('[Sync-TPSL] Detected error:', e.message); }
                 }
             }
             return { success: true, ...results };
