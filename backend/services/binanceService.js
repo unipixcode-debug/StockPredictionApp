@@ -8,13 +8,14 @@ const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
  * Direct HTTPS POST to Binance Futures API (bypasses CCXT URL routing bugs for Demo Trading).
  * Works for both testnet (demo-fapi) and mainnet (fapi).
  */
-function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
+function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true, timeOffset = 0) {
     return new Promise((resolve, reject) => {
         const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
         const path     = '/fapi/v1/order';
 
-        const timestamp = Date.now();
-        const body      = querystring.stringify({ ...params, timestamp });
+        // Synchronize with server time using CCXT's calculated offset
+        const timestamp = Date.now() + timeOffset;
+        const body      = querystring.stringify({ ...params, timestamp, recvWindow: 10000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
         const fullBody  = body + '&signature=' + signature;
 
@@ -317,6 +318,7 @@ class BinanceService {
                     // Use raw HTTPS directly — CCXT URL overrides don't propagate reliably to POST.
                     // Raw HTTPS works and avoids the fork between demo and mainnet routing.
                     const apiSymbol = pair.split('/')[0] + 'USDT'; // BTC/USDT:USDT → BTCUSDT
+                    const timeOffset = exchange.options['timeDifference'] || 0;
 
                     // Ensure quantity precision is within Binance limits (3dp for most futures)
                     const markets = Object.keys(exchange.markets || {}).length > 0 ? exchange.markets : {};
@@ -324,12 +326,13 @@ class BinanceService {
                     const precision = market?.precision?.amount ?? 3;
                     const rawQty = parseFloat(amount.toFixed(precision));
 
-                    console.log(`[Binance] Raw HTTPS order → ${apiSymbol} ${side.toUpperCase()} qty:${rawQty} testnet:${!!config.isTestnet}`);
+                    console.log(`[Binance] Raw HTTPS order → ${apiSymbol} ${side.toUpperCase()} qty:${rawQty} testnet:${!!config.isTestnet} (offset:${timeOffset})`);
 
                     order = await rawFuturesOrder(
                         apiKey.trim(), apiSecret.trim(),
                         { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty },
-                        !!config.isTestnet
+                        !!config.isTestnet,
+                        timeOffset
                     );
                 } else {
                     order = await exchange.createMarketOrder(pair, side, amount);
@@ -347,6 +350,7 @@ class BinanceService {
                             ? ep * (1 - signal.stopLossPct)
                             : ep * (1 + signal.stopLossPct);
                         const apiSymbol = pair.split('/')[0] + 'USDT';
+                        const timeOffset = exchange.options['timeDifference'] || 0;
 
                         await rawFuturesOrder(
                             apiKey.trim(), apiSecret.trim(),
@@ -357,7 +361,8 @@ class BinanceService {
                                 stopPrice:    slPrice.toFixed(4),
                                 closePosition: 'true',
                             },
-                            !!config.isTestnet
+                            !!config.isTestnet,
+                            timeOffset
                         );
                         console.log(`[Binance] Stop-loss placed at ${slPrice.toFixed(4)} for ${apiSymbol}`);
                     } catch (slErr) {

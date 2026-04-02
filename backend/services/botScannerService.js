@@ -72,35 +72,47 @@ async function getTechnicalSignal(ccxtSymbol, exchange) {
 
 // ─── Dynamic Scan List ───────────────────────────────────────────────────────
 async function getDynamicScanList(exchange, limit = TOP_COINS_TO_SCAN) {
+    const whitelist = [
+        'BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT', 'XRP/USDT:USDT',
+        'ADA/USDT:USDT', 'AVAX/USDT:USDT', 'DOGE/USDT:USDT', 'DOT/USDT:USDT', 'LINK/USDT:USDT',
+        'MATIC/USDT:USDT', 'LTC/USDT:USDT', 'SHIB/USDT:USDT', 'NEAR/USDT:USDT', 'OP/USDT:USDT',
+        'ARB/USDT:USDT', 'SUI/USDT:USDT', 'TIA/USDT:USDT', 'INJ/USDT:USDT', 'APT/USDT:USDT',
+        'ORDI/USDT:USDT', 'PEPE/USDT:USDT', 'WIF/USDT:USDT', 'BONK/USDT:USDT', 'SEI/USDT:USDT',
+        'FET/USDT:USDT', 'RNDR/USDT:USDT', 'AGIX/USDT:USDT', 'GALA/USDT:USDT', 'IMX/USDT:USDT',
+        'LDO/USDT:USDT', 'AAVE/USDT:USDT', 'CRV/USDT:USDT', 'MKR/USDT:USDT', 'COMP/USDT:USDT',
+        'STX/USDT:USDT', 'FIL/USDT:USDT', 'TRX/USDT:USDT', 'BCH/USDT:USDT', 'ETC/USDT:USDT',
+        'XLM/USDT:USDT', 'UNI/USDT:USDT', 'NEAR/USDT:USDT', 'ICP/USDT:USDT', 'ALGO/USDT:USDT',
+        'FLOW/USDT:USDT', 'CHZ/USDT:USDT', 'ALGO/USDT:USDT', 'HBAR/USDT:USDT', 'MANA/USDT:USDT',
+        'SAND/USDT:USDT', 'AXS/USDT:USDT', 'JUP/USDT:USDT', 'PYTH/USDT:USDT', 'ONDO/USDT:USDT'
+    ];
+
     try {
-        const tickers = await exchange.fetchTickers();
-        // Futures CCXT format: 'BTC/USDT:USDT' (USDT-margined perpetual)
-        // NOT 'BTC/USDT' — that's spot format
+        // We still fetch tickers but only filter by our whitelist to get current price/volume
+        const tickers = await exchange.fetchTickers(whitelist);
+        
         const pairs = Object.values(tickers)
-            .filter(t =>
-                t.symbol.endsWith(':USDT') &&           // USDT-margined perpetuals only
-                (t.quoteVolume || 0) > MIN_VOLUME_USDT &&
-                t.percentage != null
-            )
-            .sort((a, b) => Math.abs(b.percentage) - Math.abs(a.percentage))
+            .filter(t => (t.quoteVolume || 0) > 1_000_000) // Minimum 1M daily volume even for whitelist
+            .sort((a, b) => Math.abs(b.percentage || 0) - Math.abs(a.percentage || 0))
             .slice(0, limit)
             .map(t => ({
                 ccxtSymbol:   t.symbol,                                    // 'BTC/USDT:USDT'
                 displaySymbol: t.symbol.replace(':USDT', ''),              // 'BTC/USDT'
                 engineSymbol: t.symbol.split('/')[0] + '-USD',            // 'BTC-USD'
-                change24h:    t.percentage?.toFixed(2),
+                change24h:    t.percentage?.toFixed(2) || '0',
                 volume:       t.quoteVolume,
                 currentPrice: t.last
             }));
 
-        console.log(`[BotScanner] ${pairs.length} futures pairs selected from ${Object.keys(tickers).length} total.`);
+        console.log(`[BotScanner] ${pairs.length} whitelisted futures pairs selected for analysis.`);
         return pairs;
     } catch (err) {
-        console.error('[BotScanner] fetchTickers error:', err.message);
+        console.warn('[BotScanner] Whitelist fetchTickers warning:', err.message);
+        // Minimum fallback
         return [
             { ccxtSymbol: 'BTC/USDT:USDT', displaySymbol: 'BTC/USDT', engineSymbol: 'BTC-USD' },
             { ccxtSymbol: 'ETH/USDT:USDT', displaySymbol: 'ETH/USDT', engineSymbol: 'ETH-USD' },
             { ccxtSymbol: 'SOL/USDT:USDT', displaySymbol: 'SOL/USDT', engineSymbol: 'SOL-USD' },
+            { ccxtSymbol: 'BNB/USDT:USDT', displaySymbol: 'BNB/USDT', engineSymbol: 'BNB-USD' },
         ];
     }
 }
