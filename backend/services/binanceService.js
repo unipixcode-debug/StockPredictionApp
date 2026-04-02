@@ -1,5 +1,56 @@
-const ccxt = require('ccxt');
+const ccxt        = require('ccxt');
+const crypto      = require('crypto');
+const https       = require('https');
+const querystring = require('querystring');
 const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
+
+/**
+ * Direct HTTPS POST to Binance Futures API (bypasses CCXT URL routing bugs for Demo Trading).
+ * Works for both testnet (demo-fapi) and mainnet (fapi).
+ */
+function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const path     = '/fapi/v1/order';
+
+        const timestamp = Date.now();
+        const body      = querystring.stringify({ ...params, timestamp });
+        const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
+        const fullBody  = body + '&signature=' + signature;
+
+        const options = {
+            hostname,
+            port: 443,
+            path,
+            method: 'POST',
+            headers: {
+                'X-MBX-APIKEY': apiKey,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(fullBody),
+            },
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.code && parsed.code < 0) {
+                        reject(new Error(`binance ${JSON.stringify(parsed)}`));
+                    } else {
+                        resolve(parsed);
+                    }
+                } catch {
+                    reject(new Error('Invalid JSON: ' + data));
+                }
+            });
+        });
+        req.on('error', reject);
+        req.write(fullBody);
+        req.end();
+    });
+}
 
 class BinanceService {
     /**
@@ -131,6 +182,10 @@ class BinanceService {
         try {
             const { exchange, config } = await this.getExchangeInstance(userId, marketType);
 
+            // Extract keys for raw HTTPS order (rawFuturesOrder bypasses CCXT URL routing)
+            const apiKey    = (marketType === 'FUTURES' ? config.futuresApiKey    : config.apiKey)?.trim();
+            const apiSecret = (marketType === 'FUTURES' ? config.futuresApiSecret : config.apiSecret)?.trim();
+
             // Sync time before any signed request (critical for Demo Trading)
             if (marketType === 'FUTURES') await exchange.loadTimeDifference();
 
@@ -213,45 +268,51 @@ class BinanceService {
                 let order;
 
                 if (marketType === 'FUTURES') {
-                    // Use raw fapiPrivatePostOrder to avoid CCXT symbol processing issues.
-                    // Demo Trading runs in ONE_WAY mode — do NOT send positionSide.
-                    // Raw Binance API expects symbol as 'BTCUSDT', not 'BTC/USDT:USDT'
+                    // Use raw HTTPS directly — CCXT URL overrides don't propagate reliably to POST.
+                    // Raw HTTPS works and avoids the fork between demo and mainnet routing.
                     const apiSymbol = pair.split('/')[0] + 'USDT'; // BTC/USDT:USDT → BTCUSDT
-                    const precision = 3; // safe default; most futures allow 3 decimal places
+
+                    // Ensure quantity precision is within Binance limits (3dp for most futures)
+                    const markets = Object.keys(exchange.markets || {}).length > 0 ? exchange.markets : {};
+                    const market  = markets[pair];
+                    const precision = market?.precision?.amount ?? 3;
                     const rawQty = parseFloat(amount.toFixed(precision));
 
-                    console.log(`[Binance] Raw order → symbol:${apiSymbol} side:${side.toUpperCase()} qty:${rawQty}`);
+                    console.log(`[Binance] Raw HTTPS order → ${apiSymbol} ${side.toUpperCase()} qty:${rawQty} testnet:${!!config.isTestnet}`);
 
-                    order = await exchange.fapiPrivatePostOrder({
-                        symbol: apiSymbol,
-                        side: side.toUpperCase(),
-                        type: 'MARKET',
-                        quantity: rawQty,
-                    });
+                    order = await rawFuturesOrder(
+                        apiKey.trim(), apiSecret.trim(),
+                        { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty },
+                        !!config.isTestnet
+                    );
                 } else {
                     order = await exchange.createMarketOrder(pair, side, amount);
                 }
 
-                tradeRecord.exchangeOrderId = order.id || order.orderId;
+                tradeRecord.exchangeOrderId = order.orderId || order.id;
                 tradeRecord.entryPrice = order.avgPrice || order.price || order.average || currentPrice;
                 await tradeRecord.save();
 
-                // ── Stop-Loss order after entry (Futures only, also using raw API) ──
+                // ── Stop-Loss order after entry ───────────────────────────────────────────
                 if (signal.stopLossPct && marketType === 'FUTURES') {
                     try {
-                        const ep = parseFloat(tradeRecord.entryPrice) || currentPrice;
-                        const slPrice = side === 'buy'
+                        const ep       = parseFloat(tradeRecord.entryPrice) || currentPrice;
+                        const slPrice  = side === 'buy'
                             ? ep * (1 - signal.stopLossPct)
                             : ep * (1 + signal.stopLossPct);
                         const apiSymbol = pair.split('/')[0] + 'USDT';
 
-                        await exchange.fapiPrivatePostOrder({
-                            symbol: apiSymbol,
-                            side: side === 'buy' ? 'SELL' : 'BUY',
-                            type: 'STOP_MARKET',
-                            stopPrice: slPrice.toFixed(4),
-                            closePosition: 'true',
-                        });
+                        await rawFuturesOrder(
+                            apiKey.trim(), apiSecret.trim(),
+                            {
+                                symbol:       apiSymbol,
+                                side:         side === 'buy' ? 'SELL' : 'BUY',
+                                type:         'STOP_MARKET',
+                                stopPrice:    slPrice.toFixed(4),
+                                closePosition: 'true',
+                            },
+                            !!config.isTestnet
+                        );
                         console.log(`[Binance] Stop-loss placed at ${slPrice.toFixed(4)} for ${apiSymbol}`);
                     } catch (slErr) {
                         console.warn(`[Binance] Stop-loss order failed for ${pair}:`, slErr.message);
