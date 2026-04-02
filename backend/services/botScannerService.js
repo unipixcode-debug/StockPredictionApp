@@ -98,12 +98,15 @@ async function getDynamicScanList(exchange, limit = TOP_COINS_TO_SCAN) {
     }
 }
 
-// ─── Service Class ───────────────────────────────────────────────────────────
 class BotScannerService {
     constructor() {
-        this.globalInterval  = 10000; // Check intervals every 10s
-        this.activeScanners  = new Set();
-        this._publicExchange = new ccxt.binance({ enableRateLimit: true });
+        this.globalInterval = 10000;
+        this.activeScanners = new Set();
+        // Use futures-type exchange for scanning so only valid perpetual futures pairs are returned
+        this._futuresExchange = new ccxt.binance({
+            enableRateLimit: true,
+            options: { defaultType: 'future' }
+        });
     }
 
     async log(userId, message, type = 'info') {
@@ -156,7 +159,7 @@ class BotScannerService {
             return;
         }
 
-        const scanList = await getDynamicScanList(this._publicExchange);
+        const scanList = await getDynamicScanList(this._futuresExchange);
         await this.log(userId, `🔍 [${activeType}] Piyasa taraması başladı. En aktif ${scanList.length} coin RSI+AI ile analiz ediliyor...`, 'info');
 
         let signalsFound = 0;
@@ -172,7 +175,7 @@ class BotScannerService {
 
             try {
                 // ── Step 2: Fast RSI-based technical signal (no AI call needed here) ──
-                const techSignal = await getTechnicalSignal(pair.ccxtSymbol, this._publicExchange);
+                const techSignal = await getTechnicalSignal(pair.ccxtSymbol, this._futuresExchange);
                 testedCount++;
 
                 if (techSignal.direction === 'HOLD') continue;
@@ -183,7 +186,7 @@ class BotScannerService {
                 // ── Step 3: Confirmation — second RSI pass (a few seconds later) ──
                 // Small delay to get a slightly different snapshot
                 await new Promise(r => setTimeout(r, 2000));
-                const confirmSignal = await getTechnicalSignal(pair.ccxtSymbol, this._publicExchange);
+                const confirmSignal = await getTechnicalSignal(pair.ccxtSymbol, this._futuresExchange);
 
                 if (confirmSignal.direction !== techSignal.direction) {
                     await this.log(userId, `⚠️ ${pair.ccxtSymbol}: Sinyal çelişiyor (${techSignal.direction} vs ${confirmSignal.direction}). Atlandı.`, 'warning');

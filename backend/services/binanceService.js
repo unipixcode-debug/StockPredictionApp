@@ -128,7 +128,10 @@ class BinanceService {
 
         try {
             const { exchange, config } = await this.getExchangeInstance(userId, marketType);
-            
+
+            // Sync time before any signed request (critical for Demo Trading)
+            if (marketType === 'FUTURES') await exchange.loadTimeDifference();
+
             // Check specific activation
             if (marketType === 'SPOT' && !config.isSpotActive) return null;
             if (marketType === 'FUTURES' && !config.isFuturesActive) return null;
@@ -138,8 +141,18 @@ class BinanceService {
             const currentPrice = ticker.last;
 
             // Decide budget
-            const balance = await exchange.fetchBalance();
-            const freeUSDT = balance['USDT']?.free || 0;
+            let freeUSDT = 0;
+            if (marketType === 'FUTURES') {
+                // Use V2 balance endpoint (same as testConnection) for consistency
+                try {
+                    const balArray = await exchange.fapiPrivateV2GetBalance();
+                    const usdt = balArray.find(b => b.asset === 'USDT');
+                    freeUSDT = parseFloat(usdt?.withdrawAvailable || usdt?.balance || 0);
+                } catch { freeUSDT = 0; }
+            } else {
+                const balance = await exchange.fetchBalance();
+                freeUSDT = balance['USDT']?.free || 0;
+            }
 
             let tradeAmountUSDT = 0;
             if (config.budgetMode === 'PERCENTAGE') {
