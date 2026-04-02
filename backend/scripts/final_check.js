@@ -1,4 +1,4 @@
-const { ExecutedTrade, BinanceBotConfig, sequelize } = require('./models');
+const { ExecutedTrade, BinanceBotConfig, sequelize } = require('../models');
 
 async function run() {
     try {
