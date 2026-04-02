@@ -224,12 +224,14 @@ class BinanceService {
      */
     async getExchangeInstance(userId, marketType = 'SPOT') {
         // If userId is null, it's a public request (e.g. from scanner)
-        // We use a public-only instance to avoid CCXT's broken auth routing for Testnet.
+        // We use a strictly unauthenticated instance to avoid CCXT's broken auth routing.
         if (!userId) {
             const publicEx = new ccxt.binance({
+                apiKey: null,
+                secret: null,
                 options: { defaultType: marketType === 'FUTURES' ? 'future' : 'spot' }
             });
-            // Force Demo URL for public futures data if in dev/test context
+            // Force Demo URL for public futures data in dev/test contexts
             if (marketType === 'FUTURES') {
                 publicEx.urls['api'] = { ...publicEx.urls['api'], 'fapiPublic': 'https://demo-fapi.binance.com/fapi/v1' };
                 publicEx.setSandboxMode(true);

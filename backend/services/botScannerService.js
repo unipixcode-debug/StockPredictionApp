@@ -108,7 +108,7 @@ async function getDynamicScanList(exchange, limit = TOP_COINS_TO_SCAN) {
     } catch (err) {
         console.warn('[BotScanner] Whitelist fetchTickers warning:', err.message);
         // Minimum fallback
-        // Whitelist Fallback (Major coins valid for both Testnet & Mainnet)
+        // Whitelist Fallback (Top 20 most liquid USDS-M Perpetual/Testnet pairs)
         return [
             { ccxtSymbol: 'BTC/USDT:USDT', displaySymbol: 'BTC/USDT', engineSymbol: 'BTC-USD' },
             { ccxtSymbol: 'ETH/USDT:USDT', displaySymbol: 'ETH/USDT', engineSymbol: 'ETH-USD' },
@@ -124,7 +124,12 @@ async function getDynamicScanList(exchange, limit = TOP_COINS_TO_SCAN) {
             { ccxtSymbol: 'LTC/USDT:USDT', displaySymbol: 'LTC/USDT', engineSymbol: 'LTC-USD' },
             { ccxtSymbol: 'SHIB/USDT:USDT', displaySymbol: 'SHIB/USDT', engineSymbol: 'SHIB-USD' },
             { ccxtSymbol: 'NEAR/USDT:USDT', displaySymbol: 'NEAR/USDT', engineSymbol: 'NEAR-USD' },
-            { ccxtSymbol: 'TRX/USDT:USDT', displaySymbol: 'TRX/USDT', engineSymbol: 'TRX-USD' }
+            { ccxtSymbol: 'TRX/USDT:USDT', displaySymbol: 'TRX/USDT', engineSymbol: 'TRX-USD' },
+            { ccxtSymbol: 'PEPE/USDT:USDT', displaySymbol: 'PEPE/USDT', engineSymbol: 'PEPE-USD' },
+            { ccxtSymbol: 'WIF/USDT:USDT', displaySymbol: 'WIF/USDT', engineSymbol: 'WIF-USD' },
+            { ccxtSymbol: 'SUI/USDT:USDT', displaySymbol: 'SUI/USDT', engineSymbol: 'SUI-USD' },
+            { ccxtSymbol: 'APT/USDT:USDT', displaySymbol: 'APT/USDT', engineSymbol: 'APT-USD' },
+            { ccxtSymbol: 'FET/USDT:USDT', displaySymbol: 'FET/USDT', engineSymbol: 'FET-USD' }
         ];
     }
 }
@@ -133,11 +138,19 @@ class BotScannerService {
     constructor() {
         this.globalInterval = 10000;
         this.activeScanners = new Set();
-        // Use futures-type exchange for scanning so only valid perpetual futures pairs are returned
+        // Use unauthenticated futures-type exchange for scanning to avoid CCXT's 
+        // broken URL routing/authentication logic for Futures Testnet.
         this._futuresExchange = new ccxt.binance({
+            apiKey: null,
+            secret: null,
             enableRateLimit: true,
             options: { defaultType: 'future' }
         });
+        // Standard sandbox mode for Spot scanner
+        this._spotExchange = new ccxt.binance({
+            options: { defaultType: 'spot' }
+        });
+        this._spotExchange.setSandboxMode(true);
     }
 
     async log(userId, message, type = 'info') {
