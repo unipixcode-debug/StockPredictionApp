@@ -134,6 +134,13 @@ class BinanceService {
             // Sync time before any signed request (critical for Demo Trading)
             if (marketType === 'FUTURES') await exchange.loadTimeDifference();
 
+            // Load markets and validate pair exists in this exchange environment
+            // (Demo Trading only supports a subset of all futures pairs)
+            await exchange.loadMarkets();
+            if (!exchange.markets[pair]) {
+                throw new Error(`SYMBOL_NOT_AVAILABLE: ${pair} is not listed in this exchange environment.`);
+            }
+
             // Check specific activation
             if (marketType === 'SPOT' && !config.isSpotActive) return null;
             if (marketType === 'FUTURES' && !config.isFuturesActive) return null;

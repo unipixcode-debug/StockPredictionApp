@@ -7,7 +7,7 @@ const TOP_COINS_TO_SCAN  = 50;   // Top N volatile coins from Binance
 const RSI_PERIOD         = 14;
 const RSI_OVERSOLD       = 35;   // BUY below this
 const RSI_OVERBOUGHT     = 65;   // SELL above this
-const MIN_VOLUME_USDT    = 500_000; // 500k USDT daily volume filter
+const MIN_VOLUME_USDT    = 10_000_000; // 10M USDT/day — filters out coins not on Demo Trading
 const STOP_LOSS_PCT      = 0.025;   // 2.5% stop-loss below/above entry
 
 // ─── RSI Helper ──────────────────────────────────────────────────────────────
