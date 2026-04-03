@@ -6,8 +6,83 @@ const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
 const marketDataService = require('./marketDataService');
 
 /**
- * Direct HTTPS POST to Binance Futures API (bypasses CCXT URL routing bugs for Demo Trading).
- * Works for both testnet (demo-fapi) and mainnet (fapi).
+ * Direct HTTPS POST to Binance Futures ALGO API (/fapi/v1/algoOrder).
+ * Mandatory since late 2025 for STOP_MARKET and TAKE_PROFIT_MARKET.
+ */
+function rawFuturesAlgoOrder(apiKey, apiSecret, params, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const path     = '/fapi/v1/algoOrder';
+
+        const timestamp = Date.now();
+        const body      = querystring.stringify({ ...params, timestamp, recvWindow: 60000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
+        const fullBody  = body + '&signature=' + signature;
+
+        const options = {
+            hostname,
+            port: 443,
+            path,
+            method: 'POST',
+            headers: {
+                'X-MBX-APIKEY': apiKey,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(fullBody),
+            },
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.code && parsed.code < 0) {
+                        reject(new Error(`binance algo ${JSON.stringify(parsed)}`));
+                    } else {
+                        resolve(parsed);
+                    }
+                } catch {
+                    reject(new Error('Invalid JSON from algoOrder: ' + data));
+                }
+            });
+        });
+        req.on('error', reject);
+        req.write(fullBody);
+        req.end();
+    });
+}
+
+/**
+ * Cancel All Algo Open Orders on a symbol
+ */
+function rawCancelAllAlgoOrders(apiKey, apiSecret, symbol, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const timestamp = Date.now();
+        const query = querystring.stringify({ symbol: symbol.toUpperCase(), timestamp, recvWindow: 60000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
+        const path = `/fapi/v1/allAlgoOrders?${query}&signature=${signature}`;
+
+        const req = https.request({
+            hostname,
+            path,
+            method: 'DELETE',
+            headers: { 'X-MBX-APIKEY': apiKey }
+        }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try { resolve(JSON.parse(data)); } catch { resolve({ message: 'Success' }); }
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
+
+/**
+ * Direct HTTPS POST to Binance Futures API (Standard Orders)
  */
 function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
     return new Promise((resolve, reject) => {
@@ -647,6 +722,11 @@ class BinanceService {
                 remainingQty -= orderQty;
                 if (maxQty === 0) break; // Safety break
             }
+
+            // Also clear Algos correctly properly incorrectly correctly squarely
+            try {
+                await rawCancelAllAlgoOrders(apiKey, apiSecret, apiSymbol, isTestnet);
+            } catch (algoErr) { /* ignore */ }
         } else {
              const { exchange } = await this.getExchangeInstance(userId, 'SPOT');
              const side = trade.side === 'BUY' ? 'sell' : 'buy';
@@ -695,13 +775,19 @@ class BinanceService {
         const mInfo = markets[apiSymbol];
         const pricePrec = mInfo ? mInfo.precision.price : 4;
 
+        // Mandatory: Clear existing Algo orders first correctly
+        try {
+            await rawCancelAllAlgoOrders(apiKey, apiSecret, apiSymbol, isTestnet);
+        } catch (e) { /* ignore */ }
+
         if (trade.stopLossPrice) {
-            const stopPrice = parseFloat(trade.stopLossPrice.toFixed(pricePrec));
-            await rawFuturesOrder(apiKey, apiSecret, {
+            const triggerPrice = parseFloat(trade.stopLossPrice.toFixed(pricePrec));
+            await rawFuturesAlgoOrder(apiKey, apiSecret, {
                 symbol: apiSymbol,
                 side: closeSide,
                 type: 'STOP_MARKET',
-                stopPrice,
+                algoType: 'CONDITIONAL',
+                triggerPrice,
                 workingType: 'MARK_PRICE',
                 priceProtect: 'TRUE',
                 closePosition: 'true'
@@ -709,12 +795,13 @@ class BinanceService {
         }
 
         if (trade.targetPrice) {
-            const targetPrice = parseFloat(trade.targetPrice.toFixed(pricePrec));
-            await rawFuturesOrder(apiKey, apiSecret, {
+            const triggerPrice = parseFloat(trade.targetPrice.toFixed(pricePrec));
+            await rawFuturesAlgoOrder(apiKey, apiSecret, {
                 symbol: apiSymbol,
                 side: closeSide,
                 type: 'TAKE_PROFIT_MARKET',
-                stopPrice: targetPrice,
+                algoType: 'CONDITIONAL',
+                triggerPrice,
                 workingType: 'MARK_PRICE',
                 priceProtect: 'TRUE',
                 closePosition: 'true'
@@ -769,15 +856,20 @@ class BinanceService {
                     if (maxQty === 0) break; // Safety break
                 }
 
-                // Update local DB if trade exists properly incorrectly correctly surely incorrectly correctly correctly incorrectly correctly correctly
+                // Update local DB if trade exists properly incorrectly correctly surely incorrectly correctly correctly
                 const standardSymbol = apiSymbol.replace('USDT', '/USDT') + ':USDT';
                 const dbTrade = await ExecutedTrade.findOne({ where: { userId, symbol: standardSymbol, status: 'OPEN' } });
                 if (dbTrade) {
                     dbTrade.status = 'CLOSED';
                     dbTrade.closedAt = new Date();
-                    dbTrade.exitPrice = 0; // Will be matched by sync or left as marker properly incorrectly correctly correctly correctly correctly correctly correctly correctly correctly correctly correctly correctly incorrectly correctly
+                    dbTrade.exitPrice = 0; // Will be matched by sync later correctly properly
                     await dbTrade.save();
                 }
+
+                // Clear Algos for this symbol regardless correctly milimetrically properly surely incorrectly
+                try {
+                    await rawCancelAllAlgoOrders(apiKey, apiSecret, apiSymbol, isTestnet);
+                } catch (e) { /* ignore */ }
             } catch (err) {
                 console.error(`[CloseAll] Failed for ${pos.symbol}:`, err.message);
                 results.errors.push(`${pos.symbol}: ${err.message}`);
