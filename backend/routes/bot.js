@@ -20,6 +20,15 @@ router.get('/config', authCheck, async (req, res) => {
 });
 
 // Update Bot Config
+router.get('/account-summary', authCheck, async (req, res) => {
+    try {
+        const summary = await binanceService.getFuturesAccountSummary(req.user.id);
+        res.json(summary);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 router.post('/config', authCheck, async (req, res) => {
     try {
         const { 

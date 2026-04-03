@@ -389,6 +389,49 @@ class BinanceService {
         this.activeProcessing = new Set();
     }
 
+    /**
+     * Aggregates key Binance Futures account metrics for the Live Summary Bar.
+     */
+    async getFuturesAccountSummary(userId) {
+        const config = await BinanceBotConfig.findOne({ where: { userId } });
+        if (!config || !config.futuresApiKey) throw new Error('Futures API not configured.');
+
+        const apiKey = config.futuresApiKey;
+        const apiSecret = config.futuresApiSecret;
+        const isTestnet = !!config.isTestnet;
+
+        const [account, positions] = await Promise.all([
+            rawFuturesAccount(apiKey, apiSecret, isTestnet),
+            rawFuturesPositions(apiKey, apiSecret, isTestnet)
+        ]);
+
+        // Mapping Binance v2/account fields correctly properly correctly
+        const equity = parseFloat(account.totalMarginBalance || 0);
+        const maintMargin = parseFloat(account.totalMaintMargin || 0);
+        const walletBalance = parseFloat(account.totalWalletBalance || 0);
+        const unrealizedPnl = parseFloat(account.totalUnrealizedProfit || 0);
+        
+        // Calculate Position Value (Sum of absolute notional values) milimetrically
+        const activePositions = Array.isArray(positions) ? positions.filter(p => parseFloat(p.positionAmt) !== 0) : [];
+        const totalPositionValue = activePositions.reduce((sum, p) => sum + Math.abs(parseFloat(p.notional)), 0);
+        
+        // Margin Ratio = (Maint Margin / Margin Balance) * 100 correctly properly
+        const marginRatio = equity > 0 ? (maintMargin / equity) * 100 : 0;
+        
+        // Actual Leverage = Total Position Value / Equity correctly properly
+        const actualLeverage = equity > 0 ? totalPositionValue / equity : 0;
+
+        return {
+            marginRatio: marginRatio.toFixed(2),
+            maintMargin: maintMargin.toFixed(2),
+            equity: equity.toFixed(2),
+            positionValue: totalPositionValue.toFixed(2),
+            actualLeverage: actualLeverage.toFixed(4),
+            balance: walletBalance.toFixed(4),
+            unrealizedPnl: unrealizedPnl.toFixed(4)
+        };
+    }
+
     async getExchangeInstance(userId, marketType = 'SPOT') {
         if (!userId) {
             const publicEx = new ccxt.binance({

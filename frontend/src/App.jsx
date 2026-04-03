@@ -22,6 +22,7 @@ import Profile from './Profile';
 import AIScanner from './AIScanner';
 import AIProviderManagement from './AIProviderManagement';
 import BotDashboard from './BotDashboard';
+import AccountSummaryBar from './components/AccountSummaryBar';
 import { AuthProvider, useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 
@@ -120,8 +121,9 @@ function AppLayout() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 lg:ml-72 ml-20 overflow-y-auto relative min-h-screen">
-          <div className="p-4 md:p-10 max-w-[1600px] mx-auto min-h-screen">
+        <main className="flex-1 lg:ml-72 ml-20 overflow-y-auto relative min-h-screen flex flex-col">
+          <AccountSummaryBar />
+          <div className="p-4 md:p-10 max-w-[1600px] mx-auto flex-1 w-full">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />

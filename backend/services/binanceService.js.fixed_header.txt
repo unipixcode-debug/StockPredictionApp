@@ -1,0 +1,131 @@
+const ccxt        = require('ccxt');
+const crypto      = require('crypto');
+const https       = require('https');
+const querystring = require('querystring');
+const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
+const marketDataService = require('./marketDataService');
+
+/**
+ * Direct HTTPS POST to Binance Futures ALGO API (/fapi/v1/algoOrder).
+ * Mandatory since late 2025 for STOP_MARKET and TAKE_PROFIT_MARKET.
+ */
+function rawFuturesAlgoOrder(apiKey, apiSecret, params, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const path     = '/fapi/v1/algoOrder';
+
+        const timestamp = Date.now();
+        const body      = querystring.stringify({ ...params, timestamp, recvWindow: 60000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
+        const fullBody  = body + '&signature=' + signature;
+
+        const options = {
+            hostname,
+            port: 443,
+            path,
+            method: 'POST',
+            headers: {
+                'X-MBX-APIKEY': apiKey,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(fullBody),
+            },
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.code && parsed.code < 0) {
+                        reject(new Error(`binance algo ${JSON.stringify(parsed)}`));
+                    } else {
+                        resolve(parsed);
+                    }
+                } catch {
+                    reject(new Error('Invalid JSON from algoOrder: ' + data));
+                }
+            });
+        });
+        req.on('error', reject);
+        req.write(fullBody);
+        req.end();
+    });
+}
+
+/**
+ * Cancel All Algo Open Orders handled separately correctly
+ */
+function rawCancelAllAlgoOrders(apiKey, apiSecret, symbol, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const timestamp = Date.now();
+        const query = querystring.stringify({ symbol: symbol.toUpperCase(), timestamp, recvWindow: 60000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
+        const path = `/fapi/v1/allAlgoOrders?${query}&signature=${signature}`;
+
+        const req = https.request({
+            hostname,
+            path,
+            method: 'DELETE',
+            headers: { 'X-MBX-APIKEY': apiKey }
+        }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try { resolve(JSON.parse(data)); } catch { resolve({ message: 'Success (assuming)' }); }
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
+
+/**
+ * Direct HTTPS POST to Binance Futures API (bypasses CCXT URL routing bugs for Demo Trading).
+ * Works for both testnet (demo-fapi) and mainnet (fapi).
+ */
+function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const path     = '/fapi/v1/order';
+
+        if (params.symbol) params.symbol = params.symbol.toUpperCase();
+        const timestamp = Date.now();
+        const body      = querystring.stringify({ ...params, timestamp, recvWindow: 60000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(body).digest('hex');
+        const fullBody  = body + '&signature=' + signature;
+
+        const options = {
+            hostname,
+            port: 443,
+            path,
+            method: 'POST',
+            headers: {
+                'X-MBX-APIKEY': apiKey,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(fullBody),
+            },
+        };
+
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.code && parsed.code < 0) {
+                        reject(new Error(`binance ${JSON.stringify(parsed)}`));
+                    } else {
+                        resolve(parsed);
+                    }
+                } catch {
+                    reject(new Error('Invalid JSON: ' + data));
+                }
+            });
+        });
+        req.on('error', reject);
+        req.write(fullBody);
+        req.end();
+    });
+}
