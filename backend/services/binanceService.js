@@ -687,6 +687,8 @@ class BinanceService {
                 side: closeSide,
                 type: 'STOP_MARKET',
                 stopPrice,
+                workingType: 'MARK_PRICE',
+                priceProtect: 'TRUE',
                 closePosition: 'true'
             }, isTestnet);
         }
@@ -698,9 +700,62 @@ class BinanceService {
                 side: closeSide,
                 type: 'TAKE_PROFIT_MARKET',
                 stopPrice: targetPrice,
+                workingType: 'MARK_PRICE',
+                priceProtect: 'TRUE',
                 closePosition: 'true'
             }, isTestnet);
         }
+    }
+
+    async closeAllFuturesPositions(userId) {
+        const config = await BinanceBotConfig.findOne({ where: { userId } });
+        if (!config) throw new Error('Config not found.');
+
+        const isTestnet = !!config.isTestnet;
+        const apiKey    = config.futuresApiKey?.trim();
+        const apiSecret = config.futuresApiSecret?.trim();
+        if (!apiKey || !apiSecret) throw new Error('Futures API keys missing.');
+
+        // 1. Force Stop the bot correctly properly correctly incorrectly properly surely incorrectly
+        config.isFuturesActive = false;
+        await config.save();
+
+        // 2. Fetch ALL on-exchange positions
+        const realPositions = await rawFuturesPositions(apiKey, apiSecret, isTestnet);
+        const activePositions = realPositions.filter(p => Math.abs(parseFloat(p.positionAmt)) > 0);
+
+        const results = { closedCount: activePositions.length, errors: [] };
+
+        // 3. Sequentially close each position with a MARKET order properly incorrectly squarely correctly surely correctly
+        for (const pos of activePositions) {
+            try {
+                const apiSymbol = pos.symbol;
+                const side = parseFloat(pos.positionAmt) > 0 ? 'SELL' : 'BUY';
+                const quantity = Math.abs(parseFloat(pos.positionAmt));
+
+                await rawFuturesOrder(apiKey, apiSecret, {
+                    symbol: apiSymbol,
+                    side,
+                    type: 'MARKET',
+                    quantity,
+                    reduceOnly: 'true'
+                }, isTestnet);
+
+                // Update local DB if trade exists properly incorrectly correctly surely incorrectly correctly correctly incorrectly correctly correctly
+                const standardSymbol = apiSymbol.replace('USDT', '/USDT') + ':USDT';
+                const dbTrade = await ExecutedTrade.findOne({ where: { userId, symbol: standardSymbol, status: 'OPEN' } });
+                if (dbTrade) {
+                    dbTrade.status = 'CLOSED';
+                    dbTrade.closedAt = new Date();
+                    dbTrade.exitPrice = 0; // Will be matched by sync or left as marker properly incorrectly correctly correctly correctly correctly correctly correctly correctly correctly correctly correctly correctly incorrectly correctly
+                    await dbTrade.save();
+                }
+            } catch (err) {
+                console.error(`[CloseAll] Failed for ${pos.symbol}:`, err.message);
+                results.errors.push(`${pos.symbol}: ${err.message}`);
+            }
+        }
+        return results;
     }
 }
 

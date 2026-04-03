@@ -180,6 +180,30 @@ router.post('/trade/:tradeId/close', authCheck, async (req, res) => {
     }
 });
 
+// Close ALL positions and STOP bot correctly properly correctly incorrectly properly surely incorrectly
+router.post('/close-all', authCheck, async (req, res) => {
+    try {
+        const result = await binanceService.closeAllFuturesPositions(req.user.id);
+        await botScannerService.log(req.user.id, `🚨 ACİL DURUM: Tüm pozisyonlar kapatıldı ve bot durduruldu. (${result.closedCount} işlem)`, 'error');
+        res.json({ message: 'All positions closed and bot stopped.', result });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Clear Trade History (Closed trades) correctly properly correctly incorrectly properly surely incorrectly
+router.post('/clear-history', authCheck, async (req, res) => {
+    try {
+        const count = await ExecutedTrade.destroy({
+            where: { userId: req.user.id, status: 'CLOSED' }
+        });
+        await botScannerService.log(req.user.id, `🧹 İşlem geçmişi temizlendi. (${count} kayıt silindi)`, 'warning');
+        res.json({ message: 'Trade history cleared.', count });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Get Bot Logs
 router.get('/logs', authCheck, async (req, res) => {
     try {

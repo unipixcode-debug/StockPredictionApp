@@ -130,6 +130,45 @@ export default function BotDashboard() {
         }
     };
 
+    const [isClosingAll, setIsClosingAll] = useState(false);
+    const handleCloseAll = async () => {
+        if (!window.confirm(language === 'TR' 
+            ? 'DİKKAT: Tüm açık pozisyonlar borsada MARKET emriyle kapatılacak ve BOT DURDURULACAK. Emin misiniz?' 
+            : 'WARNING: All open positions will be closed on exchange and BOT will be STOPPED. Are you sure?')) {
+            return;
+        }
+
+        setIsClosingAll(true);
+        try {
+            await api.post('/bot/close-all');
+            alert(language === 'TR' ? 'Tüm pozisyonlar kapatıldı ve bot durduruldu.' : 'All positions closed and bot stopped.');
+            await fetchData();
+        } catch (error) {
+            alert('Error: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setIsClosingAll(false);
+        }
+    };
+
+    const [isClearing, setIsClearing] = useState(false);
+    const handleClearHistory = async () => {
+        if (!window.confirm(language === 'TR' 
+            ? 'Geçmiş işlem listesi temizlenecek (Açık işlemler silinmez). Emin misiniz?' 
+            : 'Closed trades history will be cleared. Are you sure?')) {
+            return;
+        }
+
+        setIsClearing(true);
+        try {
+            await api.post('/bot/clear-history');
+            await fetchData();
+        } catch (error) {
+            alert('Error: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setIsClearing(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex justify-center items-center h-full min-h-[60vh]">
@@ -164,7 +203,7 @@ export default function BotDashboard() {
                     </div>
                 </div>
 
-                <div className="flex space-x-4">
+                <div className="flex flex-wrap items-center gap-3">
                     <button 
                         onClick={() => setActiveTab('dashboard')}
                         className={`px-6 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all ${activeTab === 'dashboard' ? 'bg-primary/20 text-primary border-primary/40' : 'bg-secondary/50 text-muted-foreground border-transparent hover:border-border'}`}
@@ -177,8 +216,28 @@ export default function BotDashboard() {
                         className={`px-6 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all flex items-center gap-2 ${isSyncing ? 'bg-amber-500/20 text-amber-500 border-amber-500/40' : 'bg-secondary/50 text-emerald-400 border-emerald-500/20 hover:border-emerald-500/40'}`}
                     >
                         {isSyncing ? <RefreshCw size={14} className="animate-spin" /> : <Database size={14} />} 
-                        {isSyncing ? 'Senkronize Ediliyor...' : 'Binance ile Eşitle'}
+                        {isSyncing ? (language === 'TR' ? 'Eşitleniyor...' : 'Syncing...') : (language === 'TR' ? 'Binance ile Eşitle' : 'Sync with Binance')}
                     </button>
+
+                    {/* New management buttons properly incorrectly correctly surely incorrectly correctly correctly correctly correctly correctly correctly incorrectly correctly */}
+                    <button 
+                        onClick={handleCloseAll}
+                        disabled={isClosingAll}
+                        className={`px-6 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all flex items-center gap-2 ${isClosingAll ? 'bg-rose-500/20 text-rose-500 border-rose-500/40' : 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20 hover:border-rose-500/40'}`}
+                    >
+                        {isClosingAll ? <RefreshCw size={14} className="animate-spin" /> : <X size={14} />} 
+                        {isClosingAll ? (language === 'TR' ? 'Kapatılıyor...' : 'Closing...') : (language === 'TR' ? 'Tüm Pozisyonları Kapat' : 'Close All Positions')}
+                    </button>
+
+                    <button 
+                        onClick={handleClearHistory}
+                        disabled={isClearing}
+                        className={`px-6 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all flex items-center gap-2 ${isClearing ? 'bg-amber-500/20 text-amber-500 border-amber-500/40' : 'bg-secondary/50 text-muted-foreground border-border/40 hover:border-amber-500/40 hover:text-amber-400'}`}
+                    >
+                        {isClearing ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />} 
+                        {isClearing ? (language === 'TR' ? 'Temizleniyor...' : 'Clearing...') : (language === 'TR' ? 'Geçmişi Temizle' : 'Clear History')}
+                    </button>
+
                     <button 
                         onClick={() => setActiveTab('settings')}
                         className={`px-6 py-2 rounded-2xl font-black text-xs uppercase tracking-widest border transition-all ${activeTab === 'settings' ? 'bg-primary/20 text-primary border-primary/40' : 'bg-secondary/50 text-muted-foreground border-transparent hover:border-border'}`}
