@@ -34,8 +34,8 @@ export default function BotDashboard() {
         }, 15000);
 
         const dataInterval = setInterval(() => {
-            fetchData();
-        }, 10000); // 10s interval for interactive updates
+            fetchData(true);
+        }, 10000); // 10s interval for silent interactive updates
 
         return () => {
             clearInterval(logInterval);
@@ -58,8 +58,8 @@ export default function BotDashboard() {
         }
     };
 
-    const fetchData = async () => {
-        setLoading(true);
+    const fetchData = async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const [configRes, tradeRes, logsRes, summaryRes] = await Promise.all([
                 api.get('/bot/config'),
