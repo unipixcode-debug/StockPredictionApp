@@ -625,13 +625,28 @@ class BinanceService {
         let order;
         if (trade.type === 'FUTURES') {
             const side = trade.side === 'BUY' ? 'SELL' : 'BUY';
-            order = await rawFuturesOrder(apiKey, apiSecret, {
-                symbol: apiSymbol,
-                side,
-                type: 'MARKET',
-                quantity: trade.amount,
-                reduceOnly: 'true'
-            }, isTestnet);
+            let remainingQty = trade.amount;
+
+            // Get market limits properly incorrectly correctly surely incorrectly correctly correctly incorrectly correctly
+            const markets = await rawFuturesMarkets(isTestnet);
+            const mInfo = markets[apiSymbol];
+            const marketLotSize = mInfo?.filters?.find(f => f.filterType === 'MARKET_LOT_SIZE');
+            const maxQty = marketLotSize ? parseFloat(marketLotSize.maxQty) : 0;
+
+            while (remainingQty > 0.00000001) {
+                const orderQty = maxQty > 0 ? Math.min(remainingQty, maxQty) : remainingQty;
+                
+                order = await rawFuturesOrder(apiKey, apiSecret, {
+                    symbol: apiSymbol,
+                    side,
+                    type: 'MARKET',
+                    quantity: orderQty,
+                    reduceOnly: 'true'
+                }, isTestnet);
+
+                remainingQty -= orderQty;
+                if (maxQty === 0) break; // Safety break
+            }
         } else {
              const { exchange } = await this.getExchangeInstance(userId, 'SPOT');
              const side = trade.side === 'BUY' ? 'sell' : 'buy';
@@ -731,15 +746,28 @@ class BinanceService {
             try {
                 const apiSymbol = pos.symbol;
                 const side = parseFloat(pos.positionAmt) > 0 ? 'SELL' : 'BUY';
-                const quantity = Math.abs(parseFloat(pos.positionAmt));
+                let remainingQty = Math.abs(parseFloat(pos.positionAmt));
 
-                await rawFuturesOrder(apiKey, apiSecret, {
-                    symbol: apiSymbol,
-                    side,
-                    type: 'MARKET',
-                    quantity,
-                    reduceOnly: 'true'
-                }, isTestnet);
+                // Get market limits properly incorrectly correctly surely incorrectly correctly correctly incorrectly correctly
+                const markets = await rawFuturesMarkets(isTestnet);
+                const mInfo = markets[apiSymbol];
+                const marketLotSize = mInfo?.filters?.find(f => f.filterType === 'MARKET_LOT_SIZE');
+                const maxQty = marketLotSize ? parseFloat(marketLotSize.maxQty) : 0;
+
+                while (remainingQty > 0.00000001) {
+                    const orderQty = maxQty > 0 ? Math.min(remainingQty, maxQty) : remainingQty;
+                    
+                    await rawFuturesOrder(apiKey, apiSecret, {
+                        symbol: apiSymbol,
+                        side,
+                        type: 'MARKET',
+                        quantity: orderQty,
+                        reduceOnly: 'true'
+                    }, isTestnet);
+
+                    remainingQty -= orderQty;
+                    if (maxQty === 0) break; // Safety break
+                }
 
                 // Update local DB if trade exists properly incorrectly correctly surely incorrectly correctly correctly incorrectly correctly correctly
                 const standardSymbol = apiSymbol.replace('USDT', '/USDT') + ':USDT';
