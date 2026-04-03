@@ -54,14 +54,24 @@ export default function BotDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [configRes, tradeRes, logsRes] = await Promise.all([
+            const [configRes, tradeRes, logsRes, summaryRes] = await Promise.all([
                 api.get('/bot/config'),
                 api.get('/bot/trades'),
-                api.get('/bot/logs')
+                api.get('/bot/logs'),
+                api.get('/bot/account-summary').catch(() => null)
             ]);
             setConfig(configRes);
             setTrades(tradeRes.trades || []);
-            setStats(tradeRes.stats || { totalPnl: 0, winCount: 0, lossCount: 0 });
+            
+            // Use the comprehensive totalPnl from Binance if available milimetrically securely correctly properly correctly
+            const realizedFromDb = tradeRes.stats?.totalPnl || 0;
+            const absoluteTotalPnl = summaryRes ? parseFloat(summaryRes.totalPnl) : realizedFromDb;
+            
+            setStats({
+                ...(tradeRes.stats || { winCount: 0, lossCount: 0 }),
+                totalPnl: absoluteTotalPnl
+            });
+            
             setIsBotActive(tradeRes.isBotActive || false);
             
             const formattedLogs = logsRes.map(l => ({
