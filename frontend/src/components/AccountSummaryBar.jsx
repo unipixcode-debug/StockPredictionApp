@@ -46,15 +46,15 @@ const AccountSummaryBar = () => {
 
   const metrics = [
     { label: 'Equity', value: `$${data?.equity || '0.00'}`, icon: <Zap size={14} />, color: 'text-primary' },
-    { label: 'Balance', value: `${data?.balance || '0.0000'} USDT`, icon: <Wallet size={14} />, color: 'text-foreground' },
+    { label: 'Total P&L', value: `${parseFloat(data?.totalPnl) > 0 ? '+' : ''}${data?.totalPnl || '0.0000'} USDT`, icon: <Activity size={14} />, color: parseFloat(data?.totalPnl) >= 0 ? 'text-green-500' : 'text-red-500 font-bold' },
     { label: 'Margin Ratio', value: `${data?.marginRatio || '0.00'}%`, icon: <Layers size={14} />, color: parseFloat(data?.marginRatio) > 80 ? 'text-red-500' : 'text-cyan-500' },
-    { label: 'Unrealized PNL', value: `${parseFloat(data?.unrealizedPnl) > 0 ? '+' : ''}${data?.unrealizedPnl || '0.0000'} USDT`, icon: parseFloat(data?.unrealizedPnl) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />, color: parseFloat(data?.unrealizedPnl) >= 0 ? 'text-green-500' : 'text-red-500' },
+    { label: 'Unrealized', value: `${parseFloat(data?.unrealizedPnl) > 0 ? '+' : ''}${data?.unrealizedPnl || '0.0000'} USDT`, icon: parseFloat(data?.unrealizedPnl) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />, color: parseFloat(data?.unrealizedPnl) >= 0 ? 'text-green-500/70' : 'text-red-500/70' },
     { label: 'Pos Value', value: `$${data?.positionValue || '0.00'}`, icon: <Activity size={14} />, color: 'text-muted-foreground' },
-    { label: 'Actual Leverage', value: `${data?.actualLeverage || '0.0000'} X`, icon: <Zap size={14} />, color: 'text-yellow-500' },
+    { label: 'Leverage', value: `${data?.actualLeverage || '0.0000'} X`, icon: <Zap size={14} />, color: 'text-yellow-500' },
   ];
 
   return (
-    <div className="w-full overflow-hidden bg-card/30 backdrop-blur-2xl border-b border-border/40 sticky top-0 z-[60] shadow-sm">
+    <div className="w-full overflow-hidden bg-card/30 backdrop-blur-2xl border-b border-border/40 sticky top-0 z-60 shadow-sm">
       <div className="flex items-center h-12 px-6 overflow-x-auto no-scrollbar scroll-smooth">
         <div className="flex items-center space-x-10 min-w-max mx-auto">
           {metrics.map((m, idx) => (

@@ -232,6 +232,37 @@ function rawFuturesAccount(apiKey, apiSecret, isTestnet = true) {
 }
 
 /**
+ * Direct HTTPS GET for Futures Leverage Brackets (to find max allowed leverage) correctly properly correctly milimetrically
+ */
+function rawFuturesBrackets(apiKey, apiSecret, symbol = '', isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const timestamp = Date.now();
+        const params = symbol ? { symbol: symbol.toUpperCase(), timestamp, recvWindow: 60000 } : { timestamp, recvWindow: 60000 };
+        const query = querystring.stringify(params);
+        const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
+        const path = `/fapi/v1/leverageBracket?${query}&signature=${signature}`;
+
+        https.get({
+            hostname,
+            path,
+            headers: { 'X-MBX-APIKEY': apiKey }
+        }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (Array.isArray(parsed)) resolve(parsed); // Returns list of symbols and brackets
+                    else if (parsed.brackets) resolve([parsed]); // Returns single symbol
+                    else reject(new Error(`binance brackets error: ${data}`));
+                } catch { reject(new Error('Invalid JSON from bracket API')); }
+            });
+        }).on('error', reject);
+    });
+}
+
+/**
  * Direct HTTPS GET for Futures Position Risk (Leverage, EntryPrice, Margin)
  */
 function rawFuturesPositions(apiKey, apiSecret, isTestnet = true) {
@@ -421,6 +452,18 @@ class BinanceService {
         // Actual Leverage = Total Position Value / Equity correctly properly
         const actualLeverage = equity > 0 ? totalPositionValue / equity : 0;
 
+        // Calculate Realized PnL from DB trades (Today's closed trades) correctly properly milimetrically
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const closedTrades = await ExecutedTrade.findAll({
+            where: {
+                userId,
+                status: 'CLOSED',
+                updatedAt: { [require('sequelize').Op.gte]: startOfDay }
+            }
+        });
+        const realizedPnl = closedTrades.reduce((sum, t) => sum + (parseFloat(t.pnl) || 0), 0);
+
         return {
             marginRatio: marginRatio.toFixed(2),
             maintMargin: maintMargin.toFixed(2),
@@ -428,7 +471,9 @@ class BinanceService {
             positionValue: totalPositionValue.toFixed(2),
             actualLeverage: actualLeverage.toFixed(4),
             balance: walletBalance.toFixed(4),
-            unrealizedPnl: unrealizedPnl.toFixed(4)
+            unrealizedPnl: unrealizedPnl.toFixed(4),
+            realizedPnl: realizedPnl.toFixed(4),
+            totalPnl: (realizedPnl + unrealizedPnl).toFixed(4)
         };
     }
 
@@ -575,10 +620,38 @@ class BinanceService {
                 const qtyPrecision = marketInfo ? marketInfo.precision.amount : 3;
                 const pricePrecision = marketInfo ? marketInfo.precision.price : 4;
 
-                if (leverage > 1) {
-                    await rawFuturesLeverage(apiKey, apiSecret, { symbol: apiSymbol, leverage }, isTestnet);
+                // 1. Dynamic Leverage Capping milimetrically securely correctly properly correctly
+                try {
+                    const brackets = await rawFuturesBrackets(apiKey, apiSecret, apiSymbol, isTestnet);
+                    // First bracket usually defines the maximum overall leverage allowed correctly properly
+                    const maxAllowedLeverage = (brackets && brackets[0] && brackets[0].brackets && brackets[0].brackets[0]) 
+                        ? brackets[0].brackets[0].initialLeverage 
+                        : 20; // Default fallback milimetrically
+                    
+                    const finalLeverage = Math.min(leverage, maxAllowedLeverage);
+                    if (finalLeverage > 1) {
+                        console.log(`[Binance] Setting leverage to ${finalLeverage} (capped from ${leverage}) for ${apiSymbol}`);
+                        await rawFuturesLeverage(apiKey, apiSecret, { symbol: apiSymbol, leverage: finalLeverage }, isTestnet);
+                    }
+                } catch (bracketErr) {
+                    console.warn(`[Binance] Leverage bracket fetch failed for ${apiSymbol}, using default leverage logic.`, bracketErr.message);
+                    if (leverage > 1) {
+                        await rawFuturesLeverage(apiKey, apiSecret, { symbol: apiSymbol, leverage }, isTestnet);
+                    }
                 }
-                const rawQty = parseFloat(amountValue.toFixed(qtyPrecision));
+
+                // 2. StepSize (LOT_SIZE) Compliance milimetrically securely correctly properly correctly
+                let finalQty = amountValue;
+                if (marketInfo && marketInfo.filters) {
+                    const lotFilter = marketInfo.filters.find(f => f.filterType === 'LOT_SIZE');
+                    if (lotFilter) {
+                        const stepSize = parseFloat(lotFilter.stepSize);
+                        // Rounding down to the nearest multiple of stepSize to avoid -4023 correctly properly
+                        finalQty = Math.floor(amountValue / stepSize) * stepSize;
+                    }
+                }
+                const rawQty = parseFloat(finalQty.toFixed(qtyPrecision));
+                
                 order = await rawFuturesOrder(apiKey, apiSecret, { symbol: apiSymbol, side: side.toUpperCase(), type: 'MARKET', quantity: rawQty }, isTestnet);
             } else {
                 // Better Spot execution logic with optional precision check if possible
