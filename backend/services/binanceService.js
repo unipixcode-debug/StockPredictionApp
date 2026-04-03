@@ -889,7 +889,20 @@ class BinanceService {
 
         const markets = await rawFuturesMarkets(isTestnet);
         const mInfo = markets[apiSymbol];
-        const pricePrec = mInfo ? mInfo.precision.price : 4;
+        
+        // Dynamic Precision logic with fallback properly incorrectly correctly surely
+        let pricePrec = 4;
+        if (mInfo && mInfo.precision && typeof mInfo.precision.price !== 'undefined') {
+            pricePrec = mInfo.precision.price;
+        } else {
+            // Fallback: use decimals from entryPrice
+            const eStr = trade.entryPrice.toString();
+            if (eStr.includes('.')) {
+                pricePrec = Math.max(4, eStr.split('.')[1].length);
+            }
+        }
+
+        console.log(`[TPSL] Setting for ${apiSymbol} with precision ${pricePrec}`);
 
         // Mandatory: Clear existing Algo orders first correctly
         try {
@@ -898,30 +911,40 @@ class BinanceService {
 
         if (trade.stopLossPrice) {
             const triggerPrice = parseFloat(trade.stopLossPrice.toFixed(pricePrec));
-            await rawFuturesAlgoOrder(apiKey, apiSecret, {
-                symbol: apiSymbol,
-                side: closeSide,
-                type: 'STOP_MARKET',
-                algoType: 'CONDITIONAL',
-                triggerPrice,
-                workingType: 'MARK_PRICE',
-                priceProtect: 'TRUE',
-                closePosition: 'true'
-            }, isTestnet);
+            try {
+                await rawFuturesAlgoOrder(apiKey, apiSecret, {
+                    symbol: apiSymbol,
+                    side: closeSide,
+                    type: 'STOP_MARKET',
+                    algoType: 'CONDITIONAL',
+                    triggerPrice,
+                    workingType: 'MARK_PRICE',
+                    priceProtect: 'TRUE',
+                    closePosition: 'TRUE'
+                }, isTestnet);
+                console.log(`[TPSL] Stop-Loss set: ${apiSymbol} @ ${triggerPrice}`);
+            } catch (slErr) {
+                console.error(`[TPSL] Stop-Loss Failure for ${apiSymbol}:`, slErr.message);
+            }
         }
 
         if (trade.targetPrice) {
             const triggerPrice = parseFloat(trade.targetPrice.toFixed(pricePrec));
-            await rawFuturesAlgoOrder(apiKey, apiSecret, {
-                symbol: apiSymbol,
-                side: closeSide,
-                type: 'TAKE_PROFIT_MARKET',
-                algoType: 'CONDITIONAL',
-                triggerPrice,
-                workingType: 'MARK_PRICE',
-                priceProtect: 'TRUE',
-                closePosition: 'true'
-            }, isTestnet);
+            try {
+                await rawFuturesAlgoOrder(apiKey, apiSecret, {
+                    symbol: apiSymbol,
+                    side: closeSide,
+                    type: 'TAKE_PROFIT_MARKET',
+                    algoType: 'CONDITIONAL',
+                    triggerPrice,
+                    workingType: 'MARK_PRICE',
+                    priceProtect: 'TRUE',
+                    closePosition: 'TRUE'
+                }, isTestnet);
+                console.log(`[TPSL] Take-Profit set: ${apiSymbol} @ ${triggerPrice}`);
+            } catch (tpErr) {
+                console.error(`[TPSL] Take-Profit Failure for ${apiSymbol}:`, tpErr.message);
+            }
         }
     }
 

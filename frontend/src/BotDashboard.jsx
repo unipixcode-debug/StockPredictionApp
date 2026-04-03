@@ -28,12 +28,19 @@ export default function BotDashboard() {
     useEffect(() => {
         fetchData();
         
-        // Gerçek API'den (BotLog veritabanından) 15 saniyede bir logları çek
+        // Gerçek API'den verileri ve logları düzenli olarak çek
         const logInterval = setInterval(() => {
             fetchLogs();
         }, 15000);
 
-        return () => clearInterval(logInterval);
+        const dataInterval = setInterval(() => {
+            fetchData();
+        }, 10000); // 10s interval for interactive updates
+
+        return () => {
+            clearInterval(logInterval);
+            clearInterval(dataInterval);
+        };
     }, []);
 
     const fetchLogs = async () => {
@@ -581,6 +588,18 @@ export default function BotDashboard() {
                                              <span className={`text-lg font-black ${trade.pnl > 0 ? 'text-emerald-500' : trade.pnl < 0 ? 'text-rose-500' : 'text-muted-foreground'}`}>
                                                  {trade.pnl > 0 ? '+' : ''}{trade.pnl.toFixed(2)}$
                                              </span>
+                                             {trade.exitPrice && trade.entryPrice && (
+                                                <span className={`text-[11px] font-black tracking-tighter ${trade.pnl > 0 ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
+                                                    {(() => {
+                                                        const entry = parseFloat(trade.entryPrice);
+                                                        const exit = parseFloat(trade.exitPrice);
+                                                        const leverage = parseFloat(trade.leverage || 1);
+                                                        const sideMultiplier = trade.side === 'BUY' ? 1 : -1;
+                                                        const pct = ((exit - entry) / entry) * 100 * sideMultiplier * leverage;
+                                                        return `(${pct > 0 ? '+' : ''}${pct.toFixed(2)}%)`;
+                                                    })()}
+                                                </span>
+                                             )}
                                              <span className={`text-[10px] font-black tracking-widest px-2 py-0.5 mt-1 rounded ${trade.status === 'OPEN' ? 'bg-amber-500/20 text-amber-500' : 'bg-primary/10 text-primary'}`}>
                                                  {trade.status}
                                              </span>
