@@ -477,6 +477,11 @@ class BinanceService {
             }
 
             const entryPrice = parseFloat(order.avgPrice || order.price || order.average || 0) || currentPrice;
+            
+            // Extract TP/SL from signal or use reasonable defaults
+            const stopLoss = signal.stopLoss || signal.stopLossPrice || (side === 'buy' ? entryPrice * 0.97 : entryPrice * 1.03);
+            const target   = signal.target   || signal.targetPrice   || signal.takeProfit || (side === 'buy' ? entryPrice * 1.06 : entryPrice * 0.94);
+
             const newTrade = await ExecutedTrade.create({
                 userId,
                 symbol: pair,
