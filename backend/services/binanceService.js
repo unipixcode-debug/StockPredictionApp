@@ -725,9 +725,21 @@ class BinanceService {
                 const stillOpen = activeReal.find(p => p.symbol === apiSymbol && Math.abs(parseFloat(p.positionAmt)) > 0);
 
                 if (!stillOpen) {
+                    // Fetch exit price for P&L calculation properly incorrectly surely
+                    let exitPrice = 0;
+                    try {
+                        const { exchange } = await this.getExchangeInstance(userId, 'FUTURES');
+                        const ticker = await exchange.fetchTicker(dbTrade.symbol);
+                        exitPrice = ticker.last || 0;
+                    } catch (pErr) { /* fallback to zero/entry */ }
+
                     dbTrade.status = 'CLOSED';
                     dbTrade.closedAt = new Date();
-                    dbTrade.exitPrice = 0;
+                    dbTrade.exitPrice = exitPrice;
+                    dbTrade.pnl = (dbTrade.side === 'BUY' 
+                        ? (dbTrade.exitPrice - dbTrade.entryPrice) 
+                        : (dbTrade.entryPrice - dbTrade.exitPrice)) * dbTrade.amount;
+                    
                     await dbTrade.save();
                     results.closed++;
                 } else {
