@@ -633,9 +633,22 @@ class BinanceService {
              order = await exchange.createMarketOrder(trade.symbol, side, trade.amount);
         }
 
+        let exitPrice = parseFloat(order.avgPrice || order.price || order.average || 0);
+        
+        // Zero Price Protection: If exchange returns 0 (common on Testnet timeout), don't use it
+        if (exitPrice === 0) {
+            try {
+                const { exchange } = await this.getExchangeInstance(userId, trade.type);
+                const ticker = await exchange.fetchTicker(trade.symbol);
+                exitPrice = ticker.last;
+            } catch (pErr) {
+                exitPrice = trade.entryPrice; // Extreme fallback to avoid fake P&L
+            }
+        }
+
         trade.status = 'CLOSED';
         trade.closedAt = new Date();
-        trade.exitPrice = parseFloat(order.avgPrice || order.price || order.average || 0);
+        trade.exitPrice = exitPrice;
         trade.pnl = (trade.side === 'BUY' 
             ? (trade.exitPrice - trade.entryPrice) 
             : (trade.entryPrice - trade.exitPrice)) * trade.amount;
