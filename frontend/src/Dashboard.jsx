@@ -699,10 +699,10 @@ function PredictionCard({ data, onDelete, navigate }) {
 
                         {/* Split point vertical line effectively properly SQUARELY correctly */}
                         <ReferenceLine 
-                          x={data.analysis_details.chartData.find(d => d.isPrediction)?.time || 40} 
-                          stroke="#ffffff30" 
+                          x={data.analysis_details?.chartData?.find(d => d.isPrediction)?.time || 40} 
+                          stroke="#ffffff40" 
                           strokeWidth={2} 
-                          strokeDasharray="3 3"
+                          strokeDasharray="4 4"
                           label={{ 
                             value: 'HİPOTEZ →', 
                             position: 'top', 
@@ -718,7 +718,7 @@ function PredictionCard({ data, onDelete, navigate }) {
                         <ReferenceLine y={data.stopLoss} stroke="#e11d48" label={{ value: 'STOP', position: 'left', fill: '#e11d48', fontSize: 10, fontWeight: 'black' }} />
                         
                         {/* Comparison Line: Actual Price after prediction squarely correctly */}
-                        {postCreationData.length > 0 && (
+                        {postCreationData && postCreationData.length > 0 && (
                           <Line
                             type="monotone"
                             data={postCreationData.map((d, i) => ({ 
@@ -727,7 +727,7 @@ function PredictionCard({ data, onDelete, navigate }) {
                             }))}
                             dataKey="realPath"
                             stroke="#00f2fe"
-                            strokeWidth={2}
+                            strokeWidth={3}
                             strokeDasharray="5 5"
                             dot={false}
                             animationDuration={3000}
@@ -742,7 +742,7 @@ function PredictionCard({ data, onDelete, navigate }) {
                             strokeWidth={4}
                             fillOpacity={1}
                             fill={`url(#splitArea-${data.id})`}
-                            animationDuration={2000}
+                            animationDuration={2500}
                         />
                       </AreaChart>
                     </ResponsiveContainer>
