@@ -117,43 +117,69 @@ router.get('/trades', authCheck, async (req, res) => {
         const isBotActive = config ? (config.isSpotActive || config.isFuturesActive) : false;
         const isTestnet = config ? config.isTestnet : true;
 
-        // ── Real-time P&L for OPEN positions ─────────────────────────────────
-
+        // ── Real-time P&L for OPEN positions (Direct from Binance for Futures) ──
         const openTrades = trades.filter(t => t.status === 'OPEN' && t.entryPrice);
         if (openTrades.length > 0) {
             try {
-                const ccxt = require('ccxt');
-                const spotEx = new ccxt.binance({ enableRateLimit: true });
-                const futEx  = new ccxt.binanceusdm({ enableRateLimit: true });
-                
-                if (isTestnet) {
-                    spotEx.setSandboxMode(true);
-                    futEx.setSandboxMode(true);
-                }
-                
-                const uniqueSymbols = [...new Set(openTrades.map(t => t.symbol))];
-                const priceMap = {};
+                const config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
+                const isTestnet = config ? !!config.isTestnet : true;
+                const apiKey = config?.futuresApiKey;
+                const apiSecret = config?.futuresApiSecret;
 
-                for (const sym of uniqueSymbols) {
+                // 1. Fetch Real-time Futures Positions if keys exist
+                let exchangePositions = [];
+                if (apiKey && apiSecret) {
                     try {
-                        const isFut = sym.includes(':USDT');
-                        const ticker = await (isFut ? futEx : spotEx).fetchTicker(sym);
-                        priceMap[sym] = ticker.last;
-                    } catch { /* skip */ }
+                        exchangePositions = await binanceService.rawFuturesPositions(apiKey, apiSecret, isTestnet);
+                    } catch (fErr) {
+                        console.warn('[Trades] Futures positions fetch failed:', fErr.message);
+                    }
                 }
 
+                // 2. Fetch Spot Tickers only if needed
+                const spotTrades = openTrades.filter(t => t.type === 'SPOT');
+                const spotPriceMap = {};
+                if (spotTrades.length > 0) {
+                    try {
+                        const ccxt = require('ccxt');
+                        const spotEx = new ccxt.binance({ enableRateLimit: true });
+                        if (isTestnet) spotEx.setSandboxMode(true);
+                        const uniqueSpotSymbols = [...new Set(spotTrades.map(t => t.symbol))];
+                        for (const sym of uniqueSpotSymbols) {
+                            const ticker = await spotEx.fetchTicker(sym);
+                            spotPriceMap[sym] = ticker.last;
+                        }
+                    } catch (sErr) {
+                        console.warn('[Trades] Spot tickers fetch failed:', sErr.message);
+                    }
+                }
+
+                // 3. Map Real-time data to trades
                 for (const trade of openTrades) {
-                    const currentPrice = priceMap[trade.symbol];
-                    if (currentPrice && trade.entryPrice) {
-                        const isLong = trade.side === 'BUY';
-                        const priceDiff = currentPrice - parseFloat(trade.entryPrice);
-                        const amount = parseFloat(trade.amount || 0);
-                        trade.dataValues.unrealizedPnl = (isLong ? priceDiff : -priceDiff) * amount;
-                        trade.dataValues.currentPrice = currentPrice;
+                    if (trade.type === 'FUTURES') {
+                        const apiSymbol = binanceService.toApiSymbol(trade.symbol);
+                        const realPos = Array.isArray(exchangePositions) ? exchangePositions.find(p => p.symbol === apiSymbol) : null;
+                        
+                        if (realPos) {
+                            trade.dataValues.unrealizedPnl = parseFloat(realPos.unrealizedProfit || 0);
+                            trade.dataValues.currentPrice = parseFloat(realPos.markPrice || 0);
+                            trade.dataValues.liquidationPrice = parseFloat(realPos.liquidationPrice || 0);
+                        } else {
+                            // Fallback to estimation if not found in open positions (might be recently closed or API lag)
+                            trade.dataValues.unrealizedPnl = 0;
+                        }
+                    } else {
+                        // Spot Calculation
+                        const currentPrice = spotPriceMap[trade.symbol];
+                        if (currentPrice) {
+                            const priceDiff = currentPrice - parseFloat(trade.entryPrice);
+                            trade.dataValues.unrealizedPnl = priceDiff * parseFloat(trade.amount || 0);
+                            trade.dataValues.currentPrice = currentPrice;
+                        }
                     }
                 }
             } catch (priceErr) {
-                console.warn('[Trades] Real-time P&L fetch failed:', priceErr.message);
+                console.warn('[Trades] Real-time data merge failed:', priceErr.message);
             }
         }
 

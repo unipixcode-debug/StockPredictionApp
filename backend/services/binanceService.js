@@ -803,8 +803,26 @@ class BinanceService {
                         await this.setExchangeTPSL(userId, dbTrade.id);
                     } catch (e) { /* sync-tpsl log if needed */ }
 
-                    if (dbTrade.leverage !== parseInt(stillOpen.leverage)) {
-                        dbTrade.leverage = parseInt(stillOpen.leverage);
+                    // Fix: Update entryPrice, amount, and leverage to match exchange exactly
+                    let changed = false;
+                    const exchangeAmount = Math.abs(parseFloat(stillOpen.positionAmt));
+                    const exchangeEntry = parseFloat(stillOpen.entryPrice);
+                    const exchangeLeverage = parseInt(stillOpen.leverage);
+
+                    if (Math.abs(dbTrade.amount - exchangeAmount) > 0.00000001) {
+                        dbTrade.amount = exchangeAmount;
+                        changed = true;
+                    }
+                    if (Math.abs(dbTrade.entryPrice - exchangeEntry) > 0.00000001) {
+                        dbTrade.entryPrice = exchangeEntry;
+                        changed = true;
+                    }
+                    if (dbTrade.leverage !== exchangeLeverage) {
+                        dbTrade.leverage = exchangeLeverage;
+                        changed = true;
+                    }
+
+                    if (changed) {
                         await dbTrade.save();
                         results.updated++;
                     }
