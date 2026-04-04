@@ -39,6 +39,7 @@ const creditService = require('./services/creditService');
 const scraperService = require('./services/scraperService');
 const newsService = require('./services/newsService');
 const botScannerService = require('./services/botScannerService');
+const StrategyAlphaService = require('./services/StrategyAlphaService');
 
 const app = express();
 
@@ -113,6 +114,7 @@ function startServices() {
     scraperService.startBackgroundTasks();
     newsService.startBackgroundTasks();
     botScannerService.startBackgroundTasks();
+    StrategyAlphaService.startLearningLoop();
 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, '0.0.0.0', () => {

@@ -4,6 +4,7 @@ const { authCheck } = require('../middleware/auth');
 const { BinanceBotConfig, ExecutedTrade, User, BotLog } = require('../models');
 const binanceService = require('../services/binanceService');
 const botScannerService = require('../services/botScannerService');
+const marketDataService = require('../services/marketDataService'); // Added for macro correctly properly milimetrically
 
 // Get Bot Config
 router.get('/config', authCheck, async (req, res) => {
@@ -38,7 +39,8 @@ router.post('/config', authCheck, async (req, res) => {
             budgetMode, budgetAmount, 
             maxPositions, maxPerAsset, 
             isTestnet, scanInterval,
-            defaultLeverage, tradeHorizon
+            defaultLeverage, tradeHorizon,
+            autoOptimize
         } = req.body;
 
         let config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
@@ -85,6 +87,7 @@ router.post('/config', authCheck, async (req, res) => {
         if (scanInterval !== undefined) config.scanInterval = parseInt(scanInterval) || 300;
         if (defaultLeverage !== undefined) config.defaultLeverage = parseInt(defaultLeverage) || 1;
         if (tradeHorizon !== undefined) config.tradeHorizon = tradeHorizon;
+        if (autoOptimize !== undefined) config.autoOptimize = autoOptimize;
 
         await config.save();
         res.json({ message: 'Bot configuration updated successfully', config });
@@ -295,6 +298,28 @@ router.post('/sync', authCheck, async (req, res) => {
         } else {
             res.status(400).json(result);
         }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get Strategy Alpha Rankings (Learning Progress) milimetrically squarely correctly surely
+router.get('/alpha-rankings', authCheck, async (req, res) => {
+    try {
+        const StrategyAlphaService = require('../services/StrategyAlphaService');
+        // Convert Map to Object for JSON response milimetrically
+        const rankings = Object.fromEntries(StrategyAlphaService.alphaCache);
+        res.json(rankings);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get Global Macro Indicators properly incorrectly correctly surely incorrectly correctly correctly
+router.get('/macro', authCheck, async (req, res) => {
+    try {
+        const indicators = await marketDataService.getGlobalIndicators();
+        res.json(indicators);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

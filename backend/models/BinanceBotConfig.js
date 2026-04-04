@@ -141,6 +141,10 @@ const BinanceBotConfig = sequelize.define('BinanceBotConfig', {
     tradeHorizon: {
         type: DataTypes.ENUM('SHORT', 'MID', 'LONG'),
         defaultValue: 'SHORT' // SHORT=%5-10, MID=%10-15, LONG=%50-100 ROI
+    },
+    autoOptimize: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true // AI Sentinel & Strategy Alpha Logic
     }
 }, {
     timestamps: true,

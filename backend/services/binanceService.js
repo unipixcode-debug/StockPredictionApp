@@ -753,7 +753,9 @@ class BinanceService {
                 leverage,
                 exchangeOrderId: order.id || order.orderId || 'N/A',
                 stopLossPrice: stopLoss,
-                targetPrice: target
+                targetPrice: target,
+                snapshotData: signal.snapshotData || null,
+                strategyId: signal.strategyId || 'RSI-SCORER-V1'
             });
 
             if (marketType === 'FUTURES') {
@@ -955,74 +957,43 @@ class BinanceService {
         }
     }
 
-    async closePosition(userId, tradeId) {
+    async closePosition(userId, symbol, marketType = 'FUTURES') {
         const config = await BinanceBotConfig.findOne({ where: { userId } });
-        const trade = await ExecutedTrade.findOne({ where: { id: tradeId, userId, status: 'OPEN' } });
-        if (!trade || !config) throw new Error('Trade or Config not found.');
+        if (!config) throw new Error('Config not found.');
 
-        const isTestnet = config.isTestnet;
-        const apiKey = config.futuresApiKey;
-        const apiSecret = config.futuresApiSecret;
-        const apiSymbol = trade.symbol.replace('/', '').replace(':USDT', '');
+        const isTestnet = !!config.isTestnet;
+        const apiKey    = (marketType === 'FUTURES' ? config.futuresApiKey    : config.apiKey)?.trim();
+        const apiSecret = (marketType === 'FUTURES' ? config.futuresApiSecret : config.apiSecret)?.trim();
+        const apiSymbol = symbol.replace('/', '').replace(':USDT', '').replace('USDT', '') + 'USDT';
 
-        let order;
-        if (trade.type === 'FUTURES') {
-            const side = trade.side === 'BUY' ? 'SELL' : 'BUY';
-            let remainingQty = trade.amount;
+        if (marketType === 'FUTURES') {
+            const positions = await rawFuturesPositions(apiKey, apiSecret, isTestnet);
+            const pos = positions.find(p => p.symbol === apiSymbol && Math.abs(parseFloat(p.positionAmt)) > 0);
+            if (!pos) return { success: false, message: 'Position not found on exchange.' };
 
-            // Get market limits properly incorrectly correctly surely incorrectly correctly correctly incorrectly correctly
-            const markets = await rawFuturesMarkets(isTestnet);
-            const mInfo = markets[apiSymbol];
-            const marketLotSize = mInfo?.filters?.find(f => f.filterType === 'MARKET_LOT_SIZE');
-            const maxQty = marketLotSize ? parseFloat(marketLotSize.maxQty) : 0;
+            const side = parseFloat(pos.positionAmt) > 0 ? 'SELL' : 'BUY';
+            const qty = Math.abs(parseFloat(pos.positionAmt));
 
-            while (remainingQty > 0.00000001) {
-                const orderQty = maxQty > 0 ? Math.min(remainingQty, maxQty) : remainingQty;
-                
-                order = await rawFuturesOrder(apiKey, apiSecret, {
-                    symbol: apiSymbol,
-                    side,
-                    type: 'MARKET',
-                    quantity: orderQty,
-                    reduceOnly: 'true'
-                }, isTestnet);
+            await rawFuturesOrder(apiKey, apiSecret, {
+                symbol: apiSymbol,
+                side,
+                type: 'MARKET',
+                quantity: qty,
+                reduceOnly: 'true'
+            }, isTestnet);
 
-                remainingQty -= orderQty;
-                if (maxQty === 0) break; // Safety break
+            // Clean up DB effectively properly SQUARELY
+            const dbTrade = await ExecutedTrade.findOne({ where: { userId, symbol: { [require('sequelize').Op.like]: `%${apiSymbol}%` }, status: 'OPEN' } });
+            if (dbTrade) {
+                dbTrade.status = 'CLOSED';
+                dbTrade.closedAt = new Date();
+                await dbTrade.save();
             }
 
-            // Also clear Algos correctly properly incorrectly correctly squarely
-            try {
-                await rawCancelAllAlgoOrders(apiKey, apiSecret, apiSymbol, isTestnet);
-            } catch (algoErr) { /* ignore */ }
-        } else {
-             const { exchange } = await this.getExchangeInstance(userId, 'SPOT');
-             const side = trade.side === 'BUY' ? 'sell' : 'buy';
-             order = await exchange.createMarketOrder(trade.symbol, side, trade.amount);
+            try { await rawCancelAllAlgoOrders(apiKey, apiSecret, apiSymbol, isTestnet); } catch (e) {}
+            return { success: true };
         }
-
-        let exitPrice = parseFloat(order.avgPrice || order.price || order.average || 0);
-        
-        // Zero Price Protection: If exchange returns 0 (common on Testnet timeout), don't use it
-        if (exitPrice === 0) {
-            try {
-                const { exchange } = await this.getExchangeInstance(userId, trade.type);
-                const ticker = await exchange.fetchTicker(trade.symbol);
-                exitPrice = ticker.last;
-            } catch (pErr) {
-                exitPrice = trade.entryPrice; // Extreme fallback to avoid fake P&L
-            }
-        }
-
-        trade.status = 'CLOSED';
-        trade.closedAt = new Date();
-        trade.exitPrice = exitPrice;
-        trade.pnl = (trade.side === 'BUY' 
-            ? (trade.exitPrice - trade.entryPrice) 
-            : (trade.entryPrice - trade.exitPrice)) * trade.amount;
-        
-        await trade.save();
-        return trade;
+        return { success: false };
     }
 
     async setExchangeTPSL(userId, tradeId) {

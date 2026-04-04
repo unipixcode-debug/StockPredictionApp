@@ -15,6 +15,11 @@ const ExecutedTrade = sequelize.define('ExecutedTrade', {
         type: DataTypes.STRING, // e.g., 'BTC/USDT'
         allowNull: false
     },
+    timeframe: {
+        type: DataTypes.STRING, // e.g., '5m', '15m'
+        allowNull: true,
+        defaultValue: '5m'
+    },
     side: {
         type: DataTypes.ENUM('BUY', 'SELL'),
         allowNull: false
@@ -62,6 +67,15 @@ const ExecutedTrade = sequelize.define('ExecutedTrade', {
     leverage: {
         type: DataTypes.INTEGER,
         defaultValue: 1
+    },
+    snapshotData: {
+        type: DataTypes.JSONB, // Stores RSI, BTCD, Volatility at entry
+        allowNull: true
+    },
+    strategyId: {
+        type: DataTypes.STRING, // Identifies version (e.g. RSI-AI-V1)
+        allowNull: true,
+        defaultValue: 'RSI-SCORER-V1'
     },
     errorMessage: {
         type: DataTypes.TEXT,
