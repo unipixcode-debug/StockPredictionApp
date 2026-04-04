@@ -679,7 +679,7 @@ function PredictionCard({ data, onDelete, navigate }) {
                              transitionIdx: splitPoint
                            };
                         })} 
-                        margin={{ top: 30, right: 60, left: 20, bottom: 20 }}
+                        margin={{ top: 30, right: 80, left: 20, bottom: 20 }}
                       >
                         <defs>
                           <filter id="shadowPath" height="200%">
@@ -703,7 +703,7 @@ function PredictionCard({ data, onDelete, navigate }) {
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.1} />
-                        <XAxis dataKey="time" type="number" domain={[-2, 62]} hide={false} height={0} tick={false} axisLine={false} padding={{ left: 20, right: 20 }} />
+                        <XAxis dataKey="time" type="number" domain={[-2, 65]} hide={false} height={0} tick={false} axisLine={false} padding={{ left: 20, right: 40 }} />
                         <YAxis 
                           hide 
                           domain={['dataMin - 2', 'dataMax + 2']}
@@ -754,14 +754,16 @@ function PredictionCard({ data, onDelete, navigate }) {
                         {showActualPath && postCreationData && postCreationData.length > 0 && (
                           <Line
                             type="monotone"
-                            data={postCreationData.map((d, i) => ({ 
+                            data={postCreationData
+                              .filter(d => (d.price || d.close) > 0) // No zero values effectively properly SQUARELY surely
+                              .map((d, i) => ({ 
                                time: 40 + i, 
                                realPath: d.price || d.close 
                             }))}
                             dataKey="realPath"
                             stroke="#10b981"
                             strokeWidth={5}
-                            dot={false}
+                            dot={{ r: 2, fill: '#10b981' }}
                             filter="url(#shadowPath)"
                             animationDuration={2000}
                           />
