@@ -542,11 +542,11 @@ function PredictionCard({ data, onDelete, navigate }) {
 
     setFetchingComparison(true);
     try {
-      // Fetch history for comparison correctly properly squarely
-      const res = await api.get(`/market/history?symbol=${data.symbol}&timeframe=1h&limit=24`);
+      // Fetch high-resolution 1m history for the reality check path (SQUARELY correctly)
+      const res = await api.get(`/market/history?symbol=${data.symbol}&timeframe=1m&limit=1000`);
       if (Array.isArray(res)) {
         const createTime = new Date(data.createdAt).getTime();
-        const relevant = res.filter(h => h.time * 1000 > createTime);
+        const relevant = res.filter(h => new Date(h.time).getTime() > createTime);
         setPostCreationData(relevant);
       }
     } catch (e) {
@@ -679,7 +679,7 @@ function PredictionCard({ data, onDelete, navigate }) {
                              transitionIdx: splitPoint
                            };
                         })} 
-                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        margin={{ top: 30, right: 60, left: 20, bottom: 20 }}
                       >
                         <defs>
                           <filter id="shadowPath" height="200%">
@@ -703,7 +703,7 @@ function PredictionCard({ data, onDelete, navigate }) {
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.1} />
-                        <XAxis dataKey="time" type="number" domain={[0, 59]} hide={false} height={0} tick={false} axisLine={false} />
+                        <XAxis dataKey="time" type="number" domain={[-2, 62]} hide={false} height={0} tick={false} axisLine={false} padding={{ left: 20, right: 20 }} />
                         <YAxis 
                           hide 
                           domain={['dataMin - 2', 'dataMax + 2']}
