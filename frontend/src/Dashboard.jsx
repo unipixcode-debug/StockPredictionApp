@@ -454,7 +454,7 @@ const Dashboard = () => {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8 max-w-full">
           {loading && predictions.length === 0 ? (
             [1, 2, 3, 4].map(i => (
               <div key={i} className="glass-card h-48 animate-pulse bg-white/5 border-white/5" />
@@ -661,12 +661,12 @@ function PredictionCard({ data, onDelete, navigate }) {
                       >
                         <defs>
                           <linearGradient id={`splitLine-${data.id}`} x1="0" y1="0" x2="1" y2="0">
-                            <stop offset={data.analysis_details?.chartData?.findLastIndex(d => !d.isPrediction) / 60 * 100 + "%"} stopColor={isBuy ? "#10b981" : "#e11d48"} />
-                            <stop offset={data.analysis_details?.chartData?.findLastIndex(d => !d.isPrediction) / 60 * 100 + "%"} stopColor="#facc15" />
+                            <stop offset="66.6%" stopColor={isBuy ? "#10b981" : "#e11d48"} />
+                            <stop offset="66.6%" stopColor="#facc15" />
                           </linearGradient>
                           <linearGradient id={`splitArea-${data.id}`} x1="0" y1="0" x2="1" y2="0">
-                            <stop offset={data.analysis_details?.chartData?.findLastIndex(d => !d.isPrediction) / 60 * 100 + "%"} stopColor={isBuy ? "#10b98120" : "#e11d4820"} />
-                            <stop offset={data.analysis_details?.chartData?.findLastIndex(d => !d.isPrediction) / 60 * 100 + "%"} stopColor="#facc1530" />
+                            <stop offset="66.6%" stopColor={isBuy ? "#10b98120" : "#e11d4820"} />
+                            <stop offset="66.6%" stopColor="#facc1530" />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.1} />
@@ -688,7 +688,7 @@ function PredictionCard({ data, onDelete, navigate }) {
                                     </p>
                                   </div>
                                   <p className="text-sm font-black italic">
-                                    ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    ${item?.price?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || "–"}
                                   </p>
                                 </div>
                               );

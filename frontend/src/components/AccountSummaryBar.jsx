@@ -45,12 +45,12 @@ const AccountSummaryBar = () => {
   if (error && !data) return null;
 
   const metrics = [
-    { label: 'Equity', value: `$${data?.equity || '0.00'}`, icon: <Zap size={14} />, color: 'text-primary' },
-    { label: 'Total P&L', value: `${parseFloat(data?.totalPnl) > 0 ? '+' : ''}${data?.totalPnl || '0.0000'} USDT`, icon: <Activity size={14} />, color: parseFloat(data?.totalPnl) >= 0 ? 'text-green-500' : 'text-red-500 font-bold' },
-    { label: 'Margin Ratio', value: `${data?.marginRatio || '0.00'}%`, icon: <Layers size={14} />, color: parseFloat(data?.marginRatio) > 80 ? 'text-red-500' : 'text-cyan-500' },
-    { label: 'Unrealized', value: `${parseFloat(data?.unrealizedPnl) > 0 ? '+' : ''}${data?.unrealizedPnl || '0.0000'} USDT`, icon: parseFloat(data?.unrealizedPnl) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />, color: parseFloat(data?.unrealizedPnl) >= 0 ? 'text-green-500/70' : 'text-red-500/70' },
-    { label: 'Pos Value', value: `$${data?.positionValue || '0.00'}`, icon: <Activity size={14} />, color: 'text-muted-foreground' },
-    { label: 'Leverage', value: `${data?.actualLeverage || '0.0000'} X`, icon: <Zap size={14} />, color: 'text-yellow-500' },
+    { label: 'Equity', value: `$${parseFloat(data?.equity || 0).toFixed(4)}`, icon: <Zap size={14} />, color: 'text-primary' },
+    { label: 'Total P&L', value: `${parseFloat(data?.totalPnl) > 0 ? '+' : ''}${parseFloat(data?.totalPnl || 0).toFixed(4)} USDT`, icon: <Activity size={14} />, color: parseFloat(data?.totalPnl) >= 0 ? 'text-emerald-500' : 'text-rose-500 font-black' },
+    { label: 'Margin Ratio', value: `${parseFloat(data?.marginRatio || 0).toFixed(2)}%`, icon: <Layers size={14} />, color: parseFloat(data?.marginRatio) > 80 ? 'text-rose-500' : 'text-cyan-500' },
+    { label: 'Unrealized', value: `${parseFloat(data?.unrealizedPnl) > 0 ? '+' : ''}${parseFloat(data?.unrealizedPnl || 0).toFixed(4)} USDT`, icon: parseFloat(data?.unrealizedPnl) >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />, color: parseFloat(data?.unrealizedPnl) >= 0 ? 'text-emerald-500/70' : 'text-rose-500/70' },
+    { label: 'Pos Value', value: `${parseFloat(data?.positionValue || 0).toFixed(4)}`, icon: <Activity size={14} />, color: 'text-muted-foreground' },
+    { label: 'Leverage', value: `${parseFloat(data?.actualLeverage || 0).toFixed(4)} X`, icon: <Zap size={14} />, color: 'text-yellow-500' },
   ];
 
   return (

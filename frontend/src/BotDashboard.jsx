@@ -278,7 +278,7 @@ export default function BotDashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <StatCard 
                                 title="Toplam P&L (Kâr/Zarar)"
-                                value={`$${stats.totalPnl.toFixed(2)}`}
+                                value={`$${stats.totalPnl.toFixed(4)}`}
                                 subtext={`${trades.length} İşlem tamamlandı`}
                                 color={stats.totalPnl >= 0 ? 'emerald' : 'rose'}
                                 icon={stats.totalPnl >= 0 ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
@@ -384,7 +384,7 @@ export default function BotDashboard() {
                                                 <RechartsTooltip 
                                                     contentStyle={{ backgroundColor: 'rgba(5,5,5,0.8)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '1rem' }}
                                                     itemStyle={{ color: '#00f2fe', fontWeight: '900' }}
-                                                    formatter={(value) => [`$${value.toFixed(2)}`, 'Kümülatif P&L']}
+                                                    formatter={(value) => [`$${value.toFixed(4)}`, 'Kümülatif P&L']}
                                                 />
                                                 <Area 
                                                     type="monotone" 
@@ -484,9 +484,9 @@ export default function BotDashboard() {
                                                     <p className={`text-lg font-black ${
                                                         pnl > 0 ? 'text-emerald-400' : pnl < 0 ? 'text-rose-400' : 'text-muted-foreground'
                                                     }`}>
-                                                        {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}$
+                                                        {pnl >= 0 ? '+' : ''}{pnl.toFixed(4)}$
                                                     </p>
-                                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Anlık P&L</p>
+                                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Anlık P&L (4-Hane)</p>
                                                 </div>
                                                 <div className="flex flex-col gap-2">
                                                     <button

@@ -299,25 +299,42 @@ const AIScanner = () => {
                                                     <LineChart data={historyData}>
                                                         <defs>
                                                             <linearGradient id="scannerSplit" x1="0" y1="0" x2="1" y2="0">
-                                                                <stop offset={((historyData.findLastIndex(d => !d.isPrediction) !== -1 ? historyData.findLastIndex(d => !d.isPrediction) : historyData.length - 6) / historyData.length * 100) + "%"} stopColor="#00f2fe" />
-                                                                <stop offset={((historyData.findLastIndex(d => !d.isPrediction) !== -1 ? historyData.findLastIndex(d => !d.isPrediction) : historyData.length - 6) / historyData.length * 100) + "%"} stopColor="#facc15" />
+                                                                <stop offset="66.6%" stopColor="#00f2fe" />
+                                                                <stop offset="66.6%" stopColor="#facc15" />
                                                             </linearGradient>
                                                         </defs>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                                                         <XAxis dataKey="time" hide={false} height={0} tick={false} axisLine={false} />
                                                         <YAxis hide domain={['auto', 'auto']} />
                                                         <RechartsTooltip 
-                                                            contentStyle={{ backgroundColor: '#0c0c0e', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '10px' }}
-                                                            itemStyle={{ color: '#00f2fe' }}
+                                                            content={({ active, payload }) => {
+                                                                if (active && payload && payload.length) {
+                                                                    const item = payload[0].payload;
+                                                                    return (
+                                                                        <div className="bg-[#0c0c0e]/95 border border-white/10 p-3 rounded-2xl shadow-2xl backdrop-blur-xl">
+                                                                            <div className="flex items-center space-x-2 mb-1.5 opacity-60">
+                                                                                <div className={`w-1.5 h-1.5 rounded-full ${item.isPrediction ? "bg-yellow-400" : "bg-cyan-500"}`} />
+                                                                                <p className="text-[10px] font-black uppercase tracking-widest text-[#f5f5f7]">
+                                                                                    {item.isPrediction ? "AI Tahmini" : "Geçmiş Veri"}
+                                                                                </p>
+                                                                            </div>
+                                                                            <p className="text-sm font-black italic">
+                                                                                ${parseFloat(item?.close || 0).toFixed(4)}
+                                                                            </p>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            }}
                                                         />
                                                         
                                                         {/* Vertical Separator SQUARELY surely correctly */}
                                                         <ReferenceLine 
-                                                            x={historyData.findLastIndex(d => !d.isPrediction) !== -1 ? historyData[historyData.findLastIndex(d => !d.isPrediction)].time : historyData[historyData.length - 6]?.time} 
-                                                            stroke="#facc1550" 
-                                                            strokeWidth={2} 
+                                                            x={historyData[40]?.time || (historyData.findLastIndex(d => !d.isPrediction) !== -1 ? historyData[historyData.findLastIndex(d => !d.isPrediction)].time : historyData[historyData.length - 20]?.time)} 
+                                                            stroke="#facc1570" 
+                                                            strokeWidth={3} 
                                                             strokeDasharray="4 4"
-                                                            label={{ value: 'PROJEKSİYON', position: 'top', fill: '#facc15', fontSize: 8, fontWeight: 'bold' }}
+                                                            label={{ value: 'PROJEKSİYON →', position: 'top', fill: '#facc15', fontSize: 10, fontWeight: '900', dy: -10 }}
                                                         />
 
                                                         <Line 
@@ -342,7 +359,7 @@ const AIScanner = () => {
                                                                 y={levels.tp} 
                                                                 stroke="#10b981" 
                                                                 strokeDasharray="3 3" 
-                                                                label={{ position: 'right', value: `Hedef: ${levels.tp.toFixed(2)}`, fill: '#10b981', fontSize: 10, fontWeight: 'bold' }} 
+                                                                label={{ position: 'right', value: `Hedef: ${levels.tp.toFixed(4)}`, fill: '#10b981', fontSize: 10, fontWeight: 'bold' }} 
                                                             />
                                                         )}
                                                         {levels.sl && (
