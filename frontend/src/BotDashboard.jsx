@@ -811,8 +811,44 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                         </div>
                     </div>
 
-                    <div className="border-t border-border pt-8 mt-8">
-                        <h2 className="text-2xl font-black italic uppercase tracking-tight mb-6">Risk Parametreleri</h2>
+                    <div className="border-t border-border pt-8 mt-8 space-y-6">
+                        <h2 className="text-2xl font-black italic uppercase tracking-tight">Risk Parametreleri</h2>
+                        
+                        {/* 🚀 VADE VE STRATEJİ SEÇİMİ (Ana Panel) */}
+                        <div className="p-6 bg-amber-500/10 rounded-3xl border border-amber-500/20 shadow-[0_0_50px_rgba(245,158,11,0.05)]">
+                            <label className="text-xs font-black uppercase text-amber-500 tracking-[0.3em] mb-4 block pl-2">
+                                ⚡ Vade & Risk Stratejisi (ROI Hedefli)
+                            </label>
+                            <div className="flex flex-wrap md:flex-nowrap bg-black/40 p-2 rounded-2xl gap-3 border border-white/5 shadow-inner">
+                                <button 
+                                    type="button"
+                                    onClick={() => setFormData(p => ({...p, tradeHorizon: 'SHORT'}))}
+                                    className={`flex-1 flex flex-col items-center py-4 rounded-xl transition-all duration-300 ${formData.tradeHorizon === 'SHORT' ? 'bg-amber-500 text-black shadow-[0_0_30px_rgba(245,158,11,0.4)] scale-[1.02]' : 'text-muted-foreground hover:bg-white/5 opacity-60 hover:opacity-100'}`}
+                                >
+                                    <span className="text-[12px] font-black uppercase tracking-tight">Kısa Vade (Short)</span>
+                                    <span className="text-[9px] font-bold mt-1">%7.5 ROI / 1.5 RR</span>
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setFormData(p => ({...p, tradeHorizon: 'MID'}))}
+                                    className={`flex-1 flex flex-col items-center py-4 rounded-xl transition-all duration-300 ${formData.tradeHorizon === 'MID' ? 'bg-amber-500 text-black shadow-[0_0_30px_rgba(245,158,11,0.4)] scale-[1.02]' : 'text-muted-foreground hover:bg-white/5 opacity-60 hover:opacity-100'}`}
+                                >
+                                    <span className="text-[12px] font-black uppercase tracking-tight">Orta Vade (Mid)</span>
+                                    <span className="text-[9px] font-bold mt-1">%12.5 ROI / 1.5 RR</span>
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setFormData(p => ({...p, tradeHorizon: 'LONG'}))}
+                                    className={`flex-1 flex flex-col items-center py-4 rounded-xl transition-all duration-300 ${formData.tradeHorizon === 'LONG' ? 'bg-amber-500 text-black shadow-[0_0_30px_rgba(245,158,11,0.4)] scale-[1.02]' : 'text-muted-foreground hover:bg-white/5 opacity-60 hover:opacity-100'}`}
+                                >
+                                    <span className="text-[12px] font-black uppercase tracking-tight">Uzun Vade (Long)</span>
+                                    <span className="text-[9px] font-bold mt-1">%75 ROI / 2.0 RR</span>
+                                </button>
+                            </div>
+                            <p className="mt-3 text-[9px] font-bold text-amber-500/50 uppercase tracking-widest text-center">
+                                * Seçilen vadeye göre TP/SL rasyoları saniyeler içinde milimetrik otomatik sök tak yöntemiyle milisaniyeler içinde güncellenir.
+                            </p>
+                        </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                              <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 flex justify-between items-center">
@@ -848,37 +884,6 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <div className="space-y-4">
-                                <label className="text-xs font-black uppercase text-amber-500 tracking-[0.2em] pl-2 flex items-center gap-2">
-                                    <Zap size={14} /> Vade & Risk Stratejisi
-                                </label>
-                                <div className="flex bg-black/40 p-1.5 rounded-2xl gap-2 border border-white/5 shadow-inner">
-                                    <button 
-                                        type="button"
-                                        onClick={() => setFormData(p => ({...p, tradeHorizon: 'SHORT'}))}
-                                        className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${formData.tradeHorizon === 'SHORT' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-muted-foreground hover:bg-white/5'}`}
-                                    >
-                                        <span className="text-[10px] font-black uppercase">Kısa Vade (Short)</span>
-                                        <span className="text-[8px] font-bold opacity-80">%7.5 ROI / 1.5 RR</span>
-                                    </button>
-                                    <button 
-                                        type="button"
-                                        onClick={() => setFormData(p => ({...p, tradeHorizon: 'MID'}))}
-                                        className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${formData.tradeHorizon === 'MID' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-muted-foreground hover:bg-white/5'}`}
-                                    >
-                                        <span className="text-[10px] font-black uppercase">Orta Vade (Mid)</span>
-                                        <span className="text-[8px] font-bold opacity-80">%12.5 ROI / 1.5 RR</span>
-                                    </button>
-                                    <button 
-                                        type="button"
-                                        onClick={() => setFormData(p => ({...p, tradeHorizon: 'LONG'}))}
-                                        className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${formData.tradeHorizon === 'LONG' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-muted-foreground hover:bg-white/5'}`}
-                                    >
-                                        <span className="text-[10px] font-black uppercase">Uzun Vade (Long)</span>
-                                        <span className="text-[8px] font-bold opacity-80">%75 ROI / 2.0 RR</span>
-                                    </button>
-                                </div>
-                             </div>
 
                              <div className="space-y-4">
                                 <label className="text-xs font-black uppercase text-muted-foreground tracking-widest pl-2">Bütçe Türü</label>
