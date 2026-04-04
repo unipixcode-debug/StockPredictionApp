@@ -161,7 +161,7 @@ router.get('/trades', authCheck, async (req, res) => {
                         const realPos = Array.isArray(exchangePositions) ? exchangePositions.find(p => p.symbol === apiSymbol) : null;
                         
                         if (realPos) {
-                            trade.dataValues.unrealizedPnl = parseFloat(realPos.unrealizedProfit || 0);
+                            trade.dataValues.unrealizedPnl = parseFloat(realPos.unRealizedProfit || 0);
                             trade.dataValues.currentPrice = parseFloat(realPos.markPrice || 0);
                             trade.dataValues.liquidationPrice = parseFloat(realPos.liquidationPrice || 0);
                         } else {
