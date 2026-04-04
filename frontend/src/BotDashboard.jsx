@@ -688,7 +688,8 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
         maxPositions: 3,
         maxPerAsset: 50,
         scanInterval: 300,
-        defaultLeverage: 1
+        defaultLeverage: 1,
+        tradeHorizon: 'SHORT'
     });
 
     const [testMarket, setTestMarket] = useState('SPOT');
@@ -709,7 +710,8 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                 maxPositions: config.maxPositions || 3,
                 maxPerAsset: config.maxPerAsset || 50,
                 scanInterval: config.scanInterval || 300,
-                defaultLeverage: config.defaultLeverage || 1
+                defaultLeverage: config.defaultLeverage || 1,
+                tradeHorizon: config.tradeHorizon || 'SHORT'
             });
         }
     }, [config]);
@@ -846,6 +848,38 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <div className="space-y-4">
+                                <label className="text-xs font-black uppercase text-amber-500 tracking-[0.2em] pl-2 flex items-center gap-2">
+                                    <Zap size={14} /> Vade & Risk Stratejisi
+                                </label>
+                                <div className="flex bg-black/40 p-1.5 rounded-2xl gap-2 border border-white/5 shadow-inner">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setFormData(p => ({...p, tradeHorizon: 'SHORT'}))}
+                                        className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${formData.tradeHorizon === 'SHORT' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-muted-foreground hover:bg-white/5'}`}
+                                    >
+                                        <span className="text-[10px] font-black uppercase">Kısa Vade (Short)</span>
+                                        <span className="text-[8px] font-bold opacity-80">%7.5 ROI / 1.5 RR</span>
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setFormData(p => ({...p, tradeHorizon: 'MID'}))}
+                                        className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${formData.tradeHorizon === 'MID' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-muted-foreground hover:bg-white/5'}`}
+                                    >
+                                        <span className="text-[10px] font-black uppercase">Orta Vade (Mid)</span>
+                                        <span className="text-[8px] font-bold opacity-80">%12.5 ROI / 1.5 RR</span>
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setFormData(p => ({...p, tradeHorizon: 'LONG'}))}
+                                        className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${formData.tradeHorizon === 'LONG' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-muted-foreground hover:bg-white/5'}`}
+                                    >
+                                        <span className="text-[10px] font-black uppercase">Uzun Vade (Long)</span>
+                                        <span className="text-[8px] font-bold opacity-80">%75 ROI / 2.0 RR</span>
+                                    </button>
+                                </div>
+                             </div>
+
                              <div className="space-y-4">
                                 <label className="text-xs font-black uppercase text-muted-foreground tracking-widest pl-2">Bütçe Türü</label>
                                 <div className="flex bg-secondary/50 p-1 rounded-xl">

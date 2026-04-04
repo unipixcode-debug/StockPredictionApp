@@ -137,6 +137,10 @@ const BinanceBotConfig = sequelize.define('BinanceBotConfig', {
     riskLevel: {
         type: DataTypes.ENUM('CONSERVATIVE', 'MODERATE', 'AGGRESSIVE'),
         defaultValue: 'MODERATE' // Controls SL/TP offsets
+    },
+    tradeHorizon: {
+        type: DataTypes.ENUM('SHORT', 'MID', 'LONG'),
+        defaultValue: 'SHORT' // SHORT=%5-10, MID=%10-15, LONG=%50-100 ROI
     }
 }, {
     timestamps: true,

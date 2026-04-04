@@ -420,6 +420,26 @@ class BinanceService {
         this.activeProcessing = new Set();
     }
 
+    normalizeSymbol(symbol, marketType = 'FUTURES') {
+        if (!symbol) return '';
+        let up = symbol.toUpperCase().replace('-USD', '');
+        
+        // Robust extraction: strip everything to get the base asset (e.g., BEAT, BTC)
+        const base = up.split('/')[0].split(':')[0].replace(/USDT$/, '');
+        
+        if (marketType === 'FUTURES') {
+            return `${base}/USDT:USDT`;
+        }
+        return `${base}/USDT`;
+    }
+
+    toApiSymbol(symbol) {
+        if (!symbol) return '';
+        // Efficiently extract the base part and append USDT for Binance API
+        const base = symbol.split('/')[0].split(':')[0].toUpperCase();
+        return base + 'USDT';
+    }
+
     /**
      * Aggregates key Binance Futures account metrics for the Live Summary Bar.
      */
@@ -559,12 +579,33 @@ class BinanceService {
         }
     }
 
+    // Helper for Horizon-based TP/SL
+    calculateHorizonTPSL(horizon, leverage, entryPrice, side) {
+        let targetROI = 0.075; // 7.5% default (SHORT)
+        let rrRatio = 1.5;
+        
+        if (horizon === 'MID') {
+            targetROI = 0.125; // 12.5%
+        } else if (horizon === 'LONG') {
+            targetROI = 0.75;  // 75%
+            rrRatio = 2.0;
+        }
+
+        const priceMove = targetROI / Math.max(1, leverage);
+        const slMove = priceMove / rrRatio;
+        const isBuy = side.toLowerCase() === 'buy' || side.toUpperCase() === 'BUY';
+
+        return {
+            stopLoss: isBuy ? entryPrice * (1 - slMove) : entryPrice * (1 + slMove),
+            target: isBuy ? entryPrice * (1 + priceMove) : entryPrice * (1 - priceMove)
+        };
+    }
+
     async executeTrade(userId, signal) {
         if (signal.market !== 'CRYPTO') return null;
         
-        const baseSymbol = signal.symbol.replace('-USD', '') + '/USDT';
         const marketType = signal.type || 'SPOT';
-        const pair = marketType === 'FUTURES' ? baseSymbol + ':USDT' : baseSymbol;
+        const pair = this.normalizeSymbol(signal.symbol, marketType);
         const side = signal.direction === 'BUY' ? 'buy' : 'sell';
 
         const lockKey = `${userId}_${pair}`;
@@ -669,9 +710,8 @@ class BinanceService {
 
             const entryPrice = parseFloat(order.avgPrice || order.price || order.average || 0) || currentPrice;
             
-            // Extract TP/SL from signal or use reasonable defaults
-            const stopLoss = signal.stopLoss || signal.stopLossPrice || (side === 'buy' ? entryPrice * 0.97 : entryPrice * 1.03);
-            const target   = signal.target   || signal.targetPrice   || signal.takeProfit || (side === 'buy' ? entryPrice * 1.06 : entryPrice * 0.94);
+            // Dynamic Risk Management
+            const { stopLoss, target } = this.calculateHorizonTPSL(config.tradeHorizon, leverage, entryPrice, side);
 
             const newTrade = await ExecutedTrade.create({
                 userId,
@@ -716,12 +756,24 @@ class BinanceService {
 
             const realPositions = await rawFuturesPositions(apiKey, apiSecret, isTestnet);
             const activeReal = realPositions.filter(p => parseFloat(p.positionAmt) !== 0);
+            
+            // Self-Healing: Clean up corrupted symbols in DB before sync
+            const allMyTrades = await ExecutedTrade.findAll({ where: { userId } });
+            for (const t of allMyTrades) {
+                const normalized = this.normalizeSymbol(t.symbol);
+                if (t.symbol !== normalized) {
+                    console.log(`[Sync] Repairing corrupted symbol: ${t.symbol} -> ${normalized}`);
+                    t.symbol = normalized;
+                    await t.save();
+                }
+            }
+
             const dbOpenTrades = await ExecutedTrade.findAll({ where: { userId, status: 'OPEN', type: 'FUTURES' } });
 
             const results = { closed: 0, updated: 0, added: 0 };
             // 3. Update existing OPEN trades and ensure TP/SL is sent
             for (const dbTrade of dbOpenTrades) {
-                const apiSymbol = dbTrade.symbol.replace('/', '').replace(':USDT', '');
+                const apiSymbol = this.toApiSymbol(dbTrade.symbol);
                 const stillOpen = activeReal.find(p => p.symbol === apiSymbol && Math.abs(parseFloat(p.positionAmt)) > 0);
 
                 if (!stillOpen) {
@@ -736,9 +788,12 @@ class BinanceService {
                     dbTrade.status = 'CLOSED';
                     dbTrade.closedAt = new Date();
                     dbTrade.exitPrice = exitPrice;
-                    dbTrade.pnl = (dbTrade.side === 'BUY' 
-                        ? (dbTrade.exitPrice - dbTrade.entryPrice) 
-                        : (dbTrade.entryPrice - dbTrade.exitPrice)) * dbTrade.amount;
+                    
+                    const sideMultiplier = dbTrade.side === 'BUY' ? 1 : -1;
+                    const priceDiff = (dbTrade.exitPrice - dbTrade.entryPrice) * sideMultiplier;
+                    
+                    dbTrade.pnl = priceDiff * dbTrade.amount;
+                    dbTrade.pnlPercentage = (priceDiff / dbTrade.entryPrice) * 100 * (dbTrade.leverage || 1);
                     
                     await dbTrade.save();
                     results.closed++;
@@ -759,7 +814,7 @@ class BinanceService {
             const allDbTrades = await ExecutedTrade.findAll({ where: { userId } });
             for (const realPos of activeReal) {
                 const apiSymbol = realPos.symbol;
-                const standardSymbol = apiSymbol.replace('USDT', '/USDT') + ':USDT';
+                const standardSymbol = this.normalizeSymbol(apiSymbol);
                 const openExists = dbOpenTrades.find(t => t.symbol === standardSymbol);
                 if (openExists) continue;
 
@@ -784,9 +839,9 @@ class BinanceService {
                         await this.setExchangeTPSL(userId, closedMatch.id);
                     } catch (e) { console.warn('[Sync-TPSL] Re-open error:', e.message); }
                 } else {
-                    // Create new DETECTED
-                    const slPrice = isBuy ? entryPrice * 0.97 : entryPrice * 1.03;
-                    const tpPrice = isBuy ? entryPrice * 1.06 : entryPrice * 0.94;
+                    // Create new DETECTED with Horizon-based TP/SL
+                    const { stopLoss, target } = this.calculateHorizonTPSL(config.tradeHorizon, parseInt(realPos.leverage), entryPrice, isBuy ? 'BUY' : 'SELL');
+                    
                     const newDet = await ExecutedTrade.create({
                         userId,
                         symbol: standardSymbol,
@@ -797,8 +852,8 @@ class BinanceService {
                         status: 'OPEN',
                         leverage: parseInt(realPos.leverage),
                         exchangeOrderId: 'DETECTED',
-                        stopLossPrice: slPrice,
-                        targetPrice: tpPrice
+                        stopLossPrice: stopLoss,
+                        targetPrice: target
                     });
                     results.added++;
                     
