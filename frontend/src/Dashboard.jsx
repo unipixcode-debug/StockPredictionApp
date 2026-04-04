@@ -527,6 +527,14 @@ function PredictionCard({ data, onDelete, navigate }) {
     }
   }, [expanded]);
 
+  useEffect(() => {
+    let interval;
+    if (showActualPath) {
+      interval = setInterval(fetchComparisonData, 30000); // 30s auto-refresh for reality path
+    }
+    return () => clearInterval(interval);
+  }, [showActualPath]);
+
   const fetchComparisonData = async () => {
     // Only fetch if prediction is at least 5 minutes old
     const age = Date.now() - new Date(data.createdAt).getTime();
@@ -640,17 +648,16 @@ function PredictionCard({ data, onDelete, navigate }) {
                          <div className="w-2 h-2 rounded-full bg-emerald-500" />
                          <span className="text-[10px] uppercase font-black tracking-tighter opacity-70">Gerçekleşen</span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                         <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_#facc15]" />
-                         <span className="text-[10px] uppercase font-black tracking-tighter text-yellow-400">ML Tahmini</span>
-                      </div>
-                      {postCreationData.length > 0 && (
+                      {Date.now() - new Date(data.createdAt).getTime() > 2 * 60 * 1000 && (
                         <button 
                           onClick={() => setShowActualPath(!showActualPath)}
-                          className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl border transition-all ${showActualPath ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-secondary/40 border-border text-muted-foreground hover:border-emerald-500/20'}`}
+                          disabled={fetchingComparison && !postCreationData.length}
+                          className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl border transition-all ${showActualPath ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 font-black' : 'bg-secondary/40 border-border text-muted-foreground hover:border-emerald-500/20'}`}
                         >
-                          <Activity size={12} className={showActualPath ? 'animate-pulse' : ''} />
-                          <span className="text-[9px] font-black uppercase tracking-widest">{showActualPath ? 'Gerçekliği Gizle' : 'Gelişmeleri İzle'}</span>
+                          {fetchingComparison ? <RefreshCw size={12} className="animate-spin" /> : <Activity size={12} className={showActualPath ? 'animate-pulse' : ''} />}
+                          <span className="text-[9px] font-black uppercase tracking-widest">
+                            {showActualPath ? 'Gerçekliği Gizle' : (fetchingComparison && !postCreationData.length ? 'Veri Alınıyor...' : 'Gelişmeleri İzle')}
+                          </span>
                         </button>
                       )}
                     </div>
