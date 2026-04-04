@@ -165,6 +165,35 @@ function rawFuturesBalance(apiKey, apiSecret, isTestnet = true) {
 }
 
 /**
+ * Direct HTTPS GET for user trade history (fills)
+ */
+function rawFuturesUserTrades(apiKey, apiSecret, params, isTestnet = true) {
+    return new Promise((resolve, reject) => {
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
+        const timestamp = Date.now();
+        const query = querystring.stringify({ ...params, timestamp, recvWindow: 60000 });
+        const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
+        const path = `/fapi/v1/userTrades?${query}&signature=${signature}`;
+
+        https.get({
+            hostname,
+            path,
+            headers: { 'X-MBX-APIKEY': apiKey }
+        }, (res) => {
+            let data = '';
+            res.on('data', d => data += d);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (Array.isArray(parsed)) resolve(parsed);
+                    else reject(new Error(`binance userTrades: ${JSON.stringify(parsed)}`));
+                } catch { reject(new Error('Invalid JSON from userTrades: ' + data)); }
+            });
+        }).on('error', reject);
+    });
+}
+
+/**
  * Direct HTTPS POST for leverage
  */
 function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true) {
@@ -788,16 +817,40 @@ class BinanceService {
                         continue;
                     }
 
-                    // Fetch exit price for P&L calculation properly incorrectly surely
+                    // Fix: Fetch ACTUAL exit price from User Trade History instead of ticker fallback correctly properly milimetrically
                     let exitPrice = 0;
                     try {
-                        const { exchange } = await this.getExchangeInstance(userId, 'FUTURES');
-                        const ticker = await exchange.fetchTicker(dbTrade.symbol);
-                        exitPrice = ticker.last || 0;
-                    } catch (pErr) { /* fallback to entry */ }
+                        const apiSymbol = this.toApiSymbol(dbTrade.symbol);
+                        const trades = await rawFuturesUserTrades(apiKey, apiSecret, { symbol: apiSymbol, limit: 10 }, isTestnet);
+                        
+                        // Filter trades that occurred after open and match closing side correctly properly
+                        const closeSide = dbTrade.side === 'BUY' ? 'SELL' : 'BUY';
+                        const relevantTrades = trades.filter(t => 
+                            t.side.toUpperCase() === closeSide && 
+                            parseInt(t.time) > (new Date(dbTrade.createdAt).getTime() - 10000)
+                        );
 
-                    // Fix: Ensure exitPrice is never zero if we found a ticker
-                    if (exitPrice === 0) exitPrice = dbTrade.entryPrice;
+                        if (relevantTrades.length > 0) {
+                            const totalQty = relevantTrades.reduce((sum, t) => sum + parseFloat(t.qty), 0);
+                            const weightedSum = relevantTrades.reduce((sum, t) => sum + (parseFloat(t.price) * parseFloat(t.qty)), 0);
+                            exitPrice = weightedSum / totalQty;
+                            console.log(`[Sync] Recovered REAL exit price for ${dbTrade.symbol}: ${exitPrice}`);
+                        }
+                    } catch (hErr) {
+                        console.warn(`[Sync] History recovery failed for ${dbTrade.symbol}:`, hErr.message);
+                    }
+
+                    // Secondary fallback to ticker
+                    if (exitPrice === 0) {
+                        try {
+                            const { exchange } = await this.getExchangeInstance(userId, 'FUTURES');
+                            const ticker = await exchange.fetchTicker(dbTrade.symbol);
+                            exitPrice = ticker.last || 0;
+                        } catch (pErr) { /* ignore */ }
+                    }
+
+                    // Last resort: markPrice from some recent pool (if available) or DB entry as final failsafe correctly
+                    if (exitPrice === 0) exitPrice = parseFloat(dbTrade.entryPrice);
 
                     dbTrade.status = 'CLOSED';
                     dbTrade.closedAt = new Date();

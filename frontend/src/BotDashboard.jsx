@@ -591,18 +591,19 @@ export default function BotDashboard() {
                                             </div>
                                          </div>
                                          <div className="flex flex-col md:items-end text-sm font-medium">
-                                             <span className="text-muted-foreground">Giriş: <span className="text-foreground">${trade.entryPrice}</span></span>
-                                             {trade.exitPrice && <span>Çıkış: <span className="text-foreground">${trade.exitPrice}</span></span>}
+                                             <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-tight">Giriş: <span className="text-foreground font-black">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span></span>
+                                             {trade.exitPrice && <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-tight">Çıkış: <span className="text-cyan-400 font-black">${parseFloat(trade.exitPrice).toFixed(4)}</span></span>}
                                          </div>
                                          <div className="flex flex-col md:items-end w-32">
-                                             <span className={`text-lg font-black ${trade.pnl > 0 ? 'text-emerald-500' : trade.pnl < 0 ? 'text-rose-500' : 'text-muted-foreground'}`}>
-                                                 {trade.pnl > 0 ? '+' : ''}{trade.pnl.toFixed(2)}$
+                                             <span className={`text-lg font-black tracking-tighter ${trade.pnl > 0 ? 'text-emerald-500' : trade.pnl < 0 ? 'text-rose-500' : 'text-muted-foreground'}`}>
+                                                 {trade.pnl > 0 ? '+' : ''}{parseFloat(trade.pnl || 0).toFixed(4)}$
                                              </span>
                                              {trade.exitPrice && trade.entryPrice && (
                                                 <span className={`text-[11px] font-black tracking-tighter ${trade.pnl > 0 ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
                                                     {(() => {
                                                         const entry = parseFloat(trade.entryPrice);
                                                         const exit = parseFloat(trade.exitPrice);
+                                                        if (isNaN(entry) || isNaN(exit) || entry === 0) return '(0.00%)';
                                                         const leverage = parseFloat(trade.leverage || 1);
                                                         const sideMultiplier = trade.side === 'BUY' ? 1 : -1;
                                                         const pct = ((exit - entry) / entry) * 100 * sideMultiplier * leverage;
