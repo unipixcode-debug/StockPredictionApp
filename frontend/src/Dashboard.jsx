@@ -513,6 +513,7 @@ function StatCard({ label, value, trend, trendUp = true, icon, loading = false }
 function PredictionCard({ data, onDelete, navigate }) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
+  const [showActualPath, setShowActualPath] = useState(false);
   const [postCreationData, setPostCreationData] = useState([]);
   const [fetchingComparison, setFetchingComparison] = useState(false);
   const isBuy = data.direction === 'BUY';
@@ -629,9 +630,12 @@ function PredictionCard({ data, onDelete, navigate }) {
 
               {data.analysis_details?.chartData && data.analysis_details.chartData.length > 0 && (
                 <div className="pt-6 border-t border-border/30">
-                  <div className="flex items-center justify-between mb-6">
-                    <h4 className="text-xs font-black tracking-widest uppercase text-muted-foreground">{t('AITrendChart')}</h4>
-                    <div className="flex items-center space-x-6">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
+                    <div className="flex flex-col">
+                      <h4 className="text-xs font-black tracking-widest uppercase text-muted-foreground">{t('AITrendChart')}</h4>
+                      <p className="text-[9px] text-muted-foreground opacity-50 font-bold uppercase mt-1">Geriye Dönük Karşılaştırma Modu</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-6">
                       <div className="flex items-center space-x-2">
                          <div className="w-2 h-2 rounded-full bg-emerald-500" />
                          <span className="text-[10px] uppercase font-black tracking-tighter opacity-70">Gerçekleşen</span>
@@ -640,6 +644,15 @@ function PredictionCard({ data, onDelete, navigate }) {
                          <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_#facc15]" />
                          <span className="text-[10px] uppercase font-black tracking-tighter text-yellow-400">ML Tahmini</span>
                       </div>
+                      {postCreationData.length > 0 && (
+                        <button 
+                          onClick={() => setShowActualPath(!showActualPath)}
+                          className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl border transition-all ${showActualPath ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-secondary/40 border-border text-muted-foreground hover:border-emerald-500/20'}`}
+                        >
+                          <Activity size={12} className={showActualPath ? 'animate-pulse' : ''} />
+                          <span className="text-[9px] font-black uppercase tracking-widest">{showActualPath ? 'Gerçekliği Gizle' : 'Gelişmeleri İzle'}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="h-64 w-full">
@@ -660,6 +673,17 @@ function PredictionCard({ data, onDelete, navigate }) {
                         margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                       >
                         <defs>
+                          <filter id="shadowPath" height="200%">
+                            <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+                            <feOffset dx="0" dy="2" result="offsetblur" />
+                            <feComponentTransfer>
+                              <feFuncA type="linear" slope="0.5" />
+                            </feComponentTransfer>
+                            <feMerge>
+                              <feMergeNode />
+                              <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                          </filter>
                           <linearGradient id={`splitLine-${data.id}`} x1="0" y1="0" x2="1" y2="0">
                             <stop offset="66.6%" stopColor={isBuy ? "#10b981" : "#e11d48"} />
                             <stop offset="66.6%" stopColor="#facc15" />
@@ -717,8 +741,8 @@ function PredictionCard({ data, onDelete, navigate }) {
                         <ReferenceLine y={data.targetPrice} stroke="#10b981" label={{ value: 'HEDEF', position: 'left', fill: '#10b981', fontSize: 10, fontWeight: 'black' }} />
                         <ReferenceLine y={data.stopLoss} stroke="#e11d48" label={{ value: 'STOP', position: 'left', fill: '#e11d48', fontSize: 10, fontWeight: 'black' }} />
                         
-                        {/* Comparison Line: Actual Price after prediction squarely correctly */}
-                        {postCreationData && postCreationData.length > 0 && (
+                        {/* Reality Check: Actual Price Path after prediction SQUARELY correctly */}
+                        {showActualPath && postCreationData && postCreationData.length > 0 && (
                           <Line
                             type="monotone"
                             data={postCreationData.map((d, i) => ({ 
@@ -726,11 +750,11 @@ function PredictionCard({ data, onDelete, navigate }) {
                                realPath: d.price || d.close 
                             }))}
                             dataKey="realPath"
-                            stroke="#00f2fe"
-                            strokeWidth={3}
-                            strokeDasharray="5 5"
+                            stroke="#10b981"
+                            strokeWidth={5}
                             dot={false}
-                            animationDuration={3000}
+                            filter="url(#shadowPath)"
+                            animationDuration={2000}
                           />
                         )}
 
