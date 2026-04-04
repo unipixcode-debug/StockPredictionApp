@@ -11,7 +11,7 @@ const marketDataService = require('./marketDataService');
  */
 function rawFuturesAlgoOrder(apiKey, apiSecret, params, isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const path     = '/fapi/v1/algoOrder';
 
         const timestamp = Date.now();
@@ -58,7 +58,7 @@ function rawFuturesAlgoOrder(apiKey, apiSecret, params, isTestnet = true) {
  */
 function rawCancelAllAlgoOrders(apiKey, apiSecret, symbol, isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const timestamp = Date.now();
         const query = querystring.stringify({ symbol: symbol.toUpperCase(), timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
@@ -86,7 +86,7 @@ function rawCancelAllAlgoOrders(apiKey, apiSecret, symbol, isTestnet = true) {
  */
 function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const path     = '/fapi/v1/order';
 
         if (params.symbol) params.symbol = params.symbol.toUpperCase();
@@ -134,7 +134,7 @@ function rawFuturesOrder(apiKey, apiSecret, params, isTestnet = true) {
  */
 function rawFuturesBalance(apiKey, apiSecret, isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const timestamp = Date.now();
         const query = querystring.stringify({ timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
@@ -169,7 +169,7 @@ function rawFuturesBalance(apiKey, apiSecret, isTestnet = true) {
  */
 function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         if (params.symbol) params.symbol = params.symbol.toUpperCase();
         const timestamp = Date.now();
         const body = querystring.stringify({ ...params, timestamp, recvWindow: 60000 });
@@ -207,7 +207,7 @@ function rawFuturesLeverage(apiKey, apiSecret, params, isTestnet = true) {
  */
 function rawFuturesAccount(apiKey, apiSecret, isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const timestamp = Date.now();
         const query = querystring.stringify({ timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
@@ -236,7 +236,7 @@ function rawFuturesAccount(apiKey, apiSecret, isTestnet = true) {
  */
 function rawFuturesBrackets(apiKey, apiSecret, symbol = '', isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const timestamp = Date.now();
         const params = symbol ? { symbol: symbol.toUpperCase(), timestamp, recvWindow: 60000 } : { timestamp, recvWindow: 60000 };
         const query = querystring.stringify(params);
@@ -267,7 +267,7 @@ function rawFuturesBrackets(apiKey, apiSecret, symbol = '', isTestnet = true) {
  */
 function rawFuturesPositions(apiKey, apiSecret, isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const timestamp = Date.now();
         const query = querystring.stringify({ timestamp, recvWindow: 60000 });
         const signature = crypto.createHmac('sha256', apiSecret).update(query).digest('hex');
@@ -296,7 +296,7 @@ function rawFuturesPositions(apiKey, apiSecret, isTestnet = true) {
  */
 function rawFuturesPublicOHLCV(symbol, timeframe = '5m', limit = 30, isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const url = `https://${hostname}/fapi/v1/klines?symbol=${symbol.toUpperCase()}&interval=${timeframe}&limit=${limit}`;
         https.get(url, (res) => {
             let data = '';
@@ -324,7 +324,7 @@ function rawFuturesPublicOHLCV(symbol, timeframe = '5m', limit = 30, isTestnet =
  */
 function rawFutures24hrTickers(isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const url = `https://${hostname}/fapi/v1/ticker/24hr`;
         https.get(url, (res) => {
             let data = '';
@@ -345,7 +345,7 @@ function rawFutures24hrTickers(isTestnet = true) {
  */
 function rawFuturesPublicTickers(isTestnet = true, symbol = null) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         const url = `https://${hostname}/fapi/v1/ticker/price` + (symbol ? `?symbol=${symbol.toUpperCase()}` : '');
         https.get(url, (res) => {
             let data = '';
@@ -374,7 +374,7 @@ function rawFuturesPublicTickers(isTestnet = true, symbol = null) {
  */
 function rawFuturesTime(isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         https.get(`https://${hostname}/fapi/v1/time`, (res) => {
             let data = '';
             res.on('data', d => data += d);
@@ -393,7 +393,7 @@ function rawFuturesTime(isTestnet = true) {
  */
 function rawFuturesMarkets(isTestnet = true) {
     return new Promise((resolve, reject) => {
-        const hostname = isTestnet ? 'demo-fapi.binance.com' : 'fapi.binance.com';
+        const hostname = isTestnet ? 'testnet.binancefuture.com' : 'fapi.binance.com';
         https.get(`https://${hostname}/fapi/v1/exchangeInfo`, (res) => {
             let data = '';
             res.on('data', d => data += d);
@@ -776,14 +776,28 @@ class BinanceService {
                 const apiSymbol = this.toApiSymbol(dbTrade.symbol);
                 const stillOpen = activeReal.find(p => p.symbol === apiSymbol && Math.abs(parseFloat(p.positionAmt)) > 0);
 
+                const now = new Date();
+                const createdAt = new Date(dbTrade.createdAt);
+                const ageMs = now.getTime() - createdAt.getTime();
+                const GRACE_PERIOD_MS = 120 * 1000; // 2 minutes
+
                 if (!stillOpen) {
+                    // Fix: Skip closing if the trade was just opened (Grace Period)
+                    if (ageMs < GRACE_PERIOD_MS) {
+                        console.log(`[Sync] Skipping premature close for ${dbTrade.symbol} (Age: ${Math.round(ageMs/1000)}s)`);
+                        continue;
+                    }
+
                     // Fetch exit price for P&L calculation properly incorrectly surely
                     let exitPrice = 0;
                     try {
                         const { exchange } = await this.getExchangeInstance(userId, 'FUTURES');
                         const ticker = await exchange.fetchTicker(dbTrade.symbol);
                         exitPrice = ticker.last || 0;
-                    } catch (pErr) { /* fallback to zero/entry */ }
+                    } catch (pErr) { /* fallback to entry */ }
+
+                    // Fix: Ensure exitPrice is never zero if we found a ticker
+                    if (exitPrice === 0) exitPrice = dbTrade.entryPrice;
 
                     dbTrade.status = 'CLOSED';
                     dbTrade.closedAt = new Date();

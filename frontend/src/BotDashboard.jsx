@@ -454,15 +454,25 @@ export default function BotDashboard() {
                                                             <span className="text-[10px] text-muted-foreground uppercase font-bold">Giriş:</span>
                                                             <span className="text-xs text-foreground font-black">${parseFloat(trade.entryPrice || 0).toFixed(4)}</span>
                                                         </div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[10px] text-cyan-400/70 uppercase font-bold">Piyasa:</span>
+                                                            <span className="text-xs text-cyan-400 font-black">${parseFloat(trade.currentPrice || 0).toFixed(4)}</span>
+                                                        </div>
+                                                        {trade.type === 'FUTURES' && trade.liquidationPrice > 0 && (
+                                                            <div className="flex items-center gap-1.5 border-l border-white/10 pl-4 ml-1">
+                                                                <span className="text-[10px] text-rose-500/70 uppercase font-bold">Likidasyon:</span>
+                                                                <span className="text-xs text-rose-500 font-black">${parseFloat(trade.liquidationPrice).toFixed(4)}</span>
+                                                            </div>
+                                                        )}
                                                         {trade.stopLossPrice && (
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="text-[10px] text-rose-400/70 uppercase font-bold">Stop:</span>
+                                                                <span className="text-[10px] text-rose-400/70 uppercase font-bold text-center">Stop:</span>
                                                                 <span className="text-xs text-rose-400 font-black">${parseFloat(trade.stopLossPrice).toFixed(4)}</span>
                                                             </div>
                                                         )}
                                                         {trade.targetPrice && (
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="text-[10px] text-emerald-400/70 uppercase font-bold">Hedef:</span>
+                                                                <span className="text-[10px] text-emerald-400/70 uppercase font-bold text-center">Hedef:</span>
                                                                 <span className="text-xs text-emerald-400 font-black">${parseFloat(trade.targetPrice).toFixed(4)}</span>
                                                             </div>
                                                         )}
