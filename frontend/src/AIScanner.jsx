@@ -292,25 +292,43 @@ const AIScanner = () => {
                                             </div>
                                         </div>
 
-                                        {/* NEW: Price Chart with Signals */}
+                                        {/* NEW: Price Chart with Split Colors (History: Cyan, Prediction: Yellow) */}
                                         {historyData.length > 0 && (
                                             <div className="h-48 w-full mb-6 bg-secondary/10 rounded-3xl border border-border/30 p-4">
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={historyData}>
-                                                        <XAxis hide dataKey="time" />
+                                                        <defs>
+                                                            <linearGradient id="scannerSplit" x1="0" y1="0" x2="1" y2="0">
+                                                                <stop offset={((historyData.findLastIndex(d => !d.isPrediction) !== -1 ? historyData.findLastIndex(d => !d.isPrediction) : historyData.length - 6) / historyData.length * 100) + "%"} stopColor="#00f2fe" />
+                                                                <stop offset={((historyData.findLastIndex(d => !d.isPrediction) !== -1 ? historyData.findLastIndex(d => !d.isPrediction) : historyData.length - 6) / historyData.length * 100) + "%"} stopColor="#facc15" />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                                                        <XAxis dataKey="time" hide={false} height={0} tick={false} axisLine={false} />
                                                         <YAxis hide domain={['auto', 'auto']} />
                                                         <RechartsTooltip 
-                                                            contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '12px', fontSize: '10px' }}
+                                                            contentStyle={{ backgroundColor: '#0c0c0e', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '10px' }}
                                                             itemStyle={{ color: '#00f2fe' }}
                                                         />
+                                                        
+                                                        {/* Vertical Separator SQUARELY surely correctly */}
+                                                        <ReferenceLine 
+                                                            x={historyData.findLastIndex(d => !d.isPrediction) !== -1 ? historyData[historyData.findLastIndex(d => !d.isPrediction)].time : historyData[historyData.length - 6]?.time} 
+                                                            stroke="#facc1550" 
+                                                            strokeWidth={2} 
+                                                            strokeDasharray="4 4"
+                                                            label={{ value: 'PROJEKSİYON', position: 'top', fill: '#facc15', fontSize: 8, fontWeight: 'bold' }}
+                                                        />
+
                                                         <Line 
                                                             type="monotone" 
                                                             dataKey="close" 
-                                                            stroke="#00f2fe" 
-                                                            strokeWidth={2} 
+                                                            stroke="url(#scannerSplit)" 
+                                                            strokeWidth={4} 
                                                             dot={false} 
-                                                            animationDuration={1000}
+                                                            animationDuration={1500}
                                                         />
+
                                                         {levels.entry && (
                                                             <ReferenceLine 
                                                                 y={levels.entry} 

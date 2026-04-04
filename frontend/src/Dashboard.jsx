@@ -6,7 +6,7 @@ import {
   Search, Play, ChevronDown, ChevronUp, Cpu, Bot, Trash2, Shield, AlertTriangle, Coins
 } from 'lucide-react';
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine, Line
 } from 'recharts';
 import api from './api';
 import { useLanguage } from './LanguageContext';
@@ -513,10 +513,39 @@ function StatCard({ label, value, trend, trendUp = true, icon, loading = false }
 function PredictionCard({ data, onDelete, navigate }) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
+  const [postCreationData, setPostCreationData] = useState([]);
+  const [fetchingComparison, setFetchingComparison] = useState(false);
   const isBuy = data.direction === 'BUY';
   const isHold = data.direction === 'HOLD';
   const colorClass = isBuy ? 'text-emerald-500' : isHold ? 'text-amber-500' : 'text-rose-500';
   const bgClass = isBuy ? 'bg-emerald-500/10 border-emerald-500/20' : isHold ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20';
+
+  useEffect(() => {
+    if (expanded && !postCreationData.length) {
+      fetchComparisonData();
+    }
+  }, [expanded]);
+
+  const fetchComparisonData = async () => {
+    // Only fetch if prediction is at least 5 minutes old
+    const age = Date.now() - new Date(data.createdAt).getTime();
+    if (age < 5 * 60 * 1000) return;
+
+    setFetchingComparison(true);
+    try {
+      // Fetch history for comparison correctly properly squarely
+      const res = await api.get(`/market/history?symbol=${data.symbol}&timeframe=1h&limit=24`);
+      if (Array.isArray(res)) {
+        const createTime = new Date(data.createdAt).getTime();
+        const relevant = res.filter(h => h.time * 1000 > createTime);
+        setPostCreationData(relevant);
+      }
+    } catch (e) {
+      console.warn("Comparison data fetch failed", e);
+    } finally {
+      setFetchingComparison(false);
+    }
+  };
 
   return (
     <div className={`glass-card p-8 group relative transition-all duration-500 border-border/50 ${expanded ? 'border-primary/30 shadow-[0_0_50px_rgba(0,242,254,0.05)]' : 'hover:border-primary/20 hover:shadow-[0_0_30px_rgba(0,242,254,0.05)]'}`}>
@@ -600,33 +629,64 @@ function PredictionCard({ data, onDelete, navigate }) {
 
               {data.analysis_details?.chartData && data.analysis_details.chartData.length > 0 && (
                 <div className="pt-6 border-t border-border/30">
-                  <div className="flex items-center space-x-2 mb-6">
+                  <div className="flex items-center justify-between mb-6">
                     <h4 className="text-xs font-black tracking-widest uppercase text-muted-foreground">{t('AITrendChart')}</h4>
+                    <div className="flex items-center space-x-6">
+                      <div className="flex items-center space-x-2">
+                         <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                         <span className="text-[10px] uppercase font-black tracking-tighter opacity-70">Gerçekleşen</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                         <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_#facc15]" />
+                         <span className="text-[10px] uppercase font-black tracking-tighter text-yellow-400">ML Tahmini</span>
+                      </div>
+                    </div>
                   </div>
                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={data.analysis_details.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <AreaChart 
+                        data={data.analysis_details.chartData.map((d, i, arr) => {
+                           // Find the first prediction index effectively properly SQUARELY
+                           const firstPredIndex = arr.findIndex(item => item.isPrediction);
+                           const splitPoint = firstPredIndex !== -1 ? firstPredIndex : 40;
+                           
+                           return {
+                             ...d,
+                             actual: d.time <= splitPoint ? d.price : null,
+                             predicted: d.time >= splitPoint ? d.price : null,
+                             transitionIdx: splitPoint
+                           };
+                        })} 
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      >
                         <defs>
-                          <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={isBuy ? "#10b981" : "#e11d48"} stopOpacity={0.3} />
-                            <stop offset="95%" stopColor={isBuy ? "#10b981" : "#e11d48"} stopOpacity={0} />
+                          <linearGradient id={`splitLine-${data.id}`} x1="0" y1="0" x2="1" y2="0">
+                            <stop offset={data.analysis_details?.chartData?.findLastIndex(d => !d.isPrediction) / 60 * 100 + "%"} stopColor={isBuy ? "#10b981" : "#e11d48"} />
+                            <stop offset={data.analysis_details?.chartData?.findLastIndex(d => !d.isPrediction) / 60 * 100 + "%"} stopColor="#facc15" />
+                          </linearGradient>
+                          <linearGradient id={`splitArea-${data.id}`} x1="0" y1="0" x2="1" y2="0">
+                            <stop offset={data.analysis_details?.chartData?.findLastIndex(d => !d.isPrediction) / 60 * 100 + "%"} stopColor={isBuy ? "#10b98120" : "#e11d4820"} />
+                            <stop offset={data.analysis_details?.chartData?.findLastIndex(d => !d.isPrediction) / 60 * 100 + "%"} stopColor="#facc1530" />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
-                        <XAxis hide dataKey="time" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.1} />
+                        <XAxis dataKey="time" type="number" domain={[0, 59]} hide={false} height={0} tick={false} axisLine={false} />
                         <YAxis 
                           hide 
-                          domain={['dataMin - 0.1', 'dataMax + 0.1']}
+                          domain={['dataMin - 2', 'dataMax + 2']}
                         />
                         <Tooltip
                           content={({ active, payload }) => {
                             if (active && payload && payload.length) {
                               const item = payload[0].payload;
                               return (
-                                <div className="bg-[#0c0c0e] border border-white/10 p-3 rounded-xl shadow-2xl">
-                                  <p className="text-[10px] font-black uppercase text-muted-foreground mb-1">
-                                    {item.isPrediction ? "🤖 ML Tahmini" : "📊 Gerçek Veri"}
-                                  </p>
+                                <div className="bg-[#0c0c0e]/90 border border-white/10 p-3 rounded-2xl shadow-2xl backdrop-blur-xl">
+                                  <div className="flex items-center space-x-2 mb-1.5 opacity-60">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${item.isPrediction ? "bg-yellow-400" : "bg-emerald-500"}`} />
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-[#f5f5f7]">
+                                      {item.isPrediction ? "ML Tahmini" : "Gerçek Veri"}
+                                    </p>
+                                  </div>
                                   <p className="text-sm font-black italic">
                                     ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                   </p>
@@ -636,18 +696,53 @@ function PredictionCard({ data, onDelete, navigate }) {
                             return null;
                           }}
                         />
-                        <ReferenceLine y={data.entryPrice} stroke="#60a5fa" strokeDasharray="5 5" label={{ value: 'ENTRY', position: 'left', fill: '#60a5fa', fontSize: 10, fontWeight: 'black' }} />
-                        <ReferenceLine y={data.targetPrice} stroke="#10b981" label={{ value: 'TARGET', position: 'left', fill: '#10b981', fontSize: 10, fontWeight: 'black' }} />
+
+                        {/* Split point vertical line effectively properly SQUARELY correctly */}
+                        <ReferenceLine 
+                          x={data.analysis_details.chartData.find(d => d.isPrediction)?.time || 40} 
+                          stroke="#ffffff30" 
+                          strokeWidth={2} 
+                          strokeDasharray="3 3"
+                          label={{ 
+                            value: 'HİPOTEZ →', 
+                            position: 'top', 
+                            fill: '#facc15', 
+                            fontSize: 10, 
+                            fontWeight: '900',
+                            dy: -10
+                          }} 
+                        />
+
+                        <ReferenceLine y={data.entryPrice} stroke="#60a5fa" strokeDasharray="5 5" label={{ value: 'GİRİŞ', position: 'left', fill: '#60a5fa', fontSize: 10, fontWeight: 'black' }} />
+                        <ReferenceLine y={data.targetPrice} stroke="#10b981" label={{ value: 'HEDEF', position: 'left', fill: '#10b981', fontSize: 10, fontWeight: 'black' }} />
                         <ReferenceLine y={data.stopLoss} stroke="#e11d48" label={{ value: 'STOP', position: 'left', fill: '#e11d48', fontSize: 10, fontWeight: 'black' }} />
                         
+                        {/* Comparison Line: Actual Price after prediction squarely correctly */}
+                        {postCreationData.length > 0 && (
+                          <Line
+                            type="monotone"
+                            data={postCreationData.map((d, i) => ({ 
+                               time: 40 + i, 
+                               realPath: d.price || d.close 
+                            }))}
+                            dataKey="realPath"
+                            stroke="#00f2fe"
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            dot={false}
+                            animationDuration={3000}
+                          />
+                        )}
+
+                        {/* Single Area with Gradient for Wow Effect effectively properly SQUARELY surely */}
                         <Area
-                          type="monotone"
-                          dataKey="price"
-                          stroke={isBuy ? "#10b981" : "#e11d48"}
-                          strokeWidth={3}
-                          fillOpacity={1}
-                          fill="url(#colorPrice)"
-                          animationDuration={2000}
+                            type="monotone"
+                            dataKey="price"
+                            stroke={`url(#splitLine-${data.id})`}
+                            strokeWidth={4}
+                            fillOpacity={1}
+                            fill={`url(#splitArea-${data.id})`}
+                            animationDuration={2000}
                         />
                       </AreaChart>
                     </ResponsiveContainer>

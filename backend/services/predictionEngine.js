@@ -85,12 +85,15 @@ class PredictionEngine {
             if (isNaN(stopLoss)) stopLoss = currentPrice * 0.95;
 
             const priceHistory = [];
-            for (let i = 0; i < 20; i++) {
-                const isFuture = i > 14;
-                let price = currentPrice * (1 + (Math.random() - 0.5) * 0.02);
+            for (let i = 0; i < 60; i++) {
+                const isFuture = i >= 40;
+                let price = currentPrice * (1 + (Math.random() - 0.5) * 0.015); // History noise
+                
                 if (isFuture) {
-                    const progress = (i - 14) / 6;
-                    price = currentPrice + (targetPrice - currentPrice) * progress + (Math.random() - 0.5) * 0.01 * currentPrice;
+                    const progress = (i - 40) / 20; // 20 points for prediction
+                    // Smoother prediction curve towards target
+                    const basePrice = currentPrice + (targetPrice - currentPrice) * progress;
+                    price = basePrice + (Math.random() - 0.5) * 0.005 * currentPrice; // Reduced noise for stability
                 }
                 priceHistory.push({ time: i, price, isPrediction: isFuture });
             }

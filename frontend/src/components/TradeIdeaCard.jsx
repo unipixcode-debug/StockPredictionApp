@@ -12,11 +12,10 @@ const TradeIdeaCard = ({ data }) => {
     const isBullish = data.sentiment === 'Bullish' || data.return > 0;
     const accentColor = isBullish ? '#10b981' : '#f43f5e';
     
-    // Mock chart data for premium look
+    // Mock chart data for premium look (40 actual, 20 predicted)
     const chartData = [
-        { val: 40 }, { val: 45 }, { val: 42 }, { val: 48 }, { val: 46 }, 
-        { val: 52 }, { val: 50 }, { val: 55 }, { val: 58 }, { val: 54 }, 
-        { val: 60 }, { val: 62 }, { val: 65 }, { val: 68 }, { val: 70 }
+        ...Array.from({ length: 40 }, (_, i) => ({ val: 40 + Math.sin(i / 5) * 10 + Math.random() * 5, isPrediction: false })),
+        ...Array.from({ length: 20 }, (_, i) => ({ val: 50 + (isBullish ? i * 1.5 : -i * 1.5) + Math.random() * 2, isPrediction: true }))
     ].map((d, i) => ({ ...d, x: i }));
 
     return (
@@ -70,30 +69,40 @@ const TradeIdeaCard = ({ data }) => {
                 </div>
 
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData}>
+                    <AreaChart 
+                        data={chartData.map((d, i, arr) => {
+                            const firstPredIndex = arr.findIndex(item => item.isPrediction);
+                            const splitPoint = firstPredIndex !== -1 ? firstPredIndex : 40;
+                            return {
+                                ...d,
+                                actual: i <= splitPoint ? d.val : null,
+                                predicted: i >= splitPoint ? d.val : null
+                            };
+                        })}
+                    >
                         <defs>
-                            <linearGradient id={`grad-${data.id}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={accentColor} stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor={accentColor} stopOpacity={0}/>
+                            <linearGradient id={`split-line-${data.id}`} x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="66%" stopColor={accentColor} />
+                                <stop offset="66%" stopColor="#facc15" />
+                            </linearGradient>
+                            <linearGradient id={`split-area-${data.id}`} x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="66%" stopColor={accentColor} stopOpacity={0.2} />
+                                <stop offset="66%" stopColor="#facc1530" />
                             </linearGradient>
                         </defs>
                         <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
+                        <XAxis dataKey="x" type="number" domain={[0, 59]} hide />
+                        
+                        <ReferenceLine x={40} stroke="#ffffff20" strokeWidth={1} strokeDasharray="2 2" />
+                        
                         <Area 
                             type="monotone" 
                             dataKey="val" 
-                            stroke={accentColor} 
-                            strokeWidth={2}
+                            stroke={`url(#split-line-${data.id})`}
+                            strokeWidth={2.5}
                             fillOpacity={1} 
-                            fill={`url(#grad-${data.id})`}
+                            fill={`url(#split-area-${data.id})`}
                             isAnimationActive={true}
-                            dot={(props) => {
-                                if (props.index === chartData.length - 5) {
-                                    return (
-                                        <dot cx={props.cx} cy={props.cy} r={4} fill={accentColor} stroke="#fff" strokeWidth={1} />
-                                    );
-                                }
-                                return null;
-                            }}
                         />
                     </AreaChart>
                 </ResponsiveContainer>
