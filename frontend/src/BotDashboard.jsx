@@ -70,7 +70,7 @@ export default function BotDashboard() {
             setConfig(configRes);
             setTrades(tradeRes.trades || []);
             
-            // Use the comprehensive totalPnl from Binance if available milimetrically securely correctly properly correctly
+            // Use the comprehensive totalPnl from Binance if available
             const realizedFromDb = tradeRes.stats?.totalPnl || 0;
             const absoluteTotalPnl = summaryRes ? parseFloat(summaryRes.totalPnl) : realizedFromDb;
             
@@ -846,7 +846,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                 </button>
                             </div>
                             <p className="mt-3 text-[9px] font-bold text-amber-500/50 uppercase tracking-widest text-center">
-                                * Seçilen vadeye göre TP/SL rasyoları saniyeler içinde milimetrik otomatik sök tak yöntemiyle milisaniyeler içinde güncellenir.
+                                * Seçilen vadeye göre TP/SL rasyoları ve risk yönetimi parametreleri sistem tarafından otomatik olarak güncellenir.
                             </p>
                         </div>
                         
