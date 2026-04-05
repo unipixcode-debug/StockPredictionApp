@@ -19,13 +19,14 @@ class NewsService {
                 createdAt: { [Op.gte]: oneWeekAgo }
             };
 
+            const Sequelize = require('sequelize');
             if (symbol) {
                 const upperSymbol = symbol.toUpperCase();
                 whereClause[Op.or] = [
                     { titleEN: { [Op.iLike]: `%${upperSymbol}%` } },
                     { titleTR: { [Op.iLike]: `%${upperSymbol}%` } },
                     { tags: { [Op.iLike]: `%${upperSymbol}%` } },
-                    { impacts: { [Op.iLike]: `%${upperSymbol}%` } }
+                    Sequelize.where(Sequelize.cast(Sequelize.col('impacts'), 'text'), { [Op.iLike]: `%${upperSymbol}%` })
                 ];
             }
 
