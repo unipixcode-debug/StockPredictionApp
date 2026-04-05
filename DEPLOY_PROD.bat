@@ -1,5 +1,5 @@
 @echo off
-set "KEY_PATH=C:\Projeler\Oracleserverac\24GB\ssh-key-2026-03-14 (2).key"
+set "KEY_PATH=C:\Users\erdem\.ssh\OracleServer3-24.key"
 set "SERVER_IP=80.225.246.21"
 set "GIT_SSH=C:\Program Files\Git\usr\bin\ssh.exe"
 
