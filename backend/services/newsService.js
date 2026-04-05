@@ -98,20 +98,19 @@ class NewsService {
                         isTranslated: !!item.titleTR
                     };
                 }).filter(n => {
-                    // Smart Strict Filter: Significant Global Sentiment OR Significant Specific Asset Impact
+                    // 🎯 EXPLICIT INTEREST: If user clicks a symbol, we ALWAYS show news for that symbol.
+                    // This bypasses the strict filter ONLY for the requested symbol.
+                    if (symbol) {
+                        const upperSym = symbol.toUpperCase();
+                        const matchesSymbol = (n.tags || '').toUpperCase().includes(upperSym) || 
+                                           (Array.isArray(n.impacts) && n.impacts.some(imp => imp.asset === upperSym));
+                        if (matchesSymbol) return true;
+                    }
+
+                    // 🛡️ GENERAL STRICT FILTER: Standard professional signal filtering for the general feed
                     if (strict) {
                         const isGloballySignificant = Math.abs((n.sentimentScore || 50) - 50) >= 20 || (n.importanceScore || 0) >= 85;
-                        
-                        // Also check if this specific symbol has a >= 70% impact in its impacts array
-                        let hasHighSpecificImpact = false;
-                        if (symbol && Array.isArray(n.impacts)) {
-                            const upperSym = symbol.toUpperCase();
-                            hasHighSpecificImpact = n.impacts.some(imp => 
-                                imp.asset === upperSym && Math.abs(parseInt(imp.score)) >= 70
-                            );
-                        }
-                        
-                        return isGloballySignificant || hasHighSpecificImpact;
+                        return isGloballySignificant;
                     }
                     return true;
                 });
