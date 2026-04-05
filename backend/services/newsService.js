@@ -5,7 +5,7 @@ const cheerio = require('cheerio');
 const NewsSummary = require('../models/NewsSummary');
 const DataSource = require('../models/DataSource');
 const aiService = require('./aiService');
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 
 class NewsService {
     async fetchLatestNews(days = 7, targetLang = 'TR', symbol = null, strict = false) {
@@ -19,14 +19,14 @@ class NewsService {
                 createdAt: { [Op.gte]: oneWeekAgo }
             };
 
-            const Sequelize = require('sequelize');
             if (symbol) {
                 const upperSymbol = symbol.toUpperCase();
                 whereClause[Op.or] = [
                     { titleEN: { [Op.iLike]: `%${upperSymbol}%` } },
                     { titleTR: { [Op.iLike]: `%${upperSymbol}%` } },
                     { tags: { [Op.iLike]: `%${upperSymbol}%` } },
-                    Sequelize.where(Sequelize.cast(Sequelize.col('impacts'), 'text'), { [Op.iLike]: `%${upperSymbol}%` })
+                    // Robust JSONB Search correctly milimetrically
+                    Sequelize.literal(`CAST(impacts AS TEXT) ILIKE '%${upperSymbol}%'`)
                 ];
             }
 
@@ -97,10 +97,21 @@ class NewsService {
                         impacts: parsedImpacts,
                         isTranslated: !!item.titleTR
                     };
-                    // If strict is TRUE (UI mode), only show >70% confidence (Sentiment > 70 or < 30) OR very high importance (85+)
+                }).filter(n => {
+                    // Smart Strict Filter: Significant Global Sentiment OR Significant Specific Asset Impact
                     if (strict) {
-                        const isSignificant = Math.abs((n.sentimentScore || 50) - 50) >= 20 || (n.importanceScore || 0) >= 85;
-                        return isSignificant;
+                        const isGloballySignificant = Math.abs((n.sentimentScore || 50) - 50) >= 20 || (n.importanceScore || 0) >= 85;
+                        
+                        // Also check if this specific symbol has a >= 70% impact in its impacts array
+                        let hasHighSpecificImpact = false;
+                        if (symbol && Array.isArray(n.impacts)) {
+                            const upperSym = symbol.toUpperCase();
+                            hasHighSpecificImpact = n.impacts.some(imp => 
+                                imp.asset === upperSym && Math.abs(parseInt(imp.score)) >= 70
+                            );
+                        }
+                        
+                        return isGloballySignificant || hasHighSpecificImpact;
                     }
                     return true;
                 });
