@@ -32,14 +32,14 @@ export default function BotDashboard() {
     useEffect(() => {
         fetchData();
         
-        // Gerçek API'den verileri ve logları düzenli olarak çek
+        // Gerçek API'den verileri ve logları düzenli olarak çek (Yüksek Frekans: 2sn)
         const logInterval = setInterval(() => {
             fetchLogs();
-        }, 15000);
+        }, 2000);
 
         const dataInterval = setInterval(() => {
             fetchData(true);
-        }, 10000); // 10s interval for silent interactive updates
+        }, 2000);
 
         return () => {
             clearInterval(logInterval);

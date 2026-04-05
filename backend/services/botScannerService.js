@@ -184,8 +184,8 @@ class BotScannerService {
         console.log('🤖 Bot Scanner (RSI+AI) + AI Sentinel started…');
         // Standard Scanning Loop
         setInterval(() => this.checkUserIntervals(), this.globalInterval);
-        // AI Sentinel Loop: Monitors existing positions for News/Macro risks
-        setInterval(() => this.runSentinelForAllUsers(), 60000); // Check every 60s
+        // AI Sentinel Loop: Monitors existing positions for News/Macro risks (High Frequency: 20s)
+        setInterval(() => this.runSentinelForAllUsers(), 20000); 
     }
 
     async runSentinelForAllUsers() {
@@ -224,10 +224,22 @@ class BotScannerService {
                 // CRITICAL DEFENSE LOGIC effectively properly milimetrically
                 let actionTaken = false;
 
+                // ── [NEW] VOLATILITY SENTINEL: Detect sudden spikes ──
+                const currentPrice = await marketDataService.fetchPrice(trade.symbol).catch(() => 0);
+                if (currentPrice > 0) {
+                    const priceChange = ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100;
+                    // If move > 2% since entry or high divergence detected, force a NEWS check
+                    if (Math.abs(priceChange) >= 2.0) {
+                         await this.log(userId, `📡 VOLATİLİTE TESPİTİ: ${trade.symbol} %${priceChange.toFixed(2)} hareket etti. Canlı haberler taranıyor...`, 'info');
+                         // Trigger immediate Yahoo Search for this asset to explain the move
+                         await newsService.fetchLatestNews(1, 'TR', baseSymbol);
+                    }
+                }
+
                 // ── SENTINEL GUARDIAN: Detailed News Interjection ──
                 const newsImpact = await newsService.getSentimentImpactForAsset(baseSymbol);
                 if (newsImpact.shouldIntervene) {
-                    const interventionReason = `🛡️ SENTINEL KRİTİK: ${baseSymbol} için olumsuz haber akışı tespit edildi! Neden: ${newsImpact.reason} (Etki Skoru: ${newsImpact.score}).`;
+                    const interventionReason = `🛡️ SENTINEL KRİTİK: ${baseSymbol} için önemli gelişme tespit edildi! Neden: ${newsImpact.reason} (Etki: %${newsImpact.score}).`;
                     await this.log(userId, interventionReason, 'error');
 
                     // If score is high (>25), close immediately
