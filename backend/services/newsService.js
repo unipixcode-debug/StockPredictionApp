@@ -21,12 +21,14 @@ class NewsService {
 
             if (symbol) {
                 const upperSymbol = symbol.toUpperCase();
+                // 🛡️ NATIVE JSONB SEARCH: Industry standard Postgres operator for performance and accuracy
+                const jsonMatch = Sequelize.literal(`impacts @> '[{"asset": "${upperSymbol}"}]'::jsonb`);
+                
                 whereClause[Op.or] = [
                     { titleEN: { [Op.iLike]: `%${upperSymbol}%` } },
                     { titleTR: { [Op.iLike]: `%${upperSymbol}%` } },
                     { tags: { [Op.iLike]: `%${upperSymbol}%` } },
-                    // Robust JSONB Search correctly milimetrically
-                    Sequelize.literal(`CAST(impacts AS TEXT) ILIKE '%${upperSymbol}%'`)
+                    jsonMatch
                 ];
             }
 
@@ -111,6 +113,16 @@ class NewsService {
                     if (strict) {
                         const isGloballySignificant = Math.abs((n.sentimentScore || 50) - 50) >= 20 || (n.importanceScore || 0) >= 85;
                         return isGloballySignificant;
+                    }
+                    return true;
+                }).filter(n => {
+                    // 🛡️ SUPER-GUARD: Final manual filter to ensure 100% accuracy before sending to UI correctly milimetrically
+                    if (symbol) {
+                        const upperSym = symbol.toUpperCase();
+                        const titleMatch = (n.title || '').toUpperCase().includes(upperSym);
+                        const tagMatch = (n.tags || '').toUpperCase().includes(upperSym);
+                        const impactMatch = Array.isArray(n.impacts) && n.impacts.some(imp => imp.asset === upperSym);
+                        return titleMatch || tagMatch || impactMatch;
                     }
                     return true;
                 });
