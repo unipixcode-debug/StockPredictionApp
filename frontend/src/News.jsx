@@ -37,6 +37,15 @@ const News = () => {
     fetchNews();
   }, [language, timeframe]); 
 
+  useEffect(() => {
+    if (selectedAssetSymbol) {
+        const listElement = document.getElementById('news-list-top');
+        if (listElement) {
+            listElement.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+  }, [selectedAssetSymbol]);
+
   const handleSubscribe = async () => {
     const cost = 5; 
     const confirmMsg = language === 'TR' 
@@ -565,7 +574,9 @@ const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
         {/* Asset Heatmap Chips - Full Width Flex Wrap */}
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            {data.map((item) => (
+            {data
+              .filter(item => !selectedSymbol || item.asset === selectedSymbol)
+              .map((item) => (
               <button
                 key={item.asset}
                 onClick={() => {
