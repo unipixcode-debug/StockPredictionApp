@@ -8,12 +8,12 @@ const aiService = require('./aiService');
 const { Op, Sequelize } = require('sequelize');
 
 class NewsService {
-    async fetchLatestNews(days = 7, targetLang = 'TR', symbol = null, strict = false) {
+    async fetchLatestNews(days = 3, targetLang = 'TR', symbol = null, strict = false) {
         try {
             console.log(`🔄 Fetching News from DB (${targetLang}, Symbol: ${symbol || 'ALL'})...`);
             
             const oneWeekAgo = new Date();
-            oneWeekAgo.setDate(oneWeekAgo.getDate() - (days || 7));
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - (days || 3));
 
             const whereClause = {
                 createdAt: { [Op.gte]: oneWeekAgo }
@@ -238,10 +238,10 @@ class NewsService {
         }
     }
 
-    async getSentimentAggregation(days = 7, strict = false) {
+    async getSentimentAggregation(days = 3, strict = false) {
         try {
             const cutoffDate = new Date();
-            cutoffDate.setDate(cutoffDate.getDate() - days);
+            cutoffDate.setDate(cutoffDate.getDate() - (days || 3));
 
             const summaries = await NewsSummary.findAll({
                 where: {

@@ -16,7 +16,7 @@ const News = () => {
   
   const [sources, setSources] = useState([t('AllSources')]);
   const [activeSource, setActiveSource] = useState(sourceQuery || t('AllSources'));
-  const [timeframe, setTimeframe] = useState(7); // Default 7 days
+  const [timeframe, setTimeframe] = useState(3); // Default 3 days
   
   const timeframes = [
     { label: language === 'TR' ? 'Bugün' : 'Today', value: 1 },

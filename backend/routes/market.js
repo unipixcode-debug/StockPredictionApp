@@ -82,7 +82,7 @@ router.get('/stats', async (req, res) => {
 router.get('/news', async (req, res) => {
     try {
         const { lang, days, symbol } = req.query;
-        const daysInt = parseInt(days) || 7; 
+        const daysInt = parseInt(days) || 3; 
         
         const requestedLang = (lang || '').toUpperCase() === 'TR' ? 'TR' : 'EN';
         
@@ -129,7 +129,7 @@ router.get('/search', async (req, res) => {
 // News Sentiment Summary API for Visualization
 router.get('/news-sentiment-summary', async (req, res) => {
     try {
-        const days = parseInt(req.query.days) || 7;
+        const days = parseInt(req.query.days) || 3;
         
         // NO-CACHE: Force fresh professional signals every time
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
