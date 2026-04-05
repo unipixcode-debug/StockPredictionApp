@@ -35,9 +35,9 @@ class NewsService {
                 limit: 500
             });
 
-            // 🚀 LIVE Yahoo Finance Search Fallback
-            if (symbol && dbNews.length === 0) {
-                console.log(`🔍 Symbol ${symbol} not in DB news. Searching LIVE Yahoo Finance...`);
+            // 🚀 PROACTIVE Yahoo Finance Search (Trigger if DB has < 3 fresh items or none)
+            if (symbol && dbNews.length < 3) {
+                console.log(`🔍 Symbol ${symbol} has sparse news (${dbNews.length}). Searching LIVE Yahoo Finance...`);
                 try {
                     const searchResults = await yahooFinance.search(symbol);
                     if (searchResults && searchResults.news && searchResults.news.length > 0) {
@@ -96,9 +96,8 @@ class NewsService {
                         impacts: parsedImpacts,
                         isTranslated: !!item.titleTR
                     };
-                }).filter(n => {
-                    // Only show news with >70% confidence (Sentiment > 70 or < 30) OR very high importance
-                    const isSignificant = Math.abs((n.sentimentScore || 50) - 50) >= 20 || (n.importanceScore || 0) >= 80;
+                    // Only show news with >70% confidence (Sentiment > 70 or < 30) OR very high importance (85+)
+                    const isSignificant = Math.abs((n.sentimentScore || 50) - 50) >= 20 || (n.importanceScore || 0) >= 85;
                     return isSignificant;
                 });
             }
