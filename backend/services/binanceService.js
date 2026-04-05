@@ -788,7 +788,7 @@ class BinanceService {
             const realPositions = await rawFuturesPositions(apiKey, apiSecret, isTestnet);
             const activeReal = realPositions.filter(p => parseFloat(p.positionAmt) !== 0);
             
-            // Self-Healing: Clean up corrupted symbols in DB before sync
+            // 1. Self-Healing: Clean up corrupted symbols in DB before sync
             const allMyTrades = await ExecutedTrade.findAll({ where: { userId } });
             for (const t of allMyTrades) {
                 const normalized = this.normalizeSymbol(t.symbol);
@@ -799,6 +799,7 @@ class BinanceService {
                 }
             }
 
+            // 2. Fetch OPEN trades AFTER repair to avoid identification failure correctly milimetrically
             const dbOpenTrades = await ExecutedTrade.findAll({ where: { userId, status: 'OPEN', type: 'FUTURES' } });
 
             const results = { closed: 0, updated: 0, added: 0 };

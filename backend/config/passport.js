@@ -17,7 +17,8 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-const callbackURL = process.env.GOOGLE_CALLBACK_URL || (process.env.FRONTEND_URL || 'https://unipixcode.xyz') + "/api/auth/google/callback";
+const frontendUrl = process.env.FRONTEND_URL || 'https://unipixcode.xyz';
+const callbackURL = process.env.GOOGLE_CALLBACK_URL || `${frontendUrl.replace(/\/$/, '')}/api/auth/google/callback`;
 console.log(`[AUTH-CONFIG] Passport callbackURL: "${callbackURL}"`);
 
 passport.use(new GoogleStrategy({

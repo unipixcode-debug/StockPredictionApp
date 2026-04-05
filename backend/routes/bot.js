@@ -40,7 +40,8 @@ router.post('/config', authCheck, async (req, res) => {
             maxPositions, maxPerAsset, 
             isTestnet, scanInterval,
             defaultLeverage, tradeHorizon,
-            autoOptimize
+            autoOptimize,
+            rsiOversold, rsiOverbought, minConfirmationScore, riskConsent
         } = req.body;
 
         let config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
@@ -80,14 +81,18 @@ router.post('/config', authCheck, async (req, res) => {
 
         // Other settings
         if (budgetMode !== undefined) config.budgetMode = budgetMode;
-        if (budgetAmount !== undefined) config.budgetAmount = budgetAmount;
-        if (maxPositions !== undefined) config.maxPositions = maxPositions;
-        if (maxPerAsset !== undefined) config.maxPerAsset = maxPerAsset;
+        if (budgetAmount !== undefined) config.budgetAmount = parseFloat(budgetAmount);
+        if (maxPositions !== undefined) config.maxPositions = parseInt(maxPositions);
+        if (maxPerAsset !== undefined) config.maxPerAsset = parseFloat(maxPerAsset);
         if (isTestnet !== undefined) config.isTestnet = isTestnet;
         if (scanInterval !== undefined) config.scanInterval = parseInt(scanInterval) || 300;
         if (defaultLeverage !== undefined) config.defaultLeverage = parseInt(defaultLeverage) || 1;
         if (tradeHorizon !== undefined) config.tradeHorizon = tradeHorizon;
         if (autoOptimize !== undefined) config.autoOptimize = autoOptimize;
+        if (rsiOversold !== undefined) config.rsiOversold = parseFloat(rsiOversold);
+        if (rsiOverbought !== undefined) config.rsiOverbought = parseFloat(rsiOverbought);
+        if (minConfirmationScore !== undefined) config.minConfirmationScore = parseFloat(minConfirmationScore);
+        if (riskConsent !== undefined) config.riskConsent = !!riskConsent;
 
         await config.save();
         res.json({ message: 'Bot configuration updated successfully', config });

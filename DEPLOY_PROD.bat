@@ -11,7 +11,7 @@ echo 1. Checking SSH Key...
 if exist "%KEY_PATH%" (
     echo [OK] Key found.
 ) else (
-    echo [ERROR] SSH key not found at: %KEY_PATH%
+    echo [ERROR] SSH key not found at: "%KEY_PATH%"
     pause
     exit /b
 )

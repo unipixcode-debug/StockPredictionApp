@@ -37,7 +37,7 @@ function computeRSI(closes, period = RSI_PERIOD) {
  * Computes RSI + momentum signal for a USDT pair using 100% Direct HTTPS.
  * Returns { direction:'BUY'|'SELL'|'HOLD', score:0-100, rsi, momentum, currentPrice }
  */
-async function getTechnicalSignal(ccxtSymbol, isTestnet = true) {
+async function getTechnicalSignal(ccxtSymbol, isTestnet = true, thresholds = { oversold: RSI_OVERSOLD, overbought: RSI_OVERBOUGHT }) {
     try {
         const apiSymbol = ccxtSymbol.split('/')[0] + 'USDT';
         // Use direct HTTPS raw OHLCV fetch
@@ -57,12 +57,12 @@ async function getTechnicalSignal(ccxtSymbol, isTestnet = true) {
         let direction = 'HOLD';
         let score     = 50;
 
-        if (rsi < RSI_OVERSOLD) {
-            const strength = RSI_OVERSOLD - rsi;
+        if (rsi < thresholds.oversold) {
+            const strength = thresholds.oversold - rsi;
             score     = 55 + Math.min(strength * 1.5, 45); // Boosted score for bot confidence
             direction = 'BUY';
-        } else if (rsi > RSI_OVERBOUGHT) {
-            const strength = rsi - RSI_OVERBOUGHT;
+        } else if (rsi > thresholds.overbought) {
+            const strength = rsi - thresholds.overbought;
             score     = 55 + Math.min(strength * 1.5, 45);
             direction = 'SELL';
         }
@@ -302,14 +302,26 @@ class BotScannerService {
                     break;
                 }
 
+                // ── [NEW] DUPLICATE ASSET CHECK ──
+                const alreadyOpenForSymbol = await ExecutedTrade.findOne({ 
+                    where: { userId, symbol: pair.engineSymbol, status: 'OPEN' } 
+                });
+                if (alreadyOpenForSymbol) {
+                    // Skip silently to not clutter logs with "already open" every scan unless needed
+                    continue; 
+                }
+
                 // ── Step 2: 100% Unauthenticated technical signal ──
-                const techSignal = await getTechnicalSignal(pair.ccxtSymbol, isTestnet);
+                const techSignal = await getTechnicalSignal(pair.ccxtSymbol, isTestnet, {
+                    oversold: config.rsiOversold || RSI_OVERSOLD,
+                    overbought: config.rsiOverbought || RSI_OVERBOUGHT
+                });
                 testedCount++;
 
                 if (techSignal.direction === 'HOLD') continue;
 
-                // ── Step 2.5: Macro Filter (The Intelligence) milimetrically squarely correctly
-                // If BTC Dominance is high, Altcoins are risky for Longs effectively properly
+                // ── Step 2.5: Macro Filter (The Intelligence)
+                // If BTC Dominance is high, Altcoins are risky for Longs
                 if (btcd > 52 && pair.ccxtSymbol !== 'BTC/USDT' && techSignal.direction === 'BUY') {
                     await this.log(userId, `🛡️ MACRO-GUARD: ${pair.ccxtSymbol} atlandı. BTC Dominance çok yüksek (%${btcd.toFixed(1)}). Altcoin LONG riskli.`, 'warning');
                     continue;
@@ -320,7 +332,10 @@ class BotScannerService {
 
                 // ── Step 3: Confirmation — second RSI pass (a few seconds later) ──
                 await new Promise(r => setTimeout(r, 2000));
-                const confirmSignal = await getTechnicalSignal(pair.ccxtSymbol, isTestnet);
+                const confirmSignal = await getTechnicalSignal(pair.ccxtSymbol, isTestnet, {
+                    oversold: config.rsiOversold || RSI_OVERSOLD,
+                    overbought: config.rsiOverbought || RSI_OVERBOUGHT
+                });
 
                 if (confirmSignal.direction !== techSignal.direction) {
                     await this.log(userId, `⚠️ ${pair.ccxtSymbol}: Sinyal çelişiyor (${techSignal.direction} vs ${confirmSignal.direction}). Atlandı.`, 'warning');
@@ -328,8 +343,9 @@ class BotScannerService {
                 }
 
                 const avgScore = Math.round((techSignal.score + confirmSignal.score) / 2);
-                if (avgScore < 58) {
-                    await this.log(userId, `⏳ ${pair.ccxtSymbol}: Onay skoru yetersiz (%${avgScore} < 58). Atlandı.`, 'info');
+                const minConfirm = config.minConfirmationScore || 58;
+                if (avgScore < minConfirm) {
+                    await this.log(userId, `⏳ ${pair.ccxtSymbol}: Onay skoru yetersiz (%${avgScore} < ${minConfirm}). Atlandı.`, 'info');
                     continue;
                 }
 

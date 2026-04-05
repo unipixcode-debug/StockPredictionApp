@@ -145,6 +145,22 @@ const BinanceBotConfig = sequelize.define('BinanceBotConfig', {
     autoOptimize: {
         type: DataTypes.BOOLEAN,
         defaultValue: true // AI Sentinel & Strategy Alpha Logic
+    },
+    rsiOversold: {
+        type: DataTypes.FLOAT,
+        defaultValue: 35
+    },
+    rsiOverbought: {
+        type: DataTypes.FLOAT,
+        defaultValue: 65
+    },
+    minConfirmationScore: {
+        type: DataTypes.FLOAT,
+        defaultValue: 58
+    },
+    riskConsent: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
     }
 }, {
     timestamps: true,

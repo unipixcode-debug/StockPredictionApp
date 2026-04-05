@@ -1,4 +1,4 @@
-$keyPath = "C:\Projeler\Oracleserverac\24GB\ssh-key-2026-03-14 (2).key"
+$keyPath = "C:\Users\erdem\.ssh\OracleServer3-24.key"
 $ip = "80.225.246.21"
 
 Write-Host "--- StockPredictionApp Production Deployer ---" -ForegroundColor Cyan

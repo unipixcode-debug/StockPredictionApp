@@ -772,7 +772,11 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
         scanInterval: 300,
         defaultLeverage: 1,
         tradeHorizon: 'SHORT',
-        autoOptimize: true
+        autoOptimize: true,
+        rsiOversold: 35,
+        rsiOverbought: 65,
+        minConfirmationScore: 58,
+        riskConsent: false
     });
 
     const [testMarket, setTestMarket] = useState('SPOT');
@@ -795,7 +799,11 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                 scanInterval: config.scanInterval || 300,
                 defaultLeverage: config.defaultLeverage || 1,
                 tradeHorizon: config.tradeHorizon || 'SHORT',
-                autoOptimize: config.autoOptimize ?? true
+                autoOptimize: config.autoOptimize ?? true,
+                rsiOversold: config.rsiOversold || 35,
+                rsiOverbought: config.rsiOverbought || 65,
+                minConfirmationScore: config.minConfirmationScore || 58,
+                riskConsent: config.riskConsent || false
             });
         }
     }, [config]);
@@ -811,8 +819,41 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
         }));
     };
 
+    // 🛡️ 5-Tier Risk Intelligence logic
+    const getRiskLevel = (data) => {
+        const { rsiOversold: buy, rsiOverbought: sell, minConfirmationScore: score } = data;
+        
+        // Tier 1: EN RİSKSİZ (Safest)
+        if (buy <= 25 && sell >= 75 && score >= 70) {
+            return { name: 'En Risksiz (Safest)', color: 'text-blue-500', bg: 'bg-blue-500', needsConsent: false };
+        }
+        // Tier 2: GÜVENLİ (Safe)
+        if (buy <= 30 && sell >= 70 && score >= 65) {
+            return { name: 'Güvenli Mod', color: 'text-emerald-500', bg: 'bg-emerald-500', needsConsent: false };
+        }
+        // Tier 3: DENGELİ (Balanced)
+        if (buy <= 35 && sell >= 65 && score >= 60) {
+            return { name: 'Dengeli/Normal', color: 'text-amber-500', bg: 'bg-amber-500', needsConsent: false };
+        }
+        // Tier 4: RİSKLİ (High Risk)
+        if (buy > 40 || sell < 60 || score < 55) {
+            return { name: 'Aşırı Riskli!', color: 'text-rose-500', bg: 'bg-rose-500', needsConsent: true };
+        }
+        // Tier 5: TURUNCU (Caution)
+        return { name: 'Yüksek Riskli', color: 'text-orange-500', bg: 'bg-orange-500', needsConsent: true };
+    };
+
+    const currentRisk = getRiskLevel(formData);
+
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        // 🛡️ Final Risk Check before Save
+        if (currentRisk.needsConsent && !formData.riskConsent) {
+            alert("DİKKAT: Yüksek riskli ayarlar seçtiniz. Lütfen 'Fazla risk aldığımı onaylıyorum' kutucuğunu işaretleyin.");
+            return;
+        }
+
         onSave(formData);
     };
 
@@ -978,7 +1019,6 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                              <div className="space-y-4">
                                 <label className="text-xs font-black uppercase text-muted-foreground tracking-widest pl-2">Bütçe Türü</label>
                                 <div className="flex bg-secondary/50 p-1 rounded-xl">
@@ -1033,6 +1073,144 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                     className="w-full bg-amber-500/5 border border-amber-500/20 p-4 rounded-2xl focus:border-amber-500 text-foreground font-black"
                                 />
                              </div>
+                        </div>
+
+                        {/* 🛡️ GİRİŞ ONAYI AYARLARI (Risk Parameters) */}
+                        <div className="p-8 bg-blue-500/5 rounded-3xl border border-blue-500/20 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -z-10" />
+                            
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                                <div>
+                                    <h3 className="text-sm font-black uppercase tracking-[0.3em] text-blue-400 mb-1">🛡️ Giriş Onay Ayarları</h3>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Botun hangi hassasiyetle işlem açacağını belirleyin.</p>
+                                </div>
+                                <div className="flex items-center gap-3 bg-black/40 px-6 py-3 rounded-2xl border border-white/5 shadow-xl">
+                                    <div className={`w-3 h-3 rounded-full animate-pulse shadow-[0_0_15px] ${currentRisk.bg} shadow-${currentRisk.bg.split('-')[1]}-500`} />
+                                    <span className={`text-[10px] font-black uppercase tracking-widest ${currentRisk.color}`}>
+                                        {currentRisk.name}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center px-2">
+                                        <label className="text-[10px] font-black uppercase text-rose-400 tracking-widest">RSI Aşırı Satım (Buy)</label>
+                                        <span className="text-xs font-black text-rose-400">{formData.rsiOversold}</span>
+                                    </div>
+                                    <input 
+                                        type="range" name="rsiOversold" min="10" max="60" step="1" 
+                                        value={formData.rsiOversold} onChange={handleChange}
+                                        className="w-full h-2 bg-black/40 rounded-lg appearance-none cursor-pointer accent-rose-500 shadow-inner"
+                                    />
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter leading-tight">
+                                        Fiyat bu RSI altına indiğinde ALIM yapar. (Örn: 30-35 idealdir)
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center px-2">
+                                        <label className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">RSI Aşırı Alım (Sell)</label>
+                                        <span className="text-xs font-black text-emerald-400">{formData.rsiOverbought}</span>
+                                    </div>
+                                    <input 
+                                        type="range" name="rsiOverbought" min="40" max="90" step="1" 
+                                        value={formData.rsiOverbought} onChange={handleChange}
+                                        className="w-full h-2 bg-black/40 rounded-lg appearance-none cursor-pointer accent-emerald-500 shadow-inner"
+                                    />
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter leading-tight">
+                                        Fiyat bu RSI üstüne çıktığında SATIM yapar. (Örn: 65-70 idealdir)
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center px-2">
+                                        <label className="text-[10px] font-black uppercase text-blue-400 tracking-widest">Min Onay Skoru</label>
+                                        <span className="text-xs font-black text-blue-400">%{formData.minConfirmationScore}</span>
+                                    </div>
+                                    <input 
+                                        type="range" name="minConfirmationScore" min="50" max="95" step="1" 
+                                        value={formData.minConfirmationScore} onChange={handleChange}
+                                        className="w-full h-2 bg-black/40 rounded-lg appearance-none cursor-pointer accent-blue-500 shadow-inner"
+                                    />
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter leading-tight">
+                                        İşlem açmak için gereken minimum AI güven oranı. (Örn: %60 önerilir)
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-8 pt-6 border-t border-white/5 flex flex-wrap gap-4">
+                                <button 
+                                    type="button"
+                                    onClick={() => setFormData(p => ({...p, rsiOversold: 22, rsiOverbought: 78, minConfirmationScore: 72, riskConsent: false}))}
+                                    className="px-4 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-500 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                                >
+                                    🛡️ En Risksiz (Mavi)
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setFormData(p => ({...p, rsiOversold: 30, rsiOverbought: 70, minConfirmationScore: 65, riskConsent: false}))}
+                                    className="px-4 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+                                >
+                                    🛡️ Risk Azalt (Yeşil)
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setFormData(p => ({...p, rsiOversold: 45, rsiOverbought: 55, minConfirmationScore: 55, riskConsent: false}))}
+                                    className="px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all"
+                                >
+                                    🔥 Riski Artır (Kırmızı)
+                                </button>
+                            </div>
+
+                            {/* 🛡️ Risk Consent & Warning */}
+                            {currentRisk.needsConsent && (
+                                <div className="mt-6 p-6 rounded-2xl bg-rose-500/10 border-2 border-rose-500/30 animate-pulse">
+                                    <div className="flex items-start gap-4">
+                                        <AlertTriangle className="text-rose-500 mt-1" size={24} />
+                                        <div className="space-y-3 flex-1">
+                                            <p className="text-xs font-black text-rose-500 uppercase tracking-widest">🚨 YÜKSEK RİSK UYARISI</p>
+                                            <p className="text-[10px] font-bold text-rose-400/80 leading-relaxed uppercase">
+                                                Şu anki ayarlarınız botun çok sık ve agresif işlem açmasına neden olacaktır. 
+                                                Bu durum ani piyasa hareketlerinde bakiyenizin tamamının kaybedilmesine yol açabilir.
+                                            </p>
+                                            <label className="flex items-center gap-3 cursor-pointer group pt-2">
+                                                <div className="relative">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        name="riskConsent" 
+                                                        checked={formData.riskConsent} 
+                                                        onChange={handleChange}
+                                                        className="peer sr-only"
+                                                    />
+                                                    <div className="w-5 h-5 bg-black/40 border-2 border-rose-500/30 rounded-lg group-hover:border-rose-500 transition-all peer-checked:bg-rose-500 peer-checked:border-rose-500 flex items-center justify-center">
+                                                        {formData.riskConsent && <ShieldCheck size={14} className="text-black" />}
+                                                    </div>
+                                                </div>
+                                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest group-hover:underline">
+                                                    Fazla risk aldığımı onaylıyorum
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {formData.riskConsent && !currentRisk.needsConsent && (
+                                <div className="mt-6 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                                        <ShieldCheck size={14} /> Risk seviyesi düşürüldü, güvenli moda geçildi.
+                                    </p>
+                                </div>
+                            )}
+
+                            {config?.riskConsent && currentRisk.needsConsent && (
+                                <div className="mt-6 text-center">
+                                    <p className="text-[11px] font-black text-rose-600 uppercase tracking-[0.2em] bg-rose-600/5 py-3 rounded-xl border border-rose-600/20">
+                                        ⚠️ FAZLA RİSK ALDIĞINIZI ONAYLADINIZ TÜM BAKİYENİZİ KAYBEDEBİLİRSİNİZ
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1104,6 +1282,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
         </div>
     );
 }
+
 
 // ── Live Chart Component ─────────────────────────────────────────────────────────────
 function TradeLiveChart({ trade }) {
