@@ -8,7 +8,7 @@ const aiService = require('./aiService');
 const { Op } = require('sequelize');
 
 class NewsService {
-    async fetchLatestNews(days = 7, targetLang = 'TR', symbol = null) {
+    async fetchLatestNews(days = 7, targetLang = 'TR', symbol = null, strict = false) {
         try {
             console.log(`🔄 Fetching News from DB (${targetLang}, Symbol: ${symbol || 'ALL'})...`);
             
@@ -97,9 +97,12 @@ class NewsService {
                         impacts: parsedImpacts,
                         isTranslated: !!item.titleTR
                     };
-                    // Only show news with >70% confidence (Sentiment > 70 or < 30) OR very high importance (85+)
-                    const isSignificant = Math.abs((n.sentimentScore || 50) - 50) >= 20 || (n.importanceScore || 0) >= 85;
-                    return isSignificant;
+                    // If strict is TRUE (UI mode), only show >70% confidence (Sentiment > 70 or < 30) OR very high importance (85+)
+                    if (strict) {
+                        const isSignificant = Math.abs((n.sentimentScore || 50) - 50) >= 20 || (n.importanceScore || 0) >= 85;
+                        return isSignificant;
+                    }
+                    return true;
                 });
             }
 
@@ -213,7 +216,7 @@ class NewsService {
         }
     }
 
-    async getSentimentAggregation(days = 7) {
+    async getSentimentAggregation(days = 7, strict = false) {
         try {
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -255,7 +258,7 @@ class NewsService {
                 });
             });
 
-            return Object.values(assetMap).map(data => {
+            let resultData = Object.values(assetMap).map(data => {
                 const avg = Math.round(data.totalScore / data.count);
                 const sourceDetails = Object.entries(data.sources).map(([name, sdata]) => ({
                     name, avgScore: Math.round(sdata.scoreSum / sdata.count), count: sdata.count
@@ -267,8 +270,14 @@ class NewsService {
                     totalCount: data.count,
                     sources: sourceDetails
                 };
-            }).filter(data => Math.abs(data.averageScore) >= 70) // ONLY high-impact professional signals
-              .sort((a, b) => b.totalCount - a.totalCount);
+            });
+
+            // Filter ONLY for UI display if strict is set to TRUE
+            if (strict) {
+                resultData = resultData.filter(data => Math.abs(data.averageScore) >= 70);
+            }
+
+            return resultData.sort((a, b) => b.totalCount - a.totalCount);
         } catch (error) {
             console.error('getSentimentAggregation Error:', error.message);
             return [];

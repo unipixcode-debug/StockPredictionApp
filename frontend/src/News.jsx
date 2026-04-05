@@ -462,7 +462,7 @@ const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
   const fetchSentiment = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/market/news-sentiment-summary?days=${days}`);
+      const res = await api.get(`/market/news-sentiment-summary?days=${days}&t=${Date.now()}`);
       // Sort data by average score descending
       const sorted = [...res].sort((a, b) => b.averageScore - a.averageScore);
       setData(sorted);
@@ -580,7 +580,7 @@ const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
             {data
-              .filter(item => !selectedSymbol || item.asset === selectedSymbol)
+              .filter(item => (!selectedSymbol || item.asset === selectedSymbol) && Math.abs(item.averageScore) >= 70)
               .map((item) => (
               <button
                 key={item.asset}
