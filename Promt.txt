@@ -1,0 +1,5 @@
+1-)Nazdaq ve BIST için Tarama çalışmıyor. 
+2-)Haberler de bir sembole tıklandığında diğer sembolleri gizlesin aşağıda clear filter yapıldığında tekrar görünsün.  Ayrıca burada bu sembol geldiyse haber kaynağını mutlaka görmeliyiz. Burada sadece 4-5 haber kaynağı görünüyor tüm haber kaynaklarından haber alınmalı  bunu mutlaka denetlemeli sürekli. sembole tıklandığında haberi mutlaka görünmeli. 
+3-)Alpha Mind'ın ne kadar parametre öğrendiğini vs üzerine tıkladığımızda açılan bir popup sayfada görelim  gelişimini bize göstersin ve bunun bize katkısı ne olacak bilelim. 
+4-)Bot işlem açtığında işlemlerle ilgili gelen haberleri - BTC ve cyripto dünyasında olanları bizim işlemlerimize olan etkisini denetleyip BOT işlem terminalinde göstersin. Aksi bir durumda hedefe gelmesini veya stop olmasını beklemeden müdehale etsinve bize terminalde nedenlerini iletsin.
+5-)
