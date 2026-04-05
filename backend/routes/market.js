@@ -81,11 +81,11 @@ router.get('/stats', async (req, res) => {
 
 router.get('/news', async (req, res) => {
     try {
-        const { lang, days } = req.query;
-        const daysInt = parseInt(days) || 7; // Default 7 days
+        const { lang, days, symbol } = req.query;
+        const daysInt = parseInt(days) || 7; 
         
         const requestedLang = (lang || '').toUpperCase() === 'TR' ? 'TR' : 'EN';
-        const news = await newsService.fetchLatestNews(daysInt, requestedLang);
+        const news = await newsService.fetchLatestNews(daysInt, requestedLang, symbol);
         res.json(news);
     } catch (error) {
         console.error('News API error:', error);

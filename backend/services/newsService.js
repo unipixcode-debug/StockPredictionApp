@@ -8,17 +8,29 @@ const aiService = require('./aiService');
 const { Op } = require('sequelize');
 
 class NewsService {
-    async fetchLatestNews(days = 7, targetLang = 'TR') {
+    async fetchLatestNews(days = 7, targetLang = 'TR', symbol = null) {
         try {
-            console.log(`🔄 Fetching News from DB (${targetLang})...`);
+            console.log(`🔄 Fetching News from DB (${targetLang}, Symbol: ${symbol || 'ALL'})...`);
             
             const oneWeekAgo = new Date();
             oneWeekAgo.setDate(oneWeekAgo.getDate() - (days || 7));
 
+            const whereClause = {
+                createdAt: { [Op.gte]: oneWeekAgo }
+            };
+
+            if (symbol) {
+                const upperSymbol = symbol.toUpperCase();
+                whereClause[Op.or] = [
+                    { titleEN: { [Op.iLike]: `%${upperSymbol}%` } },
+                    { titleTR: { [Op.iLike]: `%${upperSymbol}%` } },
+                    { tags: { [Op.iLike]: `%${upperSymbol}%` } },
+                    { impacts: { [Op.iLike]: `%${upperSymbol}%` } }
+                ];
+            }
+
             const dbNews = await NewsSummary.findAll({
-                where: {
-                    createdAt: { [Op.gte]: oneWeekAgo }
-                },
+                where: whereClause,
                 order: [['createdAt', 'DESC']],
                 limit: 500
             });

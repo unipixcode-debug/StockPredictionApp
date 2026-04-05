@@ -35,7 +35,7 @@ const News = () => {
 
   useEffect(() => {
     fetchNews();
-  }, [language, timeframe]); 
+  }, [language, timeframe, selectedAssetSymbol]); 
 
   useEffect(() => {
     if (selectedAssetSymbol) {
@@ -80,7 +80,7 @@ const News = () => {
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const data = await api.get(`/market/news?lang=${language}&days=${timeframe}`);
+      const data = await api.get(`/market/news?lang=${language}&days=${timeframe}${selectedAssetSymbol ? `&symbol=${selectedAssetSymbol}` : ''}`);
       setNews(data);
       // Extract unique sources
       const uniqueSources = [t('AllSources'), ...new Set(data.map(item => item.sourceName || t('OtherSource')))];
