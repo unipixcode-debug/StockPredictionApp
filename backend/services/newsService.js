@@ -29,11 +29,53 @@ class NewsService {
                 ];
             }
 
-            const dbNews = await NewsSummary.findAll({
+            let dbNews = await NewsSummary.findAll({
                 where: whereClause,
                 order: [['createdAt', 'DESC']],
                 limit: 500
             });
+
+            // 🚀 LIVE Yahoo Finance Search Fallback
+            if (symbol && dbNews.length === 0) {
+                console.log(`🔍 Symbol ${symbol} not in DB news. Searching LIVE Yahoo Finance...`);
+                try {
+                    const searchResults = await yahooFinance.search(symbol);
+                    if (searchResults && searchResults.news && searchResults.news.length > 0) {
+                        const topNews = searchResults.news.slice(0, 5);
+                        for (const n of topNews) {
+                            try {
+                                const analysis = await aiService.batchTranslateNews([{ 
+                                    title: n.title, 
+                                    contentSnippet: n.publisher || '' 
+                                }], 'TR');
+                                const trans = analysis[0] || {};
+                                
+                                await NewsSummary.upsert({
+                                    url: n.link || `LIVE_${Date.now()}_${Math.random()}`,
+                                    titleEN: n.title,
+                                    snippetEN: n.publisher || '',
+                                    titleTR: trans.titleTR || n.title,
+                                    snippetTR: trans.snippetTR || n.publisher || '',
+                                    importanceScore: trans.importanceScore || 90,
+                                    sentimentScore: trans.sentimentScore || 50,
+                                    tags: symbol.toUpperCase(),
+                                    impacts: trans.impacts || [{ asset: symbol.toUpperCase(), score: Math.abs((trans.sentimentScore || 50) - 50) * 2, direction: (trans.sentimentScore || 50) >= 50 ? 'POSITIVE' : 'NEGATIVE' }],
+                                    sourceName: n.publisher || 'Yahoo Live',
+                                    lastProcessed: new Date()
+                                });
+                            } catch (e) { console.error(`AI News Analysis failed for ${n.title}: ${e.message}`); }
+                        }
+                        // Re-fetch after sync
+                        dbNews = await NewsSummary.findAll({
+                            where: whereClause,
+                            order: [['createdAt', 'DESC']],
+                            limit: 10
+                        });
+                    }
+                } catch (liveErr) {
+                    console.error('Yahoo Live Search Failed:', liveErr.message);
+                }
+            }
 
             if (dbNews.length > 0) {
                 return dbNews.map(item => {
@@ -54,6 +96,10 @@ class NewsService {
                         impacts: parsedImpacts,
                         isTranslated: !!item.titleTR
                     };
+                }).filter(n => {
+                    // Only show news with >70% confidence (Sentiment > 70 or < 30) OR very high importance
+                    const isSignificant = Math.abs((n.sentimentScore || 50) - 50) >= 20 || (n.importanceScore || 0) >= 80;
+                    return isSignificant;
                 });
             }
 
@@ -221,7 +267,8 @@ class NewsService {
                     totalCount: data.count,
                     sources: sourceDetails
                 };
-            }).sort((a, b) => b.totalCount - a.totalCount);
+            }).filter(data => Math.abs(data.averageScore) >= 70) // ONLY high-impact professional signals
+              .sort((a, b) => b.totalCount - a.totalCount);
         } catch (error) {
             console.error('getSentimentAggregation Error:', error.message);
             return [];
