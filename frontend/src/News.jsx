@@ -17,6 +17,7 @@ const News = () => {
   const [sources, setSources] = useState([t('AllSources')]);
   const [activeSource, setActiveSource] = useState(sourceQuery || t('AllSources'));
   const [timeframe, setTimeframe] = useState(3); // Default 3 days
+  const [strictMode, setStrictMode] = useState(true); // Default Strict ON
   
   const timeframes = [
     { label: language === 'TR' ? 'Bugün' : 'Today', value: 1 },
@@ -35,7 +36,7 @@ const News = () => {
 
   useEffect(() => {
     fetchNews();
-  }, [language, timeframe, selectedAssetSymbol]); 
+  }, [language, timeframe, selectedAssetSymbol, strictMode]); 
 
   useEffect(() => {
     if (selectedAssetSymbol) {
@@ -80,7 +81,7 @@ const News = () => {
   const fetchNews = async () => {
     setLoading(true);
     try {
-      const data = await api.get(`/market/news?lang=${language}&days=${timeframe}${selectedAssetSymbol ? `&symbol=${selectedAssetSymbol}` : ''}`);
+      const data = await api.get(`/market/news?lang=${language}&days=${timeframe}&strict=${strictMode}${selectedAssetSymbol ? `&symbol=${selectedAssetSymbol}` : ''}`);
       setNews(data);
       // Extract unique sources
       const uniqueSources = [t('AllSources'), ...new Set(data.map(item => item.sourceName || t('OtherSource')))];
@@ -187,6 +188,7 @@ const News = () => {
           days={timeframe} 
           selectedSymbol={selectedAssetSymbol} 
           onSelect={setSelectedAssetSymbol} 
+          strict={strictMode}
       />
 
       <>
@@ -214,9 +216,26 @@ const News = () => {
               </div>
             )}
 
-            <div className="flex items-center space-x-4 mb-2">
-               <Clock size={16} className="text-primary" />
-               <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{language === 'TR' ? 'Tarih Filtresi' : 'Date Filter'}</span>
+            <div className="flex flex-col md:flex-row md:items-center gap-4 mb-2">
+               <div className="flex items-center space-x-2">
+                 <Clock size={16} className="text-primary" />
+                 <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{language === 'TR' ? 'Tarih Filtresi' : 'Date Filter'}</span>
+               </div>
+               
+               {/* Professional Mode Toggle */}
+               <button 
+                onClick={() => setStrictMode(!strictMode)}
+                className={`flex items-center space-x-2 px-4 py-1.5 rounded-full border transition-all duration-300 ${
+                  strictMode 
+                    ? 'bg-primary/20 border-primary text-primary shadow-[0_0_15px_rgba(0,242,254,0.2)]' 
+                    : 'bg-secondary/20 border-border text-muted-foreground'
+                }`}
+               >
+                 <div className={`w-2 h-2 rounded-full ${strictMode ? 'bg-primary animate-pulse' : 'bg-muted-foreground'}`} />
+                 <span className="text-[10px] font-black uppercase tracking-widest">
+                   {language === 'TR' ? '%70 PROFESYONEL FİLTRE' : '70% PRO FILTER'}
+                 </span>
+               </button>
             </div>
             <div className="flex flex-wrap gap-2">
                 {timeframes.map(tf => (
@@ -442,7 +461,7 @@ const News = () => {
   );
 };
 
-const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
+const SentimentAnalysis = ({ days, selectedSymbol, onSelect, strict }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [localSelectedAsset, setLocalSelectedAsset] = useState(null);
@@ -450,7 +469,7 @@ const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
 
   useEffect(() => {
     fetchSentiment();
-  }, [days]);
+  }, [days, strict]);
 
   useEffect(() => {
     if (data.length > 0 && selectedSymbol) {
@@ -462,7 +481,7 @@ const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
   const fetchSentiment = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/market/news-sentiment-summary?days=${days}&t=${Date.now()}`);
+      const res = await api.get(`/market/news-sentiment-summary?days=${days}&strict=${strict}&t=${Date.now()}`);
       // Sort data by average score descending
       const sorted = [...res].sort((a, b) => b.averageScore - a.averageScore);
       setData(sorted);
@@ -580,7 +599,7 @@ const SentimentAnalysis = ({ days, selectedSymbol, onSelect }) => {
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
             {data
-              .filter(item => (!selectedSymbol || item.asset === selectedSymbol) && Math.abs(item.averageScore) >= 70)
+              .filter(item => (!selectedSymbol || item.asset === selectedSymbol) && (!strict || Math.abs(item.averageScore) >= 70))
               .map((item) => (
               <button
                 key={item.asset}

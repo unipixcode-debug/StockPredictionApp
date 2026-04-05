@@ -89,7 +89,7 @@ router.get('/news', async (req, res) => {
         // Cache busting headers for news
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         
-        const news = await newsService.fetchLatestNews(daysInt, requestedLang, symbol, true);
+        const news = await newsService.fetchLatestNews(daysInt, requestedLang, symbol, req.query.strict !== 'false');
         res.json(news);
     } catch (error) {
         console.error('News API error:', error);
@@ -134,7 +134,7 @@ router.get('/news-sentiment-summary', async (req, res) => {
         // NO-CACHE: Force fresh professional signals every time
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         
-        const result = await newsService.getSentimentAggregation(days, true);
+        const result = await newsService.getSentimentAggregation(days, req.query.strict !== 'false');
         res.json(result);
     } catch (error) {
         console.error('Sentiment Summary API error:', error);
