@@ -37,39 +37,54 @@ function computeRSI(closes, period = RSI_PERIOD) {
  * Computes RSI + momentum signal for a USDT pair using 100% Direct HTTPS.
  * Returns { direction:'BUY'|'SELL'|'HOLD', score:0-100, rsi, momentum, currentPrice }
  */
-async function getTechnicalSignal(ccxtSymbol, isTestnet = true, thresholds = { oversold: RSI_OVERSOLD, overbought: RSI_OVERBOUGHT }) {
+async function getTechnicalSignal(symbol, isTestnet = true, thresholds = { oversold: RSI_OVERSOLD, overbought: RSI_OVERBOUGHT }) {
     try {
-        const apiSymbol = ccxtSymbol.split('/')[0] + 'USDT';
-        // Use direct HTTPS raw OHLCV fetch
-        const ohlcv = await binanceService.rawFuturesPublicOHLCV(apiSymbol, '1h', 30, isTestnet);
-        if (!ohlcv || ohlcv.length < RSI_PERIOD + 2) return { direction: 'HOLD', score: 50 };
+        let closes = [];
+        let currentPrice = 0;
+        let prevPrice = 0;
 
-        const closes = ohlcv.map(c => c[4]);
+        const isStock = symbol.includes('.IS') || marketDataService.NASDAQ_SYMBOLS?.includes(symbol.replace('.IS', ''));
+
+        if (isStock) {
+            // Yahoo Finance for Stocks
+            const history = await marketDataService.getHistoricalData(symbol, '1h', 30);
+            if (!history || history.length < RSI_PERIOD + 2) return { direction: 'HOLD', score: 50 };
+            closes = history.map(c => c.close);
+            currentPrice = closes[closes.length - 1];
+            prevPrice = closes[closes.length - 2];
+        } else {
+            // Binance for Crypto
+            const apiSymbol = symbol.split('/')[0].replace('USDT', '') + 'USDT';
+            const ohlcv = await binanceService.rawFuturesPublicOHLCV(apiSymbol, '1h', 30, isTestnet);
+            if (!ohlcv || ohlcv.length < RSI_PERIOD + 2) return { direction: 'HOLD', score: 50 };
+            closes = ohlcv.map(c => c[4]);
+            currentPrice = closes[closes.length - 1];
+            prevPrice = closes[closes.length - 2];
+        }
+
         const rsi = computeRSI(closes);
-        const currentPrice = closes[closes.length - 1];
-        const prevPrice    = closes[closes.length - 2];
-        const momentum     = ((currentPrice - prevPrice) / prevPrice) * 100;
+        const momentum = ((currentPrice - prevPrice) / prevPrice) * 100;
+        const trend = ((currentPrice - closes[0]) / closes[0]) * 100;
 
         // RSI artifact protection
         if (rsi === 100 || rsi === 0) return { direction: 'HOLD', score: 50 };
 
-        const trend = ((currentPrice - closes[0]) / closes[0]) * 100;
         let direction = 'HOLD';
-        let score     = 50;
+        let score = 50;
 
         if (rsi < thresholds.oversold) {
             const strength = thresholds.oversold - rsi;
-            score     = 55 + Math.min(strength * 1.5, 45); // Boosted score for bot confidence
+            score = 55 + Math.min(strength * 1.5, 45); 
             direction = 'BUY';
         } else if (rsi > thresholds.overbought) {
             const strength = rsi - thresholds.overbought;
-            score     = 55 + Math.min(strength * 1.5, 45);
+            score = 55 + Math.min(strength * 1.5, 45);
             direction = 'SELL';
         }
 
         return { direction, score: Math.round(score), rsi: Math.round(rsi * 10) / 10, momentum, trend, currentPrice };
     } catch (e) {
-        console.error(`[BotScanner] Technical Signal Error for ${ccxtSymbol}:`, e.message);
+        console.error(`[BotScanner] Technical Signal Error for ${symbol}:`, e.message);
         return { direction: 'HOLD', score: 50 };
     }
 }
@@ -78,27 +93,49 @@ async function getTechnicalSignal(ccxtSymbol, isTestnet = true, thresholds = { o
 // ─── Dynamic Scan List ───────────────────────────────────────────────────────
 async function getDynamicScanList(limit = TOP_COINS_TO_SCAN, isTestnet = true) {
     try {
-        // Use 24hr ticker data to get volume
+        // 1. Binance Crypto Pool
         const tickers = await binanceService.rawFutures24hrTickers(isTestnet);
         if (!Array.isArray(tickers)) throw new Error('INVALID_TICKERS_RESPONSE');
 
-        // Filter for USDT pairs only and sort by quoteVolume (USDT volume)
-        const topPairs = tickers
+        const cryptoPairs = tickers
             .filter(t => t.symbol.endsWith('USDT'))
             .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-            .slice(0, limit);
+            .slice(0, limit)
+            .map(t => ({
+                ccxtSymbol:    t.symbol.replace('USDT', '/USDT:USDT'),
+                displaySymbol: t.symbol.replace('USDT', '/USDT'),
+                engineSymbol:  t.symbol.replace('USDT', '/USDT'),
+                change24h:     t.priceChangePercent,
+                volume:        parseFloat(t.quoteVolume),
+                currentPrice:  parseFloat(t.lastPrice),
+                market:        'CRYPTO'
+            }));
 
-        const pairs = topPairs.map(t => ({
-            ccxtSymbol:    t.symbol.replace('USDT', '/USDT:USDT'),
-            displaySymbol: t.symbol.replace('USDT', '/USDT'),
-            engineSymbol:  t.symbol.replace('USDT', '/USDT'),
-            change24h:     t.priceChangePercent,
-            volume:        parseFloat(t.quoteVolume),
-            currentPrice:  parseFloat(t.lastPrice)
+        // 2. Nasdaq Pool (Top Symbols correctly properly SQARELY)
+        const nasdaqPairs = (marketDataService.NASDAQ_SYMBOLS || []).map(s => ({
+            ccxtSymbol:    s,
+            displaySymbol: s,
+            engineSymbol:  s,
+            change24h:     '0.00',
+            volume:        1000000,
+            currentPrice:  0,
+            market:        'STOCK'
         }));
 
-        console.log(`[BotScanner] ${pairs.length} top-volume futures pairs selected (isTestnet=${isTestnet}).`);
-        return pairs;
+        // 3. BIST Pool (Top Symbols correctly properly SQARELY)
+        const bistPairs = (marketDataService.BIST_SYMBOLS || []).map(s => ({
+            ccxtSymbol:    s,
+            displaySymbol: s.replace('.IS', ''),
+            engineSymbol:  s,
+            change24h:     '0.00',
+            volume:        1000000,
+            currentPrice:  0,
+            market:        'STOCK'
+        }));
+
+        const combined = [...cryptoPairs, ...nasdaqPairs, ...bistPairs];
+        console.log(`[BotScanner] ${combined.length} total symbols selected (Crypto=${cryptoPairs.length}, Stocks=${nasdaqPairs.length + bistPairs.length}).`);
+        return combined;
     } catch (err) {
         console.warn('[BotScanner] Dynamic fetch error, falling back to whitelist:', err.message);
         const whitelist = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'LINKUSDT'];
@@ -187,25 +224,34 @@ class BotScannerService {
                 // CRITICAL DEFENSE LOGIC effectively properly milimetrically
                 let actionTaken = false;
 
-                // Threshold: If sentiment is heavily against the position effectively properly
-                if ((isLong && score < 35) || (!isLong && score > 65)) {
-                    await this.log(userId, `🛡️ SENTINEL: ${trade.symbol} için kritik haber uyarısı! Duyarlılık: ${score}/100. Defansif aksiyon alınıyor...`, 'warning');
-                    
-                    // Action A: Move SL to Break-Even if PnL is positive
-                    if (trade.stopLossPrice !== trade.entryPrice) {
-                        await this.log(userId, `🛡️ SENTINEL: Stop-Loss giriş seviyesine (${trade.entryPrice}) çekildi. Capital protected.`, 'success');
-                        await trade.update({ stopLossPrice: trade.entryPrice });
-                        // Push new SL to exchange milimetrically
-                        await binanceService.setExchangeTPSL(userId, trade.id).catch(e => {});
-                        actionTaken = true;
-                    }
+                // ── SENTINEL GUARDIAN: Detailed News Interjection ──
+                const newsImpact = await newsService.getSentimentImpactForAsset(baseSymbol);
+                if (newsImpact.shouldIntervene) {
+                    const interventionReason = `🛡️ SENTINEL KRİTİK: ${baseSymbol} için olumsuz haber akışı tespit edildi! Neden: ${newsImpact.reason} (Etki Skoru: ${newsImpact.score}).`;
+                    await this.log(userId, interventionReason, 'error');
 
-                    // Action B: If extremely bearish/bullish against us, consider Close
-                    if ((isLong && score < 20) || (!isLong && score > 80)) {
-                        await this.log(userId, `🚨 SENTINEL: Ekstrem risk! ${trade.symbol} pozisyonu kapatılıyor.`, 'error');
-                        await binanceService.closePosition(userId, trade.symbol, trade.type).catch(e => {});
+                    // If score is high (>25), close immediately
+                    if (newsImpact.score > 25) {
+                        await this.log(userId, `🚀 SENTINEL: Ekstrem negatif duyarlılık (${newsImpact.score}). Pozisyon acil kapatılıyor.`, 'error');
+                        await binanceService.closePosition(userId, trade.symbol, trade.type).catch(e => {
+                            console.error(`[Sentinel] Close failed for ${trade.symbol}:`, e.message);
+                        });
                         actionTaken = true;
+                    } else {
+                        // Move SL to BE for medium risk
+                        if (trade.stopLossPrice !== trade.entryPrice) {
+                            await this.log(userId, `🛡️ SENTINEL: Negatif haber akışı. Sermaye koruması için Stop-Loss giriş seviyesine çekildi.`, 'warning');
+                            await trade.update({ stopLossPrice: trade.entryPrice });
+                            await binanceService.setExchangeTPSL(userId, trade.id).catch(e => {});
+                            actionTaken = true;
+                        }
                     }
+                }
+
+                if (actionTaken) continue;
+
+                if ((isLong && score < 35) || (!isLong && score > 65)) {
+                    await this.log(userId, `🛡️ SENTINEL: ${trade.symbol} için genel piyasa duyarlılığı zayıf (%${score}).`, 'warning');
                 }
 
                 // Macro Filter: BTC Dominance Spike effectively properly
@@ -384,7 +430,7 @@ class BotScannerService {
                     const tradeResult = await binanceService.executeTrade(userId, {
                         symbol:    pair.engineSymbol,
                         direction: techSignal.direction,
-                        market:    'CRYPTO',
+                        market:    pair.market, // Uses dynamic market type
                         type:      targetMarket,
                         currentPrice: techSignal.currentPrice || pair.currentPrice,
                         stopLossPct: STOP_LOSS_PCT,

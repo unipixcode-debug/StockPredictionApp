@@ -330,4 +330,14 @@ router.get('/macro', authCheck, async (req, res) => {
     }
 });
 
+// Get Alpha Mind Learning Stats
+router.get('/alpha-mind/stats', authCheck, async (req, res) => {
+    try {
+        const StrategyAlphaService = require('../services/StrategyAlphaService');
+        res.json(StrategyAlphaService.getGlobalStats());
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

@@ -80,7 +80,11 @@ class NewsService {
                 ? activeSources.map(s => ({ url: s.url, name: s.name }))
                 : [
                     { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069', name: 'CNBC' },
-                    { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk' }
+                    { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk' },
+                    { url: 'https://www.investing.com/rss/news.rss', name: 'Investing.com' },
+                    { url: 'https://www.reutersagency.com/feed/?best-sectors=business-finance&post_type=best', name: 'Reuters' },
+                    { url: 'https://feeds.bloomberg.com/business/news.rss', name: 'Bloomberg' },
+                    { url: 'https://news.google.com/rss/search?q=crypto+bitcoin&hl=en-US&gl=US&ceid=US:en', name: 'Google News Crypto' }
                 ];
 
             let count = 0;
@@ -90,7 +94,7 @@ class NewsService {
                     const $ = cheerio.load(data, { xmlMode: true });
                     const items = [];
                     $('item').each((i, el) => {
-                        if (i >= 5) return; // Only process top 5 per source to avoid over-limit
+                        if (i >= 20) return; // Process top 20 per source for deep coverage
                         items.push({
                             title: $(el).find('title').text(),
                             link: $(el).find('link').text(),
@@ -261,6 +265,61 @@ class NewsService {
         } catch (error) {
             console.error('Sentiment Analysis Error:', error.message);
             return { score: 50, explanation: "Hata oluştu." };
+        }
+    }
+    
+    /**
+     * Specialized sentiment check for a specific asset to help the bot decide on emergency interventions.
+     * Returns { shouldIntervene: boolean, reason: string, score: number }
+     */
+    async getSentimentImpactForAsset(symbol) {
+        try {
+            const cleanSymbol = symbol.split('/')[0].split(':')[0].toUpperCase();
+            const oneDayAgo = new Date();
+            oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
+            const news = await NewsSummary.findAll({
+                where: {
+                    createdAt: { [Op.gte]: oneDayAgo },
+                    [Op.or]: [
+                        { titleEN: { [Op.iLike]: `%${cleanSymbol}%` } },
+                        { titleTR: { [Op.iLike]: `%${cleanSymbol}%` } },
+                        { tags: { [Op.iLike]: `%${cleanSymbol}%` } }
+                    ]
+                },
+                order: [['importanceScore', 'DESC']],
+                limit: 10
+            });
+
+            if (news.length === 0) return { shouldIntervene: false, score: 50 };
+
+            let negativeSum = 0;
+            let totalWeight = 0;
+            let criticalReason = "";
+
+            news.forEach(item => {
+                const sentiment = item.sentimentScore || 50;
+                const weight = (item.importanceScore || 50) / 100;
+                
+                if (sentiment < 40) { // Bearish news
+                    const severity = (40 - sentiment) * weight;
+                    negativeSum += severity;
+                    if (severity > 15) criticalReason = item.titleTR || item.titleEN;
+                }
+                totalWeight += weight;
+            });
+
+            const interventionScore = totalWeight > 0 ? (negativeSum / totalWeight) : 0;
+            
+            // If negative impact exceeds 20 points (normalized), suggest intervention
+            return {
+                shouldIntervene: interventionScore > 20,
+                reason: criticalReason || "Birikmiş negatif haber duyarlılığı.",
+                score: Math.round(interventionScore)
+            };
+        } catch (e) {
+            console.error('getSentimentImpactForAsset Error:', e.message);
+            return { shouldIntervene: false, score: 0 };
         }
     }
 }

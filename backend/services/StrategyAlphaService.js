@@ -5,6 +5,8 @@ class StrategyAlphaService {
     constructor() {
         this.alphaCache = new Map(); // symbol -> best settings
         this.isUpdating = false;
+        this.totalTradesProcessed = 0;
+        this.lastUpdateTime = null;
     }
 
     /**
@@ -31,8 +33,12 @@ class StrategyAlphaService {
             if (trades.length === 0) {
                 console.log('🌐 [Alpha Mind] No recent closed trades for analysis. Using defaults.');
                 this.isUpdating = false;
+                this.totalTradesProcessed = 0;
                 return;
             }
+
+            this.totalTradesProcessed = trades.length;
+            this.lastUpdateTime = new Date();
 
             // Grouping logic: symbol + horizon + timeframe correctly properly SQARELY
             const stats = {};
@@ -82,6 +88,24 @@ class StrategyAlphaService {
     getAlphaRecommendation(symbol, timeframe = '5m') {
         const key = `${symbol}_${timeframe}`;
         return this.alphaCache.get(key) || null;
+    }
+
+    /**
+     * Returns global metrics for the Alpha Mind dashboard.
+     */
+    getGlobalStats() {
+        const patterns = Array.from(this.alphaCache.values());
+        const avgWinRate = patterns.length > 0 
+            ? (patterns.reduce((sum, p) => sum + parseFloat(p.winRate), 0) / patterns.length).toFixed(1)
+            : 0;
+
+        return {
+            totalPatterns: this.alphaCache.size,
+            totalTradesAnalyzed: this.totalTradesProcessed,
+            avgWinRate: avgWinRate,
+            lastUpdate: this.lastUpdateTime,
+            topPerformers: patterns.sort((a,b) => b.winRate - a.winRate).slice(0, 3)
+        };
     }
 
     /**

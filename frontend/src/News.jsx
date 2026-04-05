@@ -179,16 +179,21 @@ const News = () => {
           {/* Filter Status & Timeframe Filter */}
           <div className="flex flex-col space-y-6">
             {selectedAssetSymbol && (
-              <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-2xl">
+              <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/30 rounded-2xl shadow-[0_0_20px_rgba(0,242,254,0.1)]">
                 <div className="flex items-center space-x-3">
-                    <Zap size={16} className="text-primary animate-pulse" />
-                    <span className="text-xs font-black uppercase tracking-widest">
-                        {language === 'TR' ? `${selectedAssetSymbol} ANALİZİ FİLTRELENDİ` : `${selectedAssetSymbol} ANALYSIS FILTERED`}
-                    </span>
+                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                        <Zap size={16} className="text-primary animate-pulse" />
+                    </div>
+                    <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-primary block">AKTİF FİLTRE</span>
+                        <span className="text-sm font-black uppercase tracking-tight">
+                            {selectedAssetSymbol} HABERLERİ
+                        </span>
+                    </div>
                 </div>
                 <button 
                     onClick={() => setSelectedAssetSymbol(null)}
-                    className="text-[10px] font-black uppercase tracking-widest bg-primary/20 hover:bg-primary/30 px-3 py-1 rounded-lg transition-colors"
+                    className="text-[10px] font-black uppercase tracking-widest bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 border border-rose-500/30 px-6 py-2 rounded-xl transition-all shadow-lg"
                 >
                     {language === 'TR' ? 'FİLTREYİ TEMİZLE' : 'CLEAR FILTER'}
                 </button>
@@ -306,16 +311,22 @@ const News = () => {
                   
                   {/* Impact Indicators */}
                   {item.impacts && item.impacts.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-6 pointer-events-none">
+                      <div className="flex flex-wrap gap-2 mb-6">
                           {item.impacts.map((impact, i) => (
-                              <div key={i} className={`
-                                  flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-tight
-                                  ${impact.direction === 'POSITIVE' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' : 'bg-rose-500/10 border-rose-500/30 text-rose-500'}
+                              <button 
+                                  key={i} 
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedAssetSymbol(impact.asset);
+                                  }}
+                                  className={`
+                                  flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-tight transition-all hover:scale-105 active:scale-95
+                                  ${impact.direction === 'POSITIVE' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20' : 'bg-rose-500/10 border-rose-500/30 text-rose-500 hover:bg-rose-500/20'}
                               `}>
                                   <span className="tracking-widest">{impact.asset}</span>
                                   <div className={`w-px h-2 ${impact.direction === 'POSITIVE' ? 'bg-emerald-500/20' : 'bg-rose-500/20'}`} />
                                   <span className="font-black">{impact.direction === 'POSITIVE' ? '+' : '-'}{impact.score}</span>
-                              </div>
+                              </button>
                           ))}
                       </div>
                   )}
