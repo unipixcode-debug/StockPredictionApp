@@ -130,9 +130,14 @@ const News = () => {
     : news.filter(item => (item.sourceName || t('OtherSource')) === activeSource);
 
   if (selectedAssetSymbol) {
-    filteredNews = filteredNews.filter(item => 
-      item.impacts?.some(imp => imp.asset === selectedAssetSymbol)
-    );
+    const symbolToMatch = selectedAssetSymbol.toUpperCase();
+    filteredNews = filteredNews.filter(item => {
+        const hasImpact = item.impacts?.some(imp => imp.asset === selectedAssetSymbol);
+        const inTitle = item.title?.toUpperCase().includes(symbolToMatch);
+        const inSnippet = item.contentSnippet?.toUpperCase().includes(symbolToMatch);
+        const inTags = item.tags?.toUpperCase().includes(symbolToMatch);
+        return hasImpact || inTitle || inSnippet || inTags;
+    });
   }
 
   const containerVariants = {

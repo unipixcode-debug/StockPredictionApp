@@ -84,7 +84,21 @@ class NewsService {
                     { url: 'https://www.investing.com/rss/news.rss', name: 'Investing.com' },
                     { url: 'https://www.reutersagency.com/feed/?best-sectors=business-finance&post_type=best', name: 'Reuters' },
                     { url: 'https://feeds.bloomberg.com/business/news.rss', name: 'Bloomberg' },
-                    { url: 'https://news.google.com/rss/search?q=crypto+bitcoin&hl=en-US&gl=US&ceid=US:en', name: 'Google News Crypto' }
+                    { url: 'https://news.google.com/rss/search?q=crypto+bitcoin&hl=en-US&gl=US&ceid=US:en', name: 'Google News Crypto' },
+                    { url: 'https://www.nasdaq.com/feed/rssoutbound?category=Markets', name: 'Nasdaq Markets' },
+                    { url: 'https://www.nasdaq.com/feed/rssoutbound?category=Stocks', name: 'Nasdaq Stocks' },
+                    { url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', name: 'WSJ Markets' },
+                    { url: 'https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml', name: 'WSJ Business' },
+                    { url: 'https://www.ft.com/markets?format=rss', name: 'Financial Times' },
+                    { url: 'https://fortune.com/feed/', name: 'Fortune' },
+                    { url: 'https://seekingalpha.com/market_currents.xml', name: 'Seeking Alpha' },
+                    { url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', name: 'MarketWatch' },
+                    { url: 'https://finance.yahoo.com/news/rssindex', name: 'Yahoo Finance' },
+                    { url: 'https://www.dunya.com/rss', name: 'Dunya Gazetesi' },
+                    { url: 'https://www.finansgundem.com/rss', name: 'FinansGundem' },
+                    { url: 'https://www.hurriyet.com.tr/rss/ekonomi', name: 'BigPara Ekonomi' },
+                    { url: 'https://www.theblock.co/rss.xml', name: 'The Block' },
+                    { url: 'https://cointelegraph.com/rss', name: 'CoinTelegraph' }
                 ];
 
             let count = 0;

@@ -409,10 +409,11 @@ class AIService {
                 const prompt = `Translate the following JSON array of news articles to Turkish. 
                 Also, for each article:
                 1. Assign a 'sentimentScore' from 0 (very bearish/negative) to 100 (very bullish/positive).
-                2. Identify related asset 'tags' (e.g., BTC, XRP, ETH, XAU, DXY, SP500, TSLA, etc.).
+                2. Identify related asset 'tags' (e.g., BTC, XRP, ETH, XAU, DXY, SP500, TSLA, etc.). LOOK CAREFULLY for tickers in titles (e.g. "APPLE (AAPL)") or snippets.
                 3. Identify specific asset 'impacts'. For each affected asset, provide a 'score' (0-100 absolute value) and a 'direction' (POSITIVE/NEGATIVE). 
                    Example: impacts: [{ "asset": "XAU", "score": 56, "direction": "POSITIVE" }, { "asset": "BTC", "score": 35, "direction": "NEGATIVE" }]
                 
+                Ensure you capture ALL relevant assets mentioned. 
                 Ensure the output is valid, complete JSON. Return ONLY the JSON array containing exactly the same 'id' fields and the translated 'title', 'snippet', 'sentimentScore', 'tags', and 'impacts' fields.\n\n${JSON.stringify(payload)}`;
                 
                 const responseText = await this.generateContent(prompt, "gemini-flash-latest");
