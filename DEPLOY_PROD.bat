@@ -18,7 +18,7 @@ if exist "%KEY_PATH%" (
 
 echo 2. Syncing Local Changes to GitHub...
 git add .
-git commit -m "feat: synchronized dashboard and scanner charts with yellow forecasts"
+git commit -m "feat: professional 70% filter toggle, 3-day default, and bulletproof groy news retrieval"
 git push origin main
 
 echo 3. Triggering Remote Update on Oracle Server (%SERVER_IP%)...
