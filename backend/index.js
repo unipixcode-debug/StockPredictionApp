@@ -101,8 +101,17 @@ async function syncDb() {
     try {
         // [EMERGENCY FIX] Manual column addition for Telegram
         console.log('🛡️  Running manual migration check...');
-        await sequelize.query('ALTER TABLE "BinanceBotConfigs" ADD COLUMN IF NOT EXISTS "telegramToken" VARCHAR(255)');
-        await sequelize.query('ALTER TABLE "BinanceBotConfigs" ADD COLUMN IF NOT EXISTS "telegramChatId" VARCHAR(255)');
+        const tables = ['BinanceBotConfigs', 'BinanceBotConfig'];
+        for (const table of tables) {
+            try {
+                await sequelize.query(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "telegramToken" VARCHAR(255)`);
+                await sequelize.query(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "telegramChatId" VARCHAR(255)`);
+                console.log(`✅ Table "${table}" updated or skipped correctly.`);
+            } catch (tErr) {
+                // Table might not exist, skip to next
+                console.log(`ℹ️ Table "${table}" skip: ${tErr.message}`);
+            }
+        }
         
         await sequelize.sync({ alter: false });
         console.log('✅ Database synchronized successfully.');
