@@ -1104,6 +1104,26 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                      <div className="w-9 h-5 bg-secondary border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
                                  </label>
                              </div>
+                             <div className="p-4 bg-orange-500/5 rounded-2xl border border-orange-500/10 flex justify-between items-center">
+                                 <div>
+                                     <p className="font-black text-[10px] uppercase text-orange-400">Keskin Yapı</p>
+                                     <p className="text-[8px] text-muted-foreground uppercase tracking-widest">Sıkışan (Bollinger) coinleri bul</p>
+                                 </div>
+                                 <label className="relative inline-flex items-center cursor-pointer">
+                                     <input type="checkbox" name="keskinYapiActive" checked={formData.keskinYapiActive} onChange={handleChange} className="sr-only peer" />
+                                     <div className="w-9 h-5 bg-secondary border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                 </label>
+                             </div>
+                             <div className="p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10 flex justify-between items-center">
+                                 <div>
+                                     <p className="font-black text-[10px] uppercase text-blue-400">Formasyon Onayı</p>
+                                     <p className="text-[8px] text-muted-foreground uppercase tracking-widest">W/OBO Dip & Tepe Analizi</p>
+                                 </div>
+                                 <label className="relative inline-flex items-center cursor-pointer">
+                                     <input type="checkbox" name="formasyonOnayiActive" checked={formData.formasyonOnayiActive} onChange={handleChange} className="sr-only peer" />
+                                     <div className="w-9 h-5 bg-secondary border border-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                                 </label>
+                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

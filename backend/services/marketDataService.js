@@ -370,39 +370,40 @@ class MarketDataService {
                     low: parseFloat(c.low),
                     close: parseFloat(c.close)
                 }));
-                // Tier 1: Try JSON Chart API (Fastest)
-                const period1Date = new Date();
-                period1Date.setMonth(period1Date.getMonth() - 2); 
-                const result = await yahooFinance.chart(rawSymbol, {
-                    period1: Math.floor(period1Date.getTime() / 1000),
-                    interval: interval === '1d' ? '1d' : interval
-                }).catch(() => null);
-
-                if (result && result.quotes && result.quotes.length > 5) {
-                    return (result.quotes || []).map(c => ({
-                        time: Math.floor((c.date instanceof Date ? c.date.getTime() : 0) / 1000),
-                        open: c.open,
-                        high: c.high,
-                        low: c.low,
-                        close: c.close
-                    })).filter(c => c.close != null);
-                }
-
-                // Tier 2: Scraper Fallback (High Resilience for Cloud IPs)
-                console.log(`[Historical Fallback] Scraping latest price for ${rawSymbol} as chart failed.`);
-                const scraped = await this.scrapeYahooFinance(rawSymbol);
-                if (scraped && scraped.price > 0) {
-                    // Create a dummy history point to allow scanner to at least show the current price
-                    return [{
-                        time: Math.floor(Date.now() / 1000),
-                        open: scraped.price,
-                        high: scraped.price,
-                        low: scraped.price,
-                        close: scraped.price
-                    }];
-                }
-                return [];
             }
+            
+            // Tier 1: Try JSON Chart API (Fastest)
+            const period1Date = new Date();
+            period1Date.setMonth(period1Date.getMonth() - 2); 
+            const result = await yahooFinance.chart(rawSymbol, {
+                period1: Math.floor(period1Date.getTime() / 1000),
+                interval: interval === '1d' ? '1d' : interval
+            }).catch(() => null);
+
+            if (result && result.quotes && result.quotes.length > 5) {
+                return (result.quotes || []).map(c => ({
+                    time: Math.floor((c.date instanceof Date ? c.date.getTime() : 0) / 1000),
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close
+                })).filter(c => c.close != null);
+            }
+
+            // Tier 2: Scraper Fallback (High Resilience for Cloud IPs)
+            console.log(`[Historical Fallback] Scraping latest price for ${rawSymbol} as chart failed.`);
+            const scraped = await this.scrapeYahooFinance(rawSymbol);
+            if (scraped && scraped.price > 0) {
+                // Create a dummy history point to allow scanner to at least show the current price
+                return [{
+                    time: Math.floor(Date.now() / 1000),
+                    open: scraped.price,
+                    high: scraped.price,
+                    low: scraped.price,
+                    close: scraped.price
+                }];
+            }
+            return [];
         } catch (error) {
             console.error(`[History Error] ${symbol}:`, error.message);
             return [];
@@ -516,12 +517,12 @@ class MarketDataService {
         } catch (e) { return []; }
     }
 
-    async getScannerData(market = 'crypto', limit = 40) {
-        console.log(`[Scanner] Requesting market: ${market}`);
+    async getScannerData(marketParam, limit = 40) {
+        const market = (marketParam || 'crypto').toLowerCase().trim();
+        console.log(`[Scanner] Requesting market: ${market}, Limit: ${limit}`);
         const startTime = Date.now();
         try {
             // NUCLEAR FIX: Bypass database settings check for market activation
-            // We force isActive to true because we know our v6 fallback logic is reliable
             const status = { isActive: true }; 
             if (!status || !status.isActive) {
                 console.log(`[Scanner] Inactive.`);

@@ -115,6 +115,10 @@ function startServices() {
     newsService.startBackgroundTasks();
     botScannerService.startBackgroundTasks();
     StrategyAlphaService.startLearningLoop();
+    
+    // Quantitative AI Platform Services
+    const marketIngestorService = require('./services/marketIngestorService');
+    marketIngestorService.start();
 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, '0.0.0.0', () => {
