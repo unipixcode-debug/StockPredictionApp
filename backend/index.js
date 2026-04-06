@@ -95,17 +95,26 @@ app.get('/', (req, res) => {
 });
 
 // Sync Database and Start Server
-console.log('🔄 Synchronizing database (ALTER ENABLED)...');
-sequelize.sync({ alter: true })
-    .then(() => {
-        console.log('✅ Database synchronized (Columns added if missing)');
+console.log('🔄 Synchronizing database...');
+
+async function syncDb() {
+    try {
+        // [EMERGENCY FIX] Manual column addition for Telegram
+        console.log('🛡️  Running manual migration check...');
+        await sequelize.query('ALTER TABLE "BinanceBotConfigs" ADD COLUMN IF NOT EXISTS "telegramToken" VARCHAR(255)');
+        await sequelize.query('ALTER TABLE "BinanceBotConfigs" ADD COLUMN IF NOT EXISTS "telegramChatId" VARCHAR(255)');
+        
+        await sequelize.sync({ alter: false });
+        console.log('✅ Database synchronized successfully.');
         startServices();
-    })
-    .catch(err => {
-        console.error('⚠️ Database sync failed, but server will continue:', err.message);
-        // Start services anyway so market stats/news can function
+    } catch (err) {
+        console.error('⚠️ Database sync/migration failed:', err.message);
+        // Start services anyway as a failsafe
         startServices();
-    });
+    }
+}
+
+syncDb();
 
 function startServices() {
     // Start Background Tasks
