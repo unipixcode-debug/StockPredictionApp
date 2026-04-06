@@ -95,10 +95,10 @@ app.get('/', (req, res) => {
 });
 
 // Sync Database and Start Server
-console.log('🔄 Synchronizing database...');
-sequelize.sync({ alter: false })
+console.log('🔄 Synchronizing database (ALTER ENABLED)...');
+sequelize.sync({ alter: true })
     .then(() => {
-        console.log('✅ Database synchronized (Alter skipped)');
+        console.log('✅ Database synchronized (Columns added if missing)');
         startServices();
     })
     .catch(err => {
