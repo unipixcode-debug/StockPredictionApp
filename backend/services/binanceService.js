@@ -474,7 +474,20 @@ class BinanceService {
      * Aggregates key Binance Futures account metrics for the Live Summary Bar.
      */
     async getFuturesAccountSummary(userId) {
-        const config = await BinanceBotConfig.findOne({ where: { userId } });
+        let config;
+        try {
+            config = await BinanceBotConfig.findOne({ where: { userId } });
+        } catch (err) {
+            if (err.message.includes('keskinYapiActive') || err.message.includes('formasyonOnayiActive')) {
+                console.warn('[BinanceService] Column mismatch in getFuturesAccountSummary. Falling back to safe query.');
+                config = await BinanceBotConfig.findOne({
+                    where: { userId },
+                    attributes: { exclude: ['keskinYapiActive', 'formasyonOnayiActive'] }
+                });
+            } else {
+                throw err;
+            }
+        }
         if (!config || !config.futuresApiKey) throw new Error('Futures API not configured.');
 
         const apiKey = config.futuresApiKey;
@@ -541,7 +554,20 @@ class BinanceService {
             return { exchange: publicEx, config: { isTestnet: true } };
         }
 
-        const config = await BinanceBotConfig.findOne({ where: { userId } });
+        let config;
+        try {
+            config = await BinanceBotConfig.findOne({ where: { userId } });
+        } catch (err) {
+            if (err.message.includes('keskinYapiActive') || err.message.includes('formasyonOnayiActive')) {
+                console.warn('[BinanceService] Column mismatch in getExchangeInstance. Falling back to safe query.');
+                config = await BinanceBotConfig.findOne({
+                    where: { userId },
+                    attributes: { exclude: ['keskinYapiActive', 'formasyonOnayiActive'] }
+                });
+            } else {
+                throw err;
+            }
+        }
         if (!config) throw new Error('BINANCE_NOT_CONFIGURED');
 
         let apiKey, apiSecret;

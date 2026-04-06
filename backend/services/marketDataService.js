@@ -605,9 +605,15 @@ class MarketDataService {
 
                                 let aiScore = 50;
                                 if (rsi < 30) aiScore += 20; else if (rsi > 70) aiScore -= 10;
-                                const cleanSym = symbol.replace('.IS', '').replace('USDT', '');
-                                const assetSent = sentimentData.find(s => s.asset === cleanSym);
-                                if (assetSent) aiScore += (assetSent.averageScore - 50) / 2;
+                                
+                                // Defensive sentiment check - sentimentData might not be in scope here
+                                try {
+                                    const newsService = require('./newsService');
+                                    const cleanSym = symbol.replace('.IS', '').replace('USDT', '');
+                                    // Try to fetch or use global sentiment if available
+                                    const assetSent = await newsService.getSentimentAggregation(1).then(sent => sent.find(s => s.asset === cleanSym)).catch(() => null);
+                                    if (assetSent) aiScore += (assetSent.averageScore - 50) / 2;
+                                } catch (se) { /* Silent fallback */ }
 
                                 return {
                                     symbol, price: currentPrice, change: currentChange || 0.01, rsi, 
@@ -622,17 +628,20 @@ class MarketDataService {
                         return assetData;
                     } catch (err) {
                         console.warn(`[Scanner] Asset skip: ${symbol} (${err.message})`);
-                        // FINAL CATCH-ALL FALLBACK: If an exception occurred
-                        const isPrimary = (this.NASDAQ_SYMBOLS || []).includes(symbol) || (this.BIST_SYMBOLS || []).includes(symbol);
-                        if (isPrimary) {
-                            return {
-                                symbol, price: 100, change: 0, rsi: 50, aiScore: 40,
-                                signal: "GECİCİ", tag: "neutral", volatility: 2,
-                                note: "Veri sunucusu meşgul"
-                            };
-                        }
-                        return null;
+                        // FINAL CATCH-ALL FALLBACK: If an exception occurred or data failed
                     }
+
+                    // RESILIENCE FALLBACK: For Nasdaq/BIST, always return a baseline if nothing else worked
+                    const isNasdaq = this.NASDAQ_SYMBOLS.includes(symbol);
+                    const isBist = this.BIST_SYMBOLS.includes(symbol);
+                    if (isNasdaq || isBist) {
+                        return {
+                            symbol, price: 100, change: 0, rsi: 50, aiScore: 45,
+                            signal: "VERİ OLUŞUYOR", tag: "neutral", volatility: 2,
+                            note: "Veri sunucusu meşgul"
+                        };
+                    }
+                    return null;
                 });
 
                 const chunkResults = await Promise.all(chunkPromises);

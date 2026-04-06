@@ -283,9 +283,25 @@ class BotScannerService {
     async checkUserIntervals() {
         try {
             const now = new Date();
-            const activeConfigs = await BinanceBotConfig.findAll({
-                where: { [require('sequelize').Op.or]: [{ isSpotActive: true }, { isFuturesActive: true }] }
-            });
+            let activeConfigs = [];
+            
+            try {
+                activeConfigs = await BinanceBotConfig.findAll({
+                    where: { [require('sequelize').Op.or]: [{ isSpotActive: true }, { isFuturesActive: true }] }
+                });
+            } catch (queryErr) {
+                if (queryErr.message.includes('keskinYapiActive') || queryErr.message.includes('formasyonOnayiActive')) {
+                    console.warn('[BotScanner] Column mismatch detected. Falling back to safe query (excluding AI strategies).');
+                    // Fallback: Manually exclude failing columns from the query SELECT
+                    activeConfigs = await BinanceBotConfig.findAll({
+                        attributes: { exclude: ['keskinYapiActive', 'formasyonOnayiActive'] },
+                        where: { [require('sequelize').Op.or]: [{ isSpotActive: true }, { isFuturesActive: true }] }
+                    });
+                } else {
+                    throw queryErr;
+                }
+            }
+
             if (!activeConfigs.length) return;
 
             for (const config of activeConfigs) {
@@ -299,7 +315,9 @@ class BotScannerService {
                 this.activeScanners.add(config.userId);
                 this.runScanForUser(config).finally(() => this.activeScanners.delete(config.userId));
             }
-        } catch (e) { console.error('[BotScanner] Interval error:', e.message); }
+        } catch (e) {
+            console.error('[BotScanner] Interval error:', e.message);
+        }
     }
 
     async runScanForUser(config) {
