@@ -335,20 +335,38 @@ class MarketDataService {
                     low: parseFloat(c.low),
                     close: parseFloat(c.close)
                 }));
-            } else {
+                // Tier 1: Try JSON Chart API (Fastest)
                 const period1Date = new Date();
                 period1Date.setMonth(period1Date.getMonth() - 2); 
                 const result = await yahooFinance.chart(rawSymbol, {
                     period1: Math.floor(period1Date.getTime() / 1000),
                     interval: interval === '1d' ? '1d' : interval
-                });
-                return (result.quotes || []).map(c => ({
-                    time: Math.floor(c.date.getTime() / 1000),
-                    open: c.open,
-                    high: c.high,
-                    low: c.low,
-                    close: c.close
-                })).filter(c => c.close != null);
+                }).catch(() => null);
+
+                if (result && result.quotes && result.quotes.length > 5) {
+                    return (result.quotes || []).map(c => ({
+                        time: Math.floor((c.date instanceof Date ? c.date.getTime() : 0) / 1000),
+                        open: c.open,
+                        high: c.high,
+                        low: c.low,
+                        close: c.close
+                    })).filter(c => c.close != null);
+                }
+
+                // Tier 2: Scraper Fallback (High Resilience for Cloud IPs)
+                console.log(`[Historical Fallback] Scraping latest price for ${rawSymbol} as chart failed.`);
+                const scraped = await this.scrapeYahooFinance(rawSymbol);
+                if (scraped && scraped.price > 0) {
+                    // Create a dummy history point to allow scanner to at least show the current price
+                    return [{
+                        time: Math.floor(Date.now() / 1000),
+                        open: scraped.price,
+                        high: scraped.price,
+                        low: scraped.price,
+                        close: scraped.price
+                    }];
+                }
+                return [];
             }
         } catch (error) {
             console.error(`[History Error] ${symbol}:`, error.message);
@@ -493,21 +511,42 @@ class MarketDataService {
                 const timeframe = (market === 'crypto') ? '1h' : '1D';
                 const candles = await this.getHistoricalData(symbol, timeframe, 50);
                 
-                if (!candles || candles.length < 5) {
+                // For stocks, even 1 candle is enough to show the asset (using RSI=50 fallback)
+                const minCandles = (market === 'crypto') ? 5 : 1;
+                
+                if (!candles || candles.length < minCandles) {
                     console.log(`[Scanner] Skipping ${symbol} - not enough data (${candles?.length || 0})`);
                     continue;
                 }
 
                 const prices = candles.map(c => c.close);
-                const rsi = this.calculateRSI(prices);
+                const rsi = prices.length >= 14 ? this.calculateRSI(prices) : 50;
                 
                 let currentPrice = symObj.price;
                 let currentChange = symObj.change || 0;
 
+                // Tier 1: Try Quote API / Scraper for Price
                 if (!currentPrice) {
-                    const quote = await yahooFinance.quote(symbol);
-                    currentPrice = quote.regularMarketPrice;
-                    currentChange = quote.regularMarketChangePercent;
+                    try {
+                        const quote = await yahooFinance.quote(symbol).catch(() => null);
+                        if (quote && quote.regularMarketPrice) {
+                            currentPrice = quote.regularMarketPrice;
+                            currentChange = quote.regularMarketChangePercent;
+                        } else {
+                            // Fallback to Scraper
+                            const scraped = await this.scrapeYahooFinance(symbol);
+                            if (scraped && scraped.price > 0) {
+                                currentPrice = scraped.price;
+                                currentChange = scraped.change;
+                            } else {
+                                // Final Fallback to latest candle close
+                                currentPrice = prices[prices.length - 1];
+                                currentChange = 0.01; 
+                            }
+                        }
+                    } catch (pe) {
+                        currentPrice = prices[prices.length - 1];
+                    }
                 }
 
                 let aiScore = 50;
