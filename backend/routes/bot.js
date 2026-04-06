@@ -58,6 +58,7 @@ router.post('/config', authCheck, async (req, res) => {
             isTestnet, scanInterval,
             defaultLeverage, tradeHorizon,
             autoOptimize,
+            keskinYapiActive, formasyonOnayiActive,
             rsiOversold, rsiOverbought, minConfirmationScore, riskConsent,
             telegramToken, telegramChatId
         } = req.body;
@@ -135,6 +136,8 @@ router.post('/config', authCheck, async (req, res) => {
         if (rsiOversold !== undefined) config.rsiOversold = parseFloat(rsiOversold);
         if (rsiOverbought !== undefined) config.rsiOverbought = parseFloat(rsiOverbought);
         if (minConfirmationScore !== undefined) config.minConfirmationScore = parseFloat(minConfirmationScore);
+        if (keskinYapiActive !== undefined) config.keskinYapiActive = !!keskinYapiActive;
+        if (formasyonOnayiActive !== undefined) config.formasyonOnayiActive = !!formasyonOnayiActive;
         if (riskConsent !== undefined) config.riskConsent = !!riskConsent;
         
         // Telegram Settings
