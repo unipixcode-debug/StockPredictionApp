@@ -23,7 +23,9 @@ class TelegramService {
             });
             return true;
         } catch (error) {
-            console.error('[TelegramService] Error sending message:', error.response?.data || error.message);
+            const errorData = error.response?.data;
+            const errorMsg = errorData?.description || error.message;
+            console.error(`[TelegramService] Error: ${errorMsg}`, errorData);
             return false;
         }
     }

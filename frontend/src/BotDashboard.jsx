@@ -801,6 +801,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
     });
 
     const [testMarket, setTestMarket] = useState('SPOT');
+    const [isTgTesting, setIsTgTesting] = useState(false);
     const [hasLoadedConfig, setHasLoadedConfig] = useState(false);
 
     // Populate initial
@@ -886,7 +887,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
             alert(language === 'TR' ? 'Token ve Chat ID gereklidir.' : 'Token and Chat ID are required.');
             return;
         }
-        setIsTesting(true);
+        setIsTgTesting(true);
         try {
             const res = await api.post('/bot/test-telegram', {
                 telegramToken: formData.telegramToken,
@@ -894,9 +895,10 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
             });
             alert(res.message || 'Test mesajı gönderildi!');
         } catch (error) {
-            alert('Hata: ' + (error.response?.data?.error || error.message));
+            const msg = error.response?.data?.error || error.message;
+            alert(language === 'TR' ? `Gönderim Hatası: ${msg}` : `Send Error: ${msg}`);
         } finally {
-            setIsTesting(false);
+            setIsTgTesting(false);
         }
     };
 
@@ -979,7 +981,7 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                     onClick={handleTestTelegram}
                                     className="px-6 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-blue-500 hover:bg-blue-500/20 transition-all flex items-center gap-2"
                                 >
-                                    <RefreshCw size={12} className={isTesting ? "animate-spin" : ""} /> Test Mesajı Gönder
+                                    <RefreshCw size={12} className={isTgTesting ? "animate-spin" : ""} /> Test Mesajı Gönder
                                 </button>
                             </div>
                         </div>
