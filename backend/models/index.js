@@ -13,6 +13,8 @@ const AIPortfolio = require('./AIPortfolio');
 const BinanceBotConfig = require('./BinanceBotConfig');
 const ExecutedTrade = require('./ExecutedTrade');
 const BotLog = require('./BotLog');
+const CandleData = require('./CandleData');
+const PivotPoint = require('./PivotPoint');
 
 // Associations
 User.hasMany(Portfolio, { foreignKey: 'userId' });
@@ -51,5 +53,7 @@ module.exports = {
     BinanceBotConfig,
     ExecutedTrade,
     BotLog,
+    CandleData,
+    PivotPoint,
     sequelize
 };

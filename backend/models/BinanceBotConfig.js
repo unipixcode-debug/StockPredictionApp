@@ -158,6 +158,14 @@ const BinanceBotConfig = sequelize.define('BinanceBotConfig', {
         type: DataTypes.FLOAT,
         defaultValue: 58
     },
+    keskinYapiActive: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    formasyonOnayiActive: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
     riskConsent: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
