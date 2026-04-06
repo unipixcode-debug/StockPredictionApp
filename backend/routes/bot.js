@@ -41,7 +41,8 @@ router.post('/config', authCheck, async (req, res) => {
             isTestnet, scanInterval,
             defaultLeverage, tradeHorizon,
             autoOptimize,
-            rsiOversold, rsiOverbought, minConfirmationScore, riskConsent
+            rsiOversold, rsiOverbought, minConfirmationScore, riskConsent,
+            telegramToken, telegramChatId
         } = req.body;
 
         let config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
@@ -93,9 +94,34 @@ router.post('/config', authCheck, async (req, res) => {
         if (rsiOverbought !== undefined) config.rsiOverbought = parseFloat(rsiOverbought);
         if (minConfirmationScore !== undefined) config.minConfirmationScore = parseFloat(minConfirmationScore);
         if (riskConsent !== undefined) config.riskConsent = !!riskConsent;
+        
+        // Telegram Settings
+        if (telegramToken !== undefined && !isMasked(telegramToken)) config.telegramToken = telegramToken.trim();
+        if (telegramChatId !== undefined && !isMasked(telegramChatId)) config.telegramChatId = telegramChatId.trim();
 
         await config.save();
         res.json({ message: 'Bot configuration updated successfully', config });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Test Telegram Connection
+router.post('/test-telegram', authCheck, async (req, res) => {
+    try {
+        const { telegramToken, telegramChatId } = req.body;
+        const telegramService = require('../services/telegramService');
+        
+        if (!telegramToken || !telegramChatId) {
+            return res.status(400).json({ error: 'Token ve Chat ID gereklidir.' });
+        }
+
+        const success = await telegramService.sendTestMessage(telegramToken, telegramChatId);
+        if (success) {
+            res.json({ success: true, message: 'Test mesajı gönderildi!' });
+        } else {
+            res.status(500).json({ success: false, error: 'Mesaj gönderilemedi. Lütfen bilgileri kontrol edin.' });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

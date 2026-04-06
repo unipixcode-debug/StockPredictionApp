@@ -161,6 +161,28 @@ const BinanceBotConfig = sequelize.define('BinanceBotConfig', {
     riskConsent: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+    },
+    telegramToken: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        set(value) {
+            this.setDataValue('telegramToken', encrypt(value));
+        },
+        get() {
+            const val = this.getDataValue('telegramToken');
+            return val ? decrypt(val) : null;
+        }
+    },
+    telegramChatId: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        set(value) {
+            this.setDataValue('telegramChatId', encrypt(value));
+        },
+        get() {
+            const val = this.getDataValue('telegramChatId');
+            return val ? decrypt(val) : null;
+        }
     }
 }, {
     timestamps: true,

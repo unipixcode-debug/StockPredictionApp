@@ -4,6 +4,7 @@ const emailService = require('./emailService');
 const newsService = require('./newsService');
 const marketDataService = require('./marketDataService');
 const StrategyAlphaService = require('./StrategyAlphaService'); // Alpha Mind Intelligence milimetrically SQARELY
+const telegramService = require('./telegramService');
 const ccxt = require('ccxt');
 
 // Start the Strategy Learning Loop (Runs every 6h)
@@ -457,6 +458,16 @@ class BotScannerService {
                             marketCondition: btcd > 52 ? 'BTC_HEAVY' : 'ALT_SEASON_POSSIBLE'
                         }
                     });
+
+                    // ── [NEW] Telegram Entry Notification ──
+                    if (tradeResult && tradeResult.success !== false) {
+                        try {
+                            const reasonData = { rsi: techSignal.rsi, score: avgScore };
+                            await telegramService.sendEntryNotification(config, tradeResult, reasonData);
+                        } catch (tErr) {
+                            console.error('[Telegram] Entry notification failed:', tErr.message);
+                        }
+                    }
 
                     if (tradeResult) {
                         const priceVal = parseFloat(tradeResult.entryPrice);

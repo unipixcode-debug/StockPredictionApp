@@ -822,7 +822,9 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                 rsiOversold: config.rsiOversold || 35,
                 rsiOverbought: config.rsiOverbought || 65,
                 minConfirmationScore: config.minConfirmationScore || 58,
-                riskConsent: config.riskConsent || false
+                riskConsent: config.riskConsent || false,
+                telegramToken: config.telegramToken || '',
+                telegramChatId: config.telegramChatId || ''
             });
         }
     }, [config]);
@@ -872,8 +874,26 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
             alert("DİKKAT: Yüksek riskli ayarlar seçtiniz. Lütfen 'Fazla risk aldığımı onaylıyorum' kutucuğunu işaretleyin.");
             return;
         }
-
         onSave(formData);
+    };
+
+    const handleTestTelegram = async () => {
+        if (!formData.telegramToken || !formData.telegramChatId) {
+            alert(language === 'TR' ? 'Token ve Chat ID gereklidir.' : 'Token and Chat ID are required.');
+            return;
+        }
+        setIsTesting(true);
+        try {
+            const res = await api.post('/bot/test-telegram', {
+                telegramToken: formData.telegramToken,
+                telegramChatId: formData.telegramChatId
+            });
+            alert(res.message || 'Test mesajı gönderildi!');
+        } catch (error) {
+            alert('Hata: ' + (error.response?.data?.error || error.message));
+        } finally {
+            setIsTesting(false);
+        }
     };
 
     return (
@@ -914,6 +934,49 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                                         </button>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* 🔔 TELEGRAM BİLDİRİM AYARLARI */}
+                        <div className="p-6 bg-blue-500/5 rounded-3xl border border-blue-500/20">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-blue-500 mb-4 flex items-center gap-2">
+                                <Zap size={14} className="text-blue-500" /> Telegram Bildirim Ayarları
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Bot Token (BotFather)</label>
+                                    <div className="relative">
+                                        <input 
+                                            type={showKeys.tgToken ? "text" : "password"} name="telegramToken" value={formData.telegramToken} onChange={handleChange}
+                                            placeholder="8566652752:AAGPK..."
+                                            className="w-full bg-black/40 border border-white/5 p-4 pr-12 rounded-2xl focus:border-blue-500/50 text-foreground transition-all"
+                                        />
+                                        <button type="button" onClick={() => toggleKey('tgToken')} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-blue-500 transition-colors">
+                                            {showKeys.tgToken ? <RefreshCw size={16} /> : <ShieldCheck size={16} />}
+                                        </button>
+                                    </div>
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase pl-2">Botunuzun API anahtarını girin.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-2">Chat ID (Kullanıcı ID)</label>
+                                    <div className="relative">
+                                        <input 
+                                            type="text" name="telegramChatId" value={formData.telegramChatId} onChange={handleChange}
+                                            placeholder="123456789"
+                                            className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl focus:border-blue-500/50 text-foreground transition-all"
+                                        />
+                                    </div>
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase pl-2">Bildirimin gideceği Chat ID değerini girin.</p>
+                                </div>
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                                <button 
+                                    type="button"
+                                    onClick={handleTestTelegram}
+                                    className="px-6 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-blue-500 hover:bg-blue-500/20 transition-all flex items-center gap-2"
+                                >
+                                    <RefreshCw size={12} className={isTesting ? "animate-spin" : ""} /> Test Mesajı Gönder
+                                </button>
                             </div>
                         </div>
 

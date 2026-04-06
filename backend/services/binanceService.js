@@ -4,6 +4,7 @@ const https       = require('https');
 const querystring = require('querystring');
 const { BinanceBotConfig, ExecutedTrade, User } = require('../models');
 const marketDataService = require('./marketDataService');
+const telegramService = require('./telegramService');
 
 /**
  * Direct HTTPS POST to Binance Futures ALGO API (/fapi/v1/algoOrder).
@@ -867,6 +868,16 @@ class BinanceService {
                     
                     await dbTrade.save();
                     results.closed++;
+
+                    // ── [NEW] Telegram Exit Notification (Sync Detected) ──
+                    try {
+                        const config = await BinanceBotConfig.findOne({ where: { userId } });
+                        if (config && config.telegramToken && config.telegramChatId) {
+                            await telegramService.sendExitNotification(config, dbTrade, 'OTOMATİK (TP/SL veya Exchange Kaynaklı)');
+                        }
+                    } catch (tErr) {
+                        console.error('[Telegram] Sync exit notification failed:', tErr.message);
+                    }
                 } else {
                     // Always try to push TP/SL if missing on exchange
                     try {
@@ -988,7 +999,15 @@ class BinanceService {
             if (dbTrade) {
                 dbTrade.status = 'CLOSED';
                 dbTrade.closedAt = new Date();
+                dbTrade.exitPrice = qty > 0 ? 0 : 0; // Will be refined by next sync properly
                 await dbTrade.save();
+
+                // ── [NEW] Telegram Exit Notification (Manual Close) ──
+                try {
+                    await telegramService.sendExitNotification(config, dbTrade, 'MANUEL (Panel Üzerinden)');
+                } catch (tErr) {
+                    console.error('[Telegram] Manual exit notification failed:', tErr.message);
+                }
             }
 
             try { await rawCancelAllAlgoOrders(apiKey, apiSecret, apiSymbol, isTestnet); } catch (e) {}
