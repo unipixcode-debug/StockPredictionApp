@@ -827,6 +827,8 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                 rsiOverbought: config.rsiOverbought || 65,
                 minConfirmationScore: config.minConfirmationScore || 58,
                 riskConsent: config.riskConsent || false,
+                keskinYapiActive: config.keskinYapiActive ?? false,
+                formasyonOnayiActive: config.formasyonOnayiActive ?? false,
                 telegramToken: config.telegramToken || '',
                 telegramChatId: config.telegramChatId || ''
             });
