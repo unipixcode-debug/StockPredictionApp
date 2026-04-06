@@ -795,7 +795,9 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
         rsiOversold: 35,
         rsiOverbought: 65,
         minConfirmationScore: 58,
-        riskConsent: false
+        riskConsent: false,
+        telegramToken: '',
+        telegramChatId: ''
     });
 
     const [testMarket, setTestMarket] = useState('SPOT');
