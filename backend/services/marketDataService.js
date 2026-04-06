@@ -262,7 +262,8 @@ class MarketDataService {
                     : `https://www.google.com/finance/quote/${cleanSym}:NASDAQ`;
                 const gRes = await axios.get(googleUrl, { headers: this.browserHeaders, timeout: 4000 });
                 const $g = cheerio.load(gRes.data);
-                const gPrice = $g('.YMlYGe').first().text().replace(/[^0-9,.]/g, '').replace(/,/g, '');
+                // Try multiple selectors for Google price
+                const gPrice = $g('.YMlYGe, .FX1vNc, [data-last-price]').first().text().replace(/[^0-9,.]/g, '').replace(/,/g, '');
                 if (gPrice && parseFloat(gPrice) > 0) {
                     return { price: parseFloat(gPrice), change: 0.05 };
                 }
@@ -618,13 +619,13 @@ class MarketDataService {
                         return assetData;
                     } catch (err) {
                         console.warn(`[Scanner] Asset skip: ${symbol} (${err.message})`);
-                        // FINAL BASELINE FALLBACK: If it's a primary symbol, return a neutral baseline
+                        // FINAL CATCH-ALL FALLBACK: If an exception occurred
                         const isPrimary = (this.NASDAQ_SYMBOLS || []).includes(symbol) || (this.BIST_SYMBOLS || []).includes(symbol);
                         if (isPrimary) {
                             return {
-                                symbol, price: 100, change: 0, rsi: 50, aiScore: 50,
-                                signal: "NÖTR", tag: "neutral", volatility: 2,
-                                note: "Geçici veri (Bağlantı hatası)"
+                                symbol, price: 100, change: 0, rsi: 50, aiScore: 40,
+                                signal: "GECİCİ", tag: "neutral", volatility: 2,
+                                note: "Veri sunucusu meşgul"
                             };
                         }
                         return null;
