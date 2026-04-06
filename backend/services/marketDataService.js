@@ -27,6 +27,20 @@ class MarketDataService {
         this.BIST_SYMBOLS = BIST_SYMBOLS;
         this.lastIndicators = {}; 
         this.isUpdating = false;
+        this.lastScannerCache = {}; // In-memory fallback for scanner results
+
+        this.browserHeaders = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Cache-Control': 'max-age=0'
+        };
         
         // Initial values for key indicators (Baseline)
         this.lastIndicators = {
@@ -183,40 +197,6 @@ class MarketDataService {
                 return data[key] || null;
             }
             return null;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    async scrapeYahooFinance(symbol) {
-        try {
-            // Tier 1: Try RSS Fallback (Most robust for Cloud IPs)
-            const rssData = await this.fetchFromRSS(symbol);
-            if (rssData) return rssData;
-
-            // Tier 2: Regular Scraper
-            const url = `https://finance.yahoo.com/quote/${symbol}`;
-            const { data } = await axios.get(url, {
-                headers: { 
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                    'Accept-Language': 'en-US,en;q=0.9'
-                },
-                timeout: 5000
-            });
-            const $ = cheerio.load(data);
-            
-            const priceText = $('fin-streamer[data-field="regularMarketPrice"]').first().attr('value') || 
-                             $('[data-test="qsp-price"]').first().text();
-            
-            const changePctText = $('fin-streamer[data-field="regularMarketChangePercent"]').first().attr('value') || 
-                                 $('[data-test="qsp-price-change-percent"]').first().text();
-
-            if (!priceText) return null;
-            
-            const price = parseFloat(priceText.toString().replace(/,/g, ''));
-            let change = parseFloat(changePctText?.toString().replace(/[()%+]/g, '')) || 0;
-
-            return { price, change };
         } catch (e) {
             return null;
         }
