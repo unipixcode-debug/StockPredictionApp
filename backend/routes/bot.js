@@ -9,13 +9,30 @@ const marketDataService = require('../services/marketDataService'); // Added for
 // Get Bot Config
 router.get('/config', authCheck, async (req, res) => {
     try {
-        let config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
+        let config;
+        try {
+            config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
+        } catch (queryErr) {
+            if (queryErr.message.includes('keskinYapiActive') || queryErr.message.includes('formasyonOnayiActive')) {
+                console.warn('[BotRouter] Column mismatch detected. Falling back to safe query.');
+                const safeAttributes = Object.keys(BinanceBotConfig.getAttributes())
+                    .filter(attr => !['keskinYapiActive', 'formasyonOnayiActive'].includes(attr));
+                config = await BinanceBotConfig.findOne({ 
+                    where: { userId: req.user.id },
+                    attributes: safeAttributes
+                });
+            } else {
+                throw queryErr;
+            }
+        }
+
         if (!config) {
             // Create default
             config = await BinanceBotConfig.create({ userId: req.user.id });
         }
         res.json(config);
     } catch (error) {
+        console.error('[BotRouter] Error fetching config:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
@@ -45,7 +62,22 @@ router.post('/config', authCheck, async (req, res) => {
             telegramToken, telegramChatId
         } = req.body;
 
-        let config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
+        let config;
+        try {
+            config = await BinanceBotConfig.findOne({ where: { userId: req.user.id } });
+        } catch (queryErr) {
+            if (queryErr.message.includes('keskinYapiActive') || queryErr.message.includes('formasyonOnayiActive')) {
+                console.warn('[BotRouter] Column mismatch detected during update. Falling back to safe query.');
+                const safeAttributes = Object.keys(BinanceBotConfig.getAttributes())
+                    .filter(attr => !['keskinYapiActive', 'formasyonOnayiActive'].includes(attr));
+                config = await BinanceBotConfig.findOne({ 
+                    where: { userId: req.user.id },
+                    attributes: safeAttributes
+                });
+            } else {
+                throw queryErr;
+            }
+        }
         const user = await User.findByPk(req.user.id);
 
         if ((isSpotActive || isFuturesActive) && (!config || (!config.isSpotActive && !config.isFuturesActive))) {
@@ -55,7 +87,17 @@ router.post('/config', authCheck, async (req, res) => {
             }
         }
         if (!config) {
-            config = await BinanceBotConfig.create({ userId: req.user.id });
+            try {
+                config = await BinanceBotConfig.create({ userId: req.user.id });
+            } catch (createErr) {
+                if (createErr.message.includes('keskinYapiActive') || createErr.message.includes('formasyonOnayiActive')) {
+                    // Manual create without missing columns milimetrically squarely correctly
+                    const { keskinYapiActive, formasyonOnayiActive, ...safeFields } = { userId: req.user.id };
+                    config = await BinanceBotConfig.create(safeFields);
+                } else {
+                    throw createErr;
+                }
+            }
         }
 
         // Helper to check if value is just stars or empty
