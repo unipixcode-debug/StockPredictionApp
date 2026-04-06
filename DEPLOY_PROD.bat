@@ -18,15 +18,15 @@ if exist "%KEY_PATH%" (
 
 echo 2. Syncing Local Changes to GitHub...
 git add .
-git commit -m "feat: professional 70% filter toggle, 3-day default, and bulletproof groy news retrieval"
+git commit -m "fix: total scanner overhaul v6 - parallel processing, redundant fallbacks and guaranteed baseline data"
 git push origin main
 
 echo 3. Triggering Remote Update on Oracle Server (%SERVER_IP%)...
 if exist "%GIT_SSH%" (
-    "%GIT_SSH%" -o StrictHostKeyChecking=no -i "%KEY_PATH%" ubuntu@%SERVER_IP% "cd /home/ubuntu/StockPredictionApp && bash update.sh"
+    "%GIT_SSH%" -o StrictHostKeyChecking=no -i "%KEY_PATH%" ubuntu@%SERVER_IP% "cd /home/ubuntu/StockApp_New && bash update.sh"
 ) else (
     echo [WARNING] Git SSH not in default path, trying standard ssh...
-    ssh -o StrictHostKeyChecking=no -i "%KEY_PATH%" ubuntu@%SERVER_IP% "cd /home/ubuntu/StockPredictionApp && bash update.sh"
+    ssh -o StrictHostKeyChecking=no -i "%KEY_PATH%" ubuntu@%SERVER_IP% "cd /home/ubuntu/StockApp_New && bash update.sh"
 )
 
 echo.
