@@ -799,10 +799,11 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
     });
 
     const [testMarket, setTestMarket] = useState('SPOT');
+    const [hasLoadedConfig, setHasLoadedConfig] = useState(false);
 
     // Populate initial
     useEffect(() => {
-        if (config) {
+        if (config && !hasLoadedConfig) {
             setFormData({
                 apiKey: config.apiKey || '',
                 apiSecret: config.apiSecret || '',
@@ -826,8 +827,9 @@ function BotSettingsForm({ config, onSave, onTest, isTesting, testResult }) {
                 telegramToken: config.telegramToken || '',
                 telegramChatId: config.telegramChatId || ''
             });
+            setHasLoadedConfig(true);
         }
-    }, [config]);
+    }, [config, hasLoadedConfig]);
 
     const [showKeys, setShowKeys] = useState({});
     const toggleKey = (key) => setShowKeys(p => ({...p, [key]: !p[key]}));

@@ -162,7 +162,6 @@ const BinanceBotConfig = sequelize.define('BinanceBotConfig', {
         type: DataTypes.BOOLEAN,
         defaultValue: false
     },
-/*
     telegramToken: {
         type: DataTypes.STRING,
         allowNull: true,
@@ -185,7 +184,6 @@ const BinanceBotConfig = sequelize.define('BinanceBotConfig', {
             return val ? decrypt(val) : null;
         }
     }
-*/
 }, {
     timestamps: true,
 });
