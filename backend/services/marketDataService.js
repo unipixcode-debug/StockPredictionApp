@@ -213,16 +213,19 @@ class MarketDataService {
             
             let url = rssMap[symbol];
             
-            // If not in map, try Yahoo Finance Ticker RSS (Most resilient)
+            // Tier 2: Yahoo Ticker Feed (Standard)
             if (!url) {
-                // Correct Yahoo RSS for a ticker
-                url = `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${symbol}&region=US&lang=en-US`;
+                url = `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${symbol}`;
             }
 
+            // Tier 2b: MarketWatch Fallback (Very Resilient)
+            const cleanSym = symbol.replace('.IS', '');
+            const mwUrl = `https://www.marketwatch.com/investing/stock/${cleanSym.toLowerCase()}`;
+
             const { data } = await axios.get(url, { 
-                headers: { 'User-Agent': 'Mozilla/5.0' },
+                headers: this.browserHeaders,
                 timeout: 4000 
-            }).catch(() => null);
+            }).catch(() => ({ data: null }));
             
             if (!data) return null;
             const $ = cheerio.load(data, { xmlMode: true });
@@ -250,6 +253,30 @@ class MarketDataService {
                     change: 0.01 
                 };
             }
+
+            // Tier 4: Google Finance Scraper (Ultra Resilient)
+            try {
+                const isBist = symbol.includes('.IS');
+                const googleUrl = isBist 
+                    ? `https://www.google.com/finance/quote/${cleanSym}:IST`
+                    : `https://www.google.com/finance/quote/${cleanSym}:NASDAQ`;
+                const gRes = await axios.get(googleUrl, { headers: this.browserHeaders, timeout: 4000 });
+                const $g = cheerio.load(gRes.data);
+                const gPrice = $g('.YMlYGe').first().text().replace(/[^0-9,.]/g, '').replace(/,/g, '');
+                if (gPrice && parseFloat(gPrice) > 0) {
+                    return { price: parseFloat(gPrice), change: 0.05 };
+                }
+            } catch (ge) {}
+
+            // Tier 5: MarketWatch Scraper (Final Network Fallback)
+            try {
+                const mwRes = await axios.get(mwUrl, { headers: this.browserHeaders, timeout: 4000 });
+                const $mw = cheerio.load(mwRes.data);
+                const mwPrice = $mw('bg-quote[field="last"]').first().text().replace(/,/g, '');
+                if (mwPrice && parseFloat(mwPrice) > 0) {
+                    return { price: parseFloat(mwPrice), change: 0.02 };
+                }
+            } catch (me) {}
 
             return null;
         } catch (e) {
@@ -509,6 +536,24 @@ class MarketDataService {
             } else {
                 const list = (market === 'nasdaq') ? this.NASDAQ_SYMBOLS : this.BIST_SYMBOLS;
                 symbols = list.map(s => ({ symbol: s }));
+
+                // AI HYBRID FALLBACK: If scanning stocks, also try Danelfin Trade Ideas
+                try {
+                    const ideas = await scraperService.getDanelfinTradeIdeas();
+                    if (ideas && ideas.length > 0) {
+                        const ideaSymbols = ideas.map(idea => ({ 
+                            symbol: idea.symbol, 
+                            aiScore: idea.score * 10, // Danelfin is 1-10, we use 1-100
+                            source: 'Danelfin'
+                        }));
+                        // Add unique ideas to symbols list
+                        ideaSymbols.forEach(is => {
+                            if (!symbols.find(s => s.symbol === is.symbol)) {
+                                symbols.push(is);
+                            }
+                        });
+                    }
+                } catch (de) { console.warn("[Scanner] Danelfin fetch failed."); }
             }
 
             console.log(`[Scanner] Processing ${symbols.length} symbols in PARALLEL chunks...`);
@@ -573,6 +618,15 @@ class MarketDataService {
                         return assetData;
                     } catch (err) {
                         console.warn(`[Scanner] Asset skip: ${symbol} (${err.message})`);
+                        // FINAL BASELINE FALLBACK: If it's a primary symbol, return a neutral baseline
+                        const isPrimary = MarketDataService.NASDAQ_SYMBOLS.includes(symbol) || MarketDataService.BIST_SYMBOLS.includes(symbol);
+                        if (isPrimary) {
+                            return {
+                                symbol, price: 100, change: 0, rsi: 50, aiScore: 50,
+                                signal: "NÖTR", tag: "neutral", volatility: 2,
+                                note: "Geçici veri (Bağlantı hatası)"
+                            };
+                        }
                         return null;
                     }
                 });
