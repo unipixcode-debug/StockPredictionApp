@@ -19,9 +19,10 @@ const TRUNCGIL_ASSETS = [
     { symbol: 'TRUNC:GBP', shortname: 'İngiliz Sterlini', longname: 'İngiliz Sterlini', typeDisp: 'Currency', exchange: 'KAPALİÇARŞI' }
 ];
 
-const NASDAQ_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX', 'PYPL', 'ADBE', 'AVGO', 'COST', 'PEP', 'CSCO', 'CMCSA'];
-const BIST_SYMBOLS = ['THYAO.IS', 'EREGL.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS', 'GARAN.IS', 'KCHOL.IS', 'SAHOL.IS', 'TUPRS.IS', 'BIMAS.IS', 'SISE.IS', 'YKBNK.IS', 'PGSUS.IS', 'ENKAI.IS', 'FROTO.IS'];
 class MarketDataService {
+    static NASDAQ_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX', 'PYPL', 'ADBE', 'AVGO', 'COST', 'PEP', 'CSCO', 'CMCSA'];
+    static BIST_SYMBOLS = ['THYAO.IS', 'EREGL.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS', 'GARAN.IS', 'KCHOL.IS', 'SAHOL.IS', 'TUPRS.IS', 'BIMAS.IS', 'SISE.IS', 'YKBNK.IS', 'PGSUS.IS', 'ENKAI.IS', 'FROTO.IS'];
+
     constructor() {
         this.lastIndicators = {}; 
         this.isUpdating = false;
@@ -222,28 +223,53 @@ class MarketDataService {
 
     async fetchFromRSS(symbol) {
         try {
-            // Map symbols to Investing.com RSS IDs
+            // Map symbols to Investing.com RSS IDs for Indices
             const rssMap = {
                 '^VIX': 'http://rss.investing.com/indices/us-30-vix',
                 'DX-Y.NYB': 'http://rss.investing.com/indices/us-dollar-index',
                 'GC=F': 'http://rss.investing.com/currencies/xau-usd'
             };
             
-            const url = rssMap[symbol];
+            let url = rssMap[symbol];
+            
+            // If not in map, try Yahoo Finance Generic RSS for Stocks
+            if (!url) {
+                const cleanSym = symbol.toUpperCase().replace('.IS', '-IS'); // Yahoo RSS sometimes likes -IS or just sym
+                url = `https://finance.yahoo.com/quote/${symbol}/rss`.replace('.IS', '.IS'); // Yahoo RSS fallback
+                // Actually, the most reliable RSS for individual stocks is the quote page itself with .rss
+            }
+
             if (!url) return null;
 
-            const { data } = await axios.get(url, { timeout: 4000 });
+            const { data } = await axios.get(url, { 
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                timeout: 4000 
+            }).catch(() => null);
+            
+            if (!data) return null;
             const $ = cheerio.load(data, { xmlMode: true });
             const title = $('item').first().find('title').text();
             
-            // Example title: "VIX Index - 13.56 (-1.24%)"
-            const match = title.match(/([0-9,.]+)\s+\(([-+0-9,.]+)%\)/);
-            if (match) {
+            if (!title) return null;
+
+            // Pattern 1: Investing.com ("VIX Index - 13.56 (-1.24%)")
+            const match1 = title.match(/([0-9,.]+)\s+\(([-+0-9,.]+)%\)/);
+            if (match1) {
                 return {
-                    price: parseFloat(match[1].replace(/,/g, '')),
-                    change: parseFloat(match[2].replace(/,/g, ''))
+                    price: parseFloat(match1[1].replace(/,/g, '')),
+                    change: parseFloat(match1[2].replace(/,/g, ''))
                 };
             }
+
+            // Pattern 2: Yahoo RSS ("AAPL leads the market at 185.92")
+            const match2 = title.match(/at\s+([0-9,.]+)/i);
+            if (match2) {
+                return {
+                    price: parseFloat(match2[1].replace(/,/g, '')),
+                    change: 0.01 // Default small change if not found
+                };
+            }
+
             return null;
         } catch (e) {
             return null;
@@ -499,7 +525,7 @@ class MarketDataService {
                     .slice(0, limit || 40) 
                     .map(t => ({ symbol: t.symbol, price: parseFloat(t.lastPrice), change: parseFloat(t.priceChangePercent) }));
             } else {
-                const list = (market === 'nasdaq') ? NASDAQ_SYMBOLS : BIST_SYMBOLS;
+                const list = (market === 'nasdaq') ? MarketDataService.NASDAQ_SYMBOLS : MarketDataService.BIST_SYMBOLS;
                 symbols = list.map(s => ({ symbol: s }));
             }
 

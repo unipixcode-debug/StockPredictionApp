@@ -113,7 +113,7 @@ async function getDynamicScanList(limit = TOP_COINS_TO_SCAN, isTestnet = true) {
             }));
 
         // 2. Nasdaq Pool (Top Symbols correctly properly SQARELY)
-        const nasdaqPairs = (marketDataService.NASDAQ_SYMBOLS || []).map(s => ({
+        const nasdaqPairs = (marketDataService.constructor.NASDAQ_SYMBOLS || []).map(s => ({
             ccxtSymbol:    s,
             displaySymbol: s,
             engineSymbol:  s,
@@ -124,7 +124,7 @@ async function getDynamicScanList(limit = TOP_COINS_TO_SCAN, isTestnet = true) {
         }));
 
         // 3. BIST Pool (Top Symbols correctly properly SQARELY)
-        const bistPairs = (marketDataService.BIST_SYMBOLS || []).map(s => ({
+        const bistPairs = (marketDataService.constructor.BIST_SYMBOLS || []).map(s => ({
             ccxtSymbol:    s,
             displaySymbol: s.replace('.IS', ''),
             engineSymbol:  s,
