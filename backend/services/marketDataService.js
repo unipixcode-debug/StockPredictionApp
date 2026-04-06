@@ -15,15 +15,16 @@ const TRUNCGIL_ASSETS = [
     { symbol: 'TRUNC:ata-altin', shortname: 'Ata Altın', longname: 'Ata Lira', typeDisp: 'Gold', exchange: 'KAPALİÇARŞI' },
     { symbol: 'TRUNC:gumus', shortname: 'Gümüş', longname: 'Gümüş (Gram)', typeDisp: 'Silver', exchange: 'KAPALİÇARŞI' },
     { symbol: 'TRUNC:USD', shortname: 'Dolar', longname: 'Amerikan Doları (Serbest Piyasa)', typeDisp: 'Currency', exchange: 'KAPALİÇARŞI' },
-    { symbol: 'TRUNC:EUR', shortname: 'Euro', longname: 'Euro (Serbest Piyasa)', typeDisp: 'Currency', exchange: 'KAPALİÇARŞI' },
     { symbol: 'TRUNC:GBP', shortname: 'İngiliz Sterlini', longname: 'İngiliz Sterlini', typeDisp: 'Currency', exchange: 'KAPALİÇARŞI' }
 ];
 
-class MarketDataService {
-    static NASDAQ_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX', 'PYPL', 'ADBE', 'AVGO', 'COST', 'PEP', 'CSCO', 'CMCSA'];
-    static BIST_SYMBOLS = ['THYAO.IS', 'EREGL.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS', 'GARAN.IS', 'KCHOL.IS', 'SAHOL.IS', 'TUPRS.IS', 'BIMAS.IS', 'SISE.IS', 'YKBNK.IS', 'PGSUS.IS', 'ENKAI.IS', 'FROTO.IS'];
+const NASDAQ_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX', 'PYPL', 'ADBE', 'AVGO', 'COST', 'PEP', 'CSCO', 'CMCSA'];
+const BIST_SYMBOLS = ['THYAO.IS', 'EREGL.IS', 'ASELS.IS', 'AKBNK.IS', 'ISCTR.IS', 'GARAN.IS', 'KCHOL.IS', 'SAHOL.IS', 'TUPRS.IS', 'BIMAS.IS', 'SISE.IS', 'YKBNK.IS', 'PGSUS.IS', 'ENKAI.IS', 'FROTO.IS'];
 
+class MarketDataService {
     constructor() {
+        this.NASDAQ_SYMBOLS = NASDAQ_SYMBOLS;
+        this.BIST_SYMBOLS = BIST_SYMBOLS;
         this.lastIndicators = {}; 
         this.isUpdating = false;
         
@@ -232,14 +233,11 @@ class MarketDataService {
             
             let url = rssMap[symbol];
             
-            // If not in map, try Yahoo Finance Generic RSS for Stocks
+            // If not in map, try Yahoo Finance Ticker RSS (Most resilient)
             if (!url) {
-                const cleanSym = symbol.toUpperCase().replace('.IS', '-IS'); // Yahoo RSS sometimes likes -IS or just sym
-                url = `https://finance.yahoo.com/quote/${symbol}/rss`.replace('.IS', '.IS'); // Yahoo RSS fallback
-                // Actually, the most reliable RSS for individual stocks is the quote page itself with .rss
+                // Correct Yahoo RSS for a ticker
+                url = `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${symbol}&region=US&lang=en-US`;
             }
-
-            if (!url) return null;
 
             const { data } = await axios.get(url, { 
                 headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -248,10 +246,12 @@ class MarketDataService {
             
             if (!data) return null;
             const $ = cheerio.load(data, { xmlMode: true });
-            const title = $('item').first().find('title').text();
             
-            if (!title) return null;
-
+            // For Ticker RSS, price info is often found in the <description> or <title>
+            const latestItem = $('item').first();
+            const desc = latestItem.find('description').text();
+            const title = latestItem.find('title').text();
+            
             // Pattern 1: Investing.com ("VIX Index - 13.56 (-1.24%)")
             const match1 = title.match(/([0-9,.]+)\s+\(([-+0-9,.]+)%\)/);
             if (match1) {
@@ -261,12 +261,13 @@ class MarketDataService {
                 };
             }
 
-            // Pattern 2: Yahoo RSS ("AAPL leads the market at 185.92")
-            const match2 = title.match(/at\s+([0-9,.]+)/i);
+            // Pattern 2: Yahoo Feed ("AAPL - Apple Inc. (185.92)")
+            // Ticker RSS is harder, so we may use the scraper as a secondary if RSS has no price
+            const match2 = desc.match(/at\s+([0-9,.]+)/i) || title.match(/\(([0-9,.]+)\)/);
             if (match2) {
                 return {
                     price: parseFloat(match2[1].replace(/,/g, '')),
-                    change: 0.01 // Default small change if not found
+                    change: 0.01 
                 };
             }
 
@@ -526,7 +527,7 @@ class MarketDataService {
                     .slice(0, limit || 40) 
                     .map(t => ({ symbol: t.symbol, price: parseFloat(t.lastPrice), change: parseFloat(t.priceChangePercent) }));
             } else {
-                const list = (market === 'nasdaq') ? MarketDataService.NASDAQ_SYMBOLS : MarketDataService.BIST_SYMBOLS;
+                const list = (market === 'nasdaq') ? this.NASDAQ_SYMBOLS : this.BIST_SYMBOLS;
                 symbols = list.map(s => ({ symbol: s }));
             }
 
