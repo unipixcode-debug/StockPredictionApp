@@ -509,12 +509,13 @@ class MarketDataService {
 
     async getScannerData(market = 'crypto', limit = 40) {
         console.log(`[Scanner] Requesting market: ${market}`);
+        const startTime = Date.now();
         try {
             let sentimentData = [];
             try {
                 const newsService = require('./newsService'); 
                 sentimentData = await newsService.getSentimentAggregation(2);
-            } catch (se) { console.error("[Scanner] Sentiment failed, continuing without it."); }
+            } catch (se) { console.error("[Scanner] Sentiment failed, continuing."); }
 
             let symbols = [];
             if (market === 'crypto') {
@@ -529,69 +530,77 @@ class MarketDataService {
                 symbols = list.map(s => ({ symbol: s }));
             }
 
-            console.log(`[Scanner] Total symbols to process: ${symbols.length}`);
+            console.log(`[Scanner] Processing ${symbols.length} symbols in PARALLEL chunks...`);
+            
+            // Parallel Processing with Concurrency Limit (e.g., 5 at a time)
             const results = [];
-            for (const symObj of symbols) {
-                try {
-                const symbol = symObj.symbol;
-                const timeframe = (market === 'crypto') ? '1h' : '1D';
-                const candles = await this.getHistoricalData(symbol, timeframe, 50);
-                
-                // For stocks, even 1 candle is enough to show the asset (using RSI=50 fallback)
-                const minCandles = (market === 'crypto') ? 5 : 1;
-                
-                if (!candles || candles.length < minCandles) {
-                    console.log(`[Scanner] Skipping ${symbol} - not enough data (${candles?.length || 0})`);
-                    continue;
-                }
+            const CONCURRENCY = 5;
+            
+            for (let i = 0; i < symbols.length; i += CONCURRENCY) {
+                const chunk = symbols.slice(i, i + CONCURRENCY);
+                const chunkPromises = chunk.map(async (symObj) => {
+                    const symbol = symObj.symbol;
+                    const timeframe = (market === 'crypto') ? '1h' : '1D';
 
-                const prices = candles.map(c => c.close);
-                const rsi = prices.length >= 14 ? this.calculateRSI(prices) : 50;
-                
-                let currentPrice = symObj.price;
-                let currentChange = symObj.change || 0;
-
-                // Tier 1: Try Quote API / Scraper for Price
-                if (!currentPrice) {
                     try {
-                        const quote = await yahooFinance.quote(symbol).catch(() => null);
-                        if (quote && quote.regularMarketPrice) {
-                            currentPrice = quote.regularMarketPrice;
-                            currentChange = quote.regularMarketChangePercent;
-                        } else {
-                            // Fallback to Scraper
-                            const scraped = await this.scrapeYahooFinance(symbol);
-                            if (scraped && scraped.price > 0) {
-                                currentPrice = scraped.price;
-                                currentChange = scraped.change;
-                            } else {
-                                // Final Fallback to latest candle close
-                                currentPrice = prices[prices.length - 1];
-                                currentChange = 0.01; 
-                            }
-                        }
-                    } catch (pe) {
-                        currentPrice = prices[prices.length - 1];
+                        // Global Timeout for individual asset processing (3s)
+                        const assetData = await Promise.race([
+                            (async () => {
+                                const candles = await this.getHistoricalData(symbol, timeframe, 50);
+                                const minCandles = (market === 'crypto') ? 5 : 1;
+                                
+                                if (!candles || candles.length < minCandles) return null;
+
+                                const prices = candles.map(c => c.close);
+                                const rsi = prices.length >= 14 ? this.calculateRSI(prices) : 50;
+                                
+                                let currentPrice = symObj.price;
+                                let currentChange = symObj.change || 0;
+
+                                if (!currentPrice) {
+                                    const quote = await yahooFinance.quote(symbol).catch(() => null);
+                                    if (quote && quote.regularMarketPrice) {
+                                        currentPrice = quote.regularMarketPrice;
+                                        currentChange = quote.regularMarketChangePercent;
+                                    } else {
+                                        const scraped = await this.scrapeYahooFinance(symbol);
+                                        if (scraped && scraped.price > 0) {
+                                            currentPrice = scraped.price;
+                                            currentChange = scraped.change;
+                                        } else {
+                                            currentPrice = prices[prices.length - 1];
+                                        }
+                                    }
+                                }
+
+                                let aiScore = 50;
+                                if (rsi < 30) aiScore += 20; else if (rsi > 70) aiScore -= 10;
+                                const cleanSym = symbol.replace('.IS', '').replace('USDT', '');
+                                const assetSent = sentimentData.find(s => s.asset === cleanSym);
+                                if (assetSent) aiScore += (assetSent.averageScore - 50) / 2;
+
+                                return {
+                                    symbol, price: currentPrice, change: currentChange || 0.01, rsi, 
+                                    aiScore: Math.min(100, Math.max(0, aiScore)),
+                                    signal: aiScore > 65 ? "AL" : "NÖTR",
+                                    tag: aiScore > 65 ? "buy" : "neutral",
+                                    volatility: 2
+                                };
+                            })(),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3500))
+                        ]);
+                        return assetData;
+                    } catch (err) {
+                        console.warn(`[Scanner] Asset skip: ${symbol} (${err.message})`);
+                        return null;
                     }
-                }
-
-                let aiScore = 50;
-                if (rsi < 30) aiScore += 20; else if (rsi > 70) aiScore -= 10;
-                
-                const cleanSym = symbol.replace('.IS', '').replace('USDT', '');
-                const assetSent = sentimentData.find(s => s.asset === cleanSym);
-                if (assetSent) aiScore += (assetSent.averageScore - 50) / 2;
-
-                aiScore = Math.min(100, Math.max(0, aiScore));
-                results.push({
-                    symbol, price: currentPrice, change: currentChange, rsi, aiScore,
-                    signal: aiScore > 65 ? "AL" : "NÖTR",
-                    tag: aiScore > 65 ? "buy" : "neutral",
-                    volatility: 2
                 });
-                } catch (e) { console.error(`[Scanner Error] ${symObj.symbol}:`, e.message); }
+
+                const chunkResults = await Promise.all(chunkPromises);
+                results.push(...chunkResults.filter(r => r !== null));
             }
-            console.log(`[Scanner] Found ${results.length} valid results.`);
+
+            console.log(`[Scanner] Completed in ${((Date.now() - startTime)/1000).toFixed(1)}s. Found ${results.length} results.`);
             return results.sort((a, b) => b.aiScore - a.aiScore);
         } catch (error) {
             console.error('[Scanner Global Error]:', error);
