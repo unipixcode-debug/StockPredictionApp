@@ -619,7 +619,7 @@ class MarketDataService {
                     } catch (err) {
                         console.warn(`[Scanner] Asset skip: ${symbol} (${err.message})`);
                         // FINAL BASELINE FALLBACK: If it's a primary symbol, return a neutral baseline
-                        const isPrimary = MarketDataService.NASDAQ_SYMBOLS.includes(symbol) || MarketDataService.BIST_SYMBOLS.includes(symbol);
+                        const isPrimary = (this.NASDAQ_SYMBOLS || []).includes(symbol) || (this.BIST_SYMBOLS || []).includes(symbol);
                         if (isPrimary) {
                             return {
                                 symbol, price: 100, change: 0, rsi: 50, aiScore: 50,
